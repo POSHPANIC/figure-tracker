@@ -1,0 +1,66 @@
+@import "tailwindcss";
+
+/*
+ * Design tokens. Dark-first — this is a market/trading style product and the
+ * charts read better on dark. Light mode is a full override, not an
+ * afterthought, so `prefers-color-scheme: light` users get a real theme.
+ */
+:root {
+  --background: #0b0d12;
+  --surface: #131722;
+  --surface-2: #1a1f2e;
+  --border: #262c3d;
+  --foreground: #e8eaf0;
+  --muted: #8b93a7;
+  --accent: #7c5cff;
+  --accent-soft: #2a2145;
+  --up: #26c281;
+  --down: #f2555a;
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    --background: #f7f8fb;
+    --surface: #ffffff;
+    --surface-2: #f1f3f8;
+    --border: #e2e5ee;
+    --foreground: #12141c;
+    --muted: #646c80;
+    --accent: #5b3df5;
+    --accent-soft: #eeeaff;
+    --up: #0f9d63;
+    --down: #d92d36;
+  }
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-border: var(--border);
+  --color-foreground: var(--foreground);
+  --color-muted: var(--muted);
+  --color-accent: var(--accent);
+  --color-accent-soft: var(--accent-soft);
+  --color-up: var(--up);
+  --color-down: var(--down);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+}
+
+/* Numbers in tables/stat blocks should line up column-wise. */
+.tabular {
+  font-variant-numeric: tabular-nums;
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+}
+
+::selection {
+  background: var(--accent);
+  color: white;
+}

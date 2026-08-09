@@ -1,0 +1,156 @@
+import Link from "next/link";
+import { ArrowRight, TrendingDown, TrendingUp } from "lucide-react";
+import { FigureCardGrid } from "@/components/figure-card";
+import { SearchBox } from "@/components/search-box";
+import { getCatalogTotals, getFacets, getMostTracked, getTopMovers } from "@/lib/queries";
+
+// The catalog only changes when ingestion runs, so serve a cached render and
+// refresh it hourly rather than hitting the database on every visit.
+export const revalidate = 3600;
+
+export default async function HomePage() {
+  const [gainers, losers, tracked, facets, totals] = await Promise.all([
+    getTopMovers("up", 5),
+    getTopMovers("down", 5),
+    getMostTracked(10),
+    getFacets(),
+    getCatalogTotals(),
+  ]);
+
+  return (
+    <div className="mx-auto max-w-7xl px-4">
+      <section className="py-12 sm:py-20">
+        <div className="mx-auto max-w-2xl text-center">
+          <h1 className="text-3xl font-semibold tracking-tight sm:text-5xl">
+            What is your figure collection worth?
+          </h1>
+          <p className="mt-4 text-muted">
+            Real sale prices, historical charts and live listings for{" "}
+            <span className="tabular font-medium text-foreground">
+              {totals.figures.toLocaleString()}
+            </span>{" "}
+            figures — built from{" "}
+            <span className="tabular font-medium text-foreground">
+              {totals.sales.toLocaleString()}
+            </span>{" "}
+            recorded sales.
+          </p>
+          <SearchBox
+            className="mx-auto mt-8 max-w-lg"
+            placeholder="Try “Nendoroid Marin” or “Chainsaw Man”…"
+          />
+        </div>
+      </section>
+
+      <section className="grid gap-6 lg:grid-cols-2">
+        <MoverPanel
+          title="Rising this month"
+          icon={<TrendingUp className="size-4 text-up" />}
+          figures={gainers}
+        />
+        <MoverPanel
+          title="Falling this month"
+          icon={<TrendingDown className="size-4 text-down" />}
+          figures={losers}
+        />
+      </section>
+
+      <section className="mt-14">
+        <SectionHeading title="Most traded" href="/figures?sort=trending" />
+        <FigureCardGrid figures={tracked} />
+      </section>
+
+      <section className="mt-14 pb-8">
+        <h2 className="mb-4 text-lg font-semibold tracking-tight">Browse by series</h2>
+        <div className="flex flex-wrap gap-2">
+          {facets.series.map((s) => (
+            <Link
+              key={s.slug}
+              href={`/figures?series=${s.slug}`}
+              className="rounded-full border border-border bg-surface px-3 py-1.5 text-sm transition hover:border-accent/60 hover:bg-surface-2"
+            >
+              {s.name}
+              <span className="tabular ml-1.5 text-xs text-muted">{s._count.figures}</span>
+            </Link>
+          ))}
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function SectionHeading({ title, href }: { title: string; href: string }) {
+  return (
+    <div className="mb-4 flex items-baseline justify-between">
+      <h2 className="text-lg font-semibold tracking-tight">{title}</h2>
+      <Link href={href} className="flex items-center gap-1 text-sm text-accent hover:underline">
+        View all <ArrowRight className="size-3.5" />
+      </Link>
+    </div>
+  );
+}
+
+function MoverPanel({
+  title,
+  icon,
+  figures,
+}: {
+  title: string;
+  icon: React.ReactNode;
+  figures: Awaited<ReturnType<typeof getTopMovers>>;
+}) {
+  return (
+    <div className="rounded-xl border border-border bg-surface p-4">
+      <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold tracking-tight">
+        {icon}
+        {title}
+      </h2>
+      {figures.length === 0 ? (
+        <p className="py-6 text-center text-sm text-muted">Not enough sales data yet.</p>
+      ) : (
+        <ol className="divide-y divide-border">
+          {figures.map((f, i) => (
+            <li key={f.id}>
+              <Link
+                href={`/figures/${f.slug}`}
+                className="-mx-2 flex items-center gap-3 rounded-lg px-2 py-2.5 transition hover:bg-surface-2"
+              >
+                <span className="tabular w-4 shrink-0 text-xs text-muted">{i + 1}</span>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-sm">{f.name}</span>
+                  <span className="block truncate text-xs text-muted">{f.series?.name}</span>
+                </span>
+                <MoverPrice figure={f} />
+              </Link>
+            </li>
+          ))}
+        </ol>
+      )}
+    </div>
+  );
+}
+
+function MoverPrice({ figure }: { figure: Awaited<ReturnType<typeof getTopMovers>>[number] }) {
+  const change = figure.change30dPct === null ? null : Number(figure.change30dPct);
+  return (
+    <span className="shrink-0 text-right">
+      <span className="tabular block text-sm font-medium">
+        {figure.marketValueUsd
+          ? new Intl.NumberFormat("en-US", {
+              style: "currency",
+              currency: "USD",
+              maximumFractionDigits: 0,
+            }).format(Number(figure.marketValueUsd))
+          : "—"}
+      </span>
+      {change !== null && (
+        <span
+          className={`tabular block text-xs ${change > 0 ? "text-up" : change < 0 ? "text-down" : "text-muted"}`}
+        >
+          {change > 0 ? "+" : ""}
+          {change.toFixed(1)}%
+        </span>
+      )}
+    </span>
+  );
+}
