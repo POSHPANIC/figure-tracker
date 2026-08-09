@@ -1,9 +1,10 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
-import { ExternalLink } from "lucide-react";
+import { ExternalLink, Users } from "lucide-react";
 import { currentUser } from "@/auth";
 import { FigureActions } from "@/components/figure-actions";
+import { ReportSale } from "@/components/report-sale";
 import { FigureThumb } from "@/components/figure-thumb";
 import { PriceChart } from "@/components/price-chart";
 import { getFigureBySlug, getFigureStats, getPriceHistory } from "@/lib/queries";
@@ -223,9 +224,19 @@ export default async function FigurePage({ params, searchParams }: PageProps<"/f
           </section>
 
           <section className="rounded-xl border border-border bg-surface p-4">
-            <h2 className="mb-3 text-sm font-semibold tracking-tight">Recent sales</h2>
+            <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <h2 className="text-sm font-semibold tracking-tight">Recent sales</h2>
+                <p className="mt-0.5 text-xs text-muted">
+                  Completed transactions — the basis for this figure's market value.
+                </p>
+              </div>
+              <ReportSale figureId={figure.id} signedIn={user !== null} />
+            </div>
             {figure.sales.length === 0 ? (
-              <p className="py-6 text-center text-sm text-muted">No sales recorded yet.</p>
+              <p className="py-6 text-center text-sm text-muted">
+                No sales recorded yet. If you've bought or sold one, reporting it helps everyone.
+              </p>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
@@ -248,7 +259,19 @@ export default async function FigurePage({ params, searchParams }: PageProps<"/f
                           })}
                         </td>
                         <td className="py-2">{CONDITION_LABELS[s.condition]}</td>
-                        <td className="py-2 text-muted">{s.source.name}</td>
+                        <td className="py-2 text-muted">
+                          {s.isUserReported ? (
+                            <span
+                              title="Reported by a community member and checked by our screening"
+                              className="inline-flex items-center gap-1"
+                            >
+                              <Users className="size-3" />
+                              {s.reportedBy?.username ? `@${s.reportedBy.username}` : "Community"}
+                            </span>
+                          ) : (
+                            s.source.name
+                          )}
+                        </td>
                         <td className="tabular py-2 text-right font-medium">
                           {formatUsd(s.amountUsd)}
                         </td>

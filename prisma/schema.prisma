@@ -227,6 +227,18 @@ model Listing {
   @@index([lastSeen])
 }
 
+/// Whether a sale counts toward market value.
+///
+/// API-sourced sales are APPROVED on arrival. User-reported ones are screened
+/// (see lib/sales/validate.ts) and only held for review when they look wrong —
+/// holding everything would make reporting useless, auto-approving everything
+/// would let one person move a figure's published value.
+enum SaleStatus {
+  APPROVED
+  PENDING_REVIEW
+  REJECTED
+}
+
 /// A completed transaction. This is what actually drives market value.
 model Sale {
   id       String  @id @default(cuid())
@@ -250,13 +262,26 @@ model Sale {
   /// True when a signed-in user reported this sale rather than an API.
   isUserReported Boolean @default(false)
   reportedById   String?
-  reportedBy     User?   @relation(fields: [reportedById], references: [id], onDelete: SetNull)
+  reportedBy     User?   @relation("SalesReported", fields: [reportedById], references: [id], onDelete: SetNull)
+
+  status       SaleStatus @default(APPROVED)
+  /// Why the screening held this one back, shown to the reporter and moderator.
+  flagReason   String?
+  reviewedAt   DateTime?
+  reviewedById String?
+  reviewedBy   User?      @relation("SalesReviewed", fields: [reviewedById], references: [id], onDelete: SetNull)
+  reviewNote   String?
 
   createdAt DateTime @default(now())
 
   @@unique([sourceId, externalId])
   @@index([figureId, soldAt])
   @@index([soldAt])
+  // Aggregation reads by (figure, status, condition, date) — this covers it.
+  @@index([figureId, status, condition, soldAt])
+  // The moderation queue reads pending items oldest-first.
+  @@index([status, createdAt])
+  @@index([reportedById, createdAt])
 }
 
 /// One pre-aggregated row per figure/condition/day. The price chart reads only
@@ -340,7 +365,8 @@ model User {
   collectionItems CollectionItem[]
   wishlistItems   WishlistItem[]
   priceAlerts     PriceAlert[]
-  reportedSales   Sale[]
+  reportedSales   Sale[]           @relation("SalesReported")
+  reviewedSales   Sale[]           @relation("SalesReviewed")
 }
 
 model Account {

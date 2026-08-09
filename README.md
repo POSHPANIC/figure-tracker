@@ -51,6 +51,7 @@ something to draw before any live data arrives.
 | `npm run db:migrate` | Create a migration after editing the schema |
 | `npm run db:reset` | Wipe the database and re-run all migrations |
 | `npm run ingest` | Pull live data from configured sources, then aggregate |
+| `npm run set-role -- you@example.com ADMIN` | Make someone a moderator or admin |
 
 ## How the project is laid out
 
@@ -158,16 +159,62 @@ Neon Postgres, Vercel, environment variables and OAuth apps. `vercel.json`
 already defines the cron schedule: ingestion every 6 hours, aggregation nightly
 at 04:30 UTC.
 
+## Community sale reporting
+
+Signed-in users can report what a figure actually sold for. This is the main
+source of real sold-price data until eBay approves Marketplace Insights access.
+
+It's also the only way a member of the public can move a number the site
+publishes, so it's the most security-sensitive part of the codebase.
+
+**How a report is handled:**
+
+1. **Rate limited** — 20 reports per user per day, 5 per figure per day.
+2. **Hard validated** — no negative prices, no future sale dates, nothing older
+   than 10 years, nothing above $100,000. These are rejected outright.
+3. **Screened** against what we already know about that figure *in that
+   condition*:
+   - If there are 3+ prior approved sales, the report must land within 0.25×–4×
+     of their median.
+   - Otherwise, if we know the MSRP, it must land within 0.2×–10× of it — a wide
+     band, because sought-after figures legitimately trade at many times retail.
+     It's only there to catch order-of-magnitude typos.
+   - With no reference at all, anything over $2,000 gets a human look.
+4. Reports that pass go live immediately and count toward market value. Reports
+   that don't are held for a moderator and **do not affect prices while they
+   wait**. The reporter is told exactly why.
+
+Users see their own reports and each one's status at `/my-reports`, and can
+delete any of them. Moderators work the queue at `/moderation`, which shows the
+claimed price against current market value, why it was flagged, and the
+reporter's approve/reject history.
+
+Approving or rejecting recomputes that figure's market value straight away
+rather than waiting for the nightly job.
+
+The screening thresholds live in `lib/sales/validate.ts` and are pure functions
+with thorough tests — change them there, and the tests will tell you what you
+broke.
+
+**Making the first moderator:** there's deliberately no UI for granting roles.
+Have the person sign in once, then run:
+
+```bash
+npm run set-role -- them@example.com MODERATOR
+```
+
+They'll need to sign out and back in for it to take effect.
+
 ## What isn't built yet
 
 - **Price alerts** — the `PriceAlert` model exists, but delivering alerts needs
   an email provider (Resend or similar) wired up.
-- **Community sale reporting** — the `Sale` model already has `isUserReported`
-  and `reportedById`. This is the main path to real sold-price data until eBay
-  approves Marketplace Insights access.
-- **User-submitted catalog data** — the `MODERATOR` role exists for reviewing
-  submissions; there's no submission UI yet.
+- **User-submitted catalog data** — adding figures that aren't in the database
+  yet. The `MODERATOR` role and review flow already exist to build on.
 - **Social features** — comments, following, a feed of recent sales.
+- **Abuse tooling beyond the basics** — there's no way to ban a user or bulk-
+  reject someone's history yet. The reporter's approve/reject record is shown in
+  the queue so patterns are at least visible.
 
 ---
 

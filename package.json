@@ -14,6 +14,7 @@
     "db:seed": "tsx prisma/seed.ts",
     "db:studio": "prisma studio",
     "ingest": "tsx scripts/ingest.ts",
+    "set-role": "tsx scripts/set-role.ts",
     "test": "tsx --test lib/**/*.test.ts",
     "db:reset": "prisma migrate reset --force"
   },

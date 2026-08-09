@@ -10,7 +10,7 @@ trouble, so read it before flipping anything on in production.
 | **eBay Browse API** | Active listings (lowest ask, live inventory) | Implemented | None — official, free |
 | **eBay Marketplace Insights** | Real *sold* prices, last 90 days | Implemented, needs approval | None — official |
 | **AmiAmi** | Retail + preorder prices, MSRP, JPY | Implemented, off by default | Grey area — undocumented endpoint |
-| **Community reports** | User-submitted sale prices | Schema ready, UI not built | None |
+| **Community reports** | User-submitted sale prices | Implemented, with screening + moderation | None |
 | **MyFigureCollection** | Best catalog data anywhere | Not implemented | **Their ToS forbids scraping** |
 | **Mandarake / Mercari / Yahoo Auctions** | Deep Japanese secondary market | Not implemented | Needs proxies; ToS varies |
 

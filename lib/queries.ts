@@ -126,9 +126,15 @@ export async function getFigureBySlug(slug: string) {
         include: { source: { select: { key: true, name: true } } },
       },
       sales: {
+        // Pending and rejected reports are invisible to the public — showing an
+        // unverified sale next to verified ones would imply it's been checked.
+        where: { status: "APPROVED" },
         orderBy: { soldAt: "desc" },
         take: 20,
-        include: { source: { select: { key: true, name: true } } },
+        include: {
+          source: { select: { key: true, name: true } },
+          reportedBy: { select: { username: true, name: true } },
+        },
       },
     },
   });

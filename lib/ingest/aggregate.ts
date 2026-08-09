@@ -43,7 +43,9 @@ export async function runAggregation(forDay?: Date): Promise<AggregateResult> {
   const dayEnd = new Date(day.getTime() + 86400_000);
 
   const sales = await prisma.sale.findMany({
-    where: { soldAt: { gte: day, lt: dayEnd } },
+    // Only approved sales count. Anything a user reported that's still waiting
+    // on a moderator must not move a published price in the meantime.
+    where: { soldAt: { gte: day, lt: dayEnd }, status: "APPROVED" },
     select: { figureId: true, condition: true, amountUsd: true },
   });
 
@@ -111,57 +113,72 @@ export async function runAggregation(forDay?: Date): Promise<AggregateResult> {
  * a value rather than a dash.
  */
 export async function recomputeFigureStats(): Promise<number> {
+  const figures = await prisma.figure.findMany({ select: { id: true } });
+  let updated = 0;
+  for (const { id } of figures) {
+    if (await recomputeFigureStatsFor(id)) updated += 1;
+  }
+  return updated;
+}
+
+/**
+ * Refresh one figure. Called after a moderator approves or rejects a reported
+ * sale, so the published value reflects the decision immediately instead of
+ * waiting for the nightly job.
+ *
+ * Returns false when the figure has no recent sales to compute from.
+ */
+export async function recomputeFigureStatsFor(figureId: string): Promise<boolean> {
   const now = Date.now();
   const d30 = new Date(now - 30 * 86400_000);
   const d60 = new Date(now - 60 * 86400_000);
   const d90 = new Date(now - 90 * 86400_000);
 
-  const figures = await prisma.figure.findMany({ select: { id: true } });
-  let updated = 0;
+  const recent = await prisma.sale.findMany({
+    where: {
+      figureId,
+      condition: "NEW_SEALED",
+      soldAt: { gte: d90 },
+      status: "APPROVED",
+    },
+    select: { amountUsd: true, soldAt: true },
+  });
 
-  for (const { id } of figures) {
-    const recent = await prisma.sale.findMany({
-      where: { figureId: id, condition: "NEW_SEALED", soldAt: { gte: d90 } },
-      select: { amountUsd: true, soldAt: true },
-    });
-
-    if (recent.length === 0) {
-      await prisma.figure.update({
-        where: { id },
-        data: { salesVolume90d: 0, lastAggregatedAt: new Date() },
-      });
-      continue;
-    }
-
-    const asNumber = (v: { toString(): string }) => Number(v.toString());
-    const current = recent.filter((s) => s.soldAt >= d30).map((s) => asNumber(s.amountUsd));
-    const prior = recent
-      .filter((s) => s.soldAt >= d60 && s.soldAt < d30)
-      .map((s) => asNumber(s.amountUsd));
-
-    const marketValue = current.length
-      ? median(current)
-      : median(recent.map((s) => asNumber(s.amountUsd)));
-
-    // Only report a change when both windows have data to compare.
-    const change =
-      current.length && prior.length
-        ? ((median(current) - median(prior)) / median(prior)) * 100
-        : null;
-
+  if (recent.length === 0) {
     await prisma.figure.update({
-      where: { id },
-      data: {
-        marketValueUsd: round2(marketValue),
-        change30dPct: change === null ? null : round2(change),
-        salesVolume90d: recent.length,
-        lastAggregatedAt: new Date(),
-      },
+      where: { id: figureId },
+      data: { salesVolume90d: 0, lastAggregatedAt: new Date() },
     });
-    updated += 1;
+    return false;
   }
 
-  return updated;
+  const asNumber = (v: { toString(): string }) => Number(v.toString());
+  const current = recent.filter((s) => s.soldAt >= d30).map((s) => asNumber(s.amountUsd));
+  const prior = recent
+    .filter((s) => s.soldAt >= d60 && s.soldAt < d30)
+    .map((s) => asNumber(s.amountUsd));
+
+  const marketValue = current.length
+    ? median(current)
+    : median(recent.map((s) => asNumber(s.amountUsd)));
+
+  // Only report a change when both windows have data to compare.
+  const change =
+    current.length && prior.length
+      ? ((median(current) - median(prior)) / median(prior)) * 100
+      : null;
+
+  await prisma.figure.update({
+    where: { id: figureId },
+    data: {
+      marketValueUsd: round2(marketValue),
+      change30dPct: change === null ? null : round2(change),
+      salesVolume90d: recent.length,
+      lastAggregatedAt: new Date(),
+    },
+  });
+
+  return true;
 }
 
 /**

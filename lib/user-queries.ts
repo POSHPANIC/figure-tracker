@@ -135,6 +135,78 @@ export async function getFigureUserState(userId: string, figureId: string) {
   return { collectionItems, wishlistItem };
 }
 
+/** A user's own sale reports, including ones awaiting review. */
+export async function getMyReports(userId: string) {
+  return prisma.sale.findMany({
+    where: { reportedById: userId, isUserReported: true },
+    select: {
+      id: true,
+      condition: true,
+      amount: true,
+      currency: true,
+      amountUsd: true,
+      soldAt: true,
+      url: true,
+      status: true,
+      flagReason: true,
+      reviewNote: true,
+      reviewedAt: true,
+      createdAt: true,
+      figure: { select: { slug: true, name: true, primaryImageUrl: true } },
+    },
+    orderBy: { createdAt: "desc" },
+    take: 100,
+  });
+}
+
+/** Reports waiting on a moderator, oldest first so nothing gets stranded. */
+export async function getModerationQueue(take = 50) {
+  const [items, pendingCount] = await Promise.all([
+    prisma.sale.findMany({
+      where: { status: "PENDING_REVIEW" },
+      select: {
+        id: true,
+        condition: true,
+        amount: true,
+        currency: true,
+        amountUsd: true,
+        soldAt: true,
+        url: true,
+        flagReason: true,
+        createdAt: true,
+        reportedBy: { select: { id: true, username: true, name: true, email: true } },
+        figure: {
+          select: { slug: true, name: true, marketValueUsd: true, salesVolume90d: true },
+        },
+      },
+      orderBy: { createdAt: "asc" },
+      take,
+    }),
+    prisma.sale.count({ where: { status: "PENDING_REVIEW" } }),
+  ]);
+
+  return { items, pendingCount };
+}
+
+/**
+ * How many reports this user has had approved vs rejected.
+ * A high rejection rate is the signal to look at someone's submissions.
+ */
+export async function getReporterHistory(userId: string) {
+  const counts = await prisma.sale.groupBy({
+    by: ["status"],
+    where: { reportedById: userId, isUserReported: true },
+    _count: { _all: true },
+  });
+
+  const byStatus = Object.fromEntries(counts.map((c) => [c.status, c._count._all]));
+  return {
+    approved: byStatus.APPROVED ?? 0,
+    pending: byStatus.PENDING_REVIEW ?? 0,
+    rejected: byStatus.REJECTED ?? 0,
+  };
+}
+
 /** Public profile by username. Returns null when missing or set to private. */
 export async function getPublicProfile(username: string) {
   const user = await prisma.user.findUnique({

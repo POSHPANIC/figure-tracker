@@ -2,7 +2,15 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import { Heart, LayoutGrid, LogOut, Settings, User as UserIcon } from "lucide-react";
+import {
+  ClipboardList,
+  Heart,
+  LayoutGrid,
+  LogOut,
+  Settings,
+  ShieldCheck,
+  User as UserIcon,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 
 type MenuUser = {
@@ -10,6 +18,7 @@ type MenuUser = {
   email?: string | null;
   image?: string | null;
   username: string | null;
+  isModerator: boolean;
 };
 
 export function UserMenu({
@@ -78,9 +87,25 @@ export function UserMenu({
                 Public profile
               </MenuLink>
             )}
+            <MenuLink
+              href="/my-reports"
+              icon={<ClipboardList className="size-4" />}
+              onNavigate={() => setOpen(false)}
+            >
+              My sale reports
+            </MenuLink>
             <MenuLink href="/settings" icon={<Settings className="size-4" />} onNavigate={() => setOpen(false)}>
               Settings
             </MenuLink>
+            {user.isModerator && (
+              <MenuLink
+                href="/moderation"
+                icon={<ShieldCheck className="size-4 text-accent" />}
+                onNavigate={() => setOpen(false)}
+              >
+                Moderation queue
+              </MenuLink>
+            )}
           </div>
 
           <form action={signOutAction} className="border-t border-border">

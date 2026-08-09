@@ -36,6 +36,8 @@ export async function SiteHeader() {
               email: session.user.email,
               image: session.user.image,
               username: session.user.username,
+              isModerator:
+                session.user.role === "MODERATOR" || session.user.role === "ADMIN",
             }}
             signOutAction={signOutAction}
           />
