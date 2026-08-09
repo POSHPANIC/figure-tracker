@@ -4,8 +4,10 @@ import type { Metadata } from "next";
 import { ExternalLink, Users } from "lucide-react";
 import { currentUser } from "@/auth";
 import { FigureActions } from "@/components/figure-actions";
+import { FigureImagesAdmin } from "@/components/figure-images-admin";
 import { ReportSale } from "@/components/report-sale";
 import { FigureThumb } from "@/components/figure-thumb";
+import { ListingThumb } from "@/components/listing-thumb";
 import { PriceChart } from "@/components/price-chart";
 import { getFigureBySlug, getFigureStats, getPriceHistory } from "@/lib/queries";
 import { getFigureUserState } from "@/lib/user-queries";
@@ -57,6 +59,9 @@ export default async function FigurePage({ params, searchParams }: PageProps<"/f
   ]);
 
   const trend = trendOf(figure.change30dPct);
+  const isModerator = user?.role === "MODERATOR" || user?.role === "ADMIN";
+  const primaryImage =
+    figure.images.find((img) => img.url === figure.primaryImageUrl) ?? null;
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-8">
@@ -73,9 +78,46 @@ export default async function FigurePage({ params, searchParams }: PageProps<"/f
       <div className="mt-4 grid gap-8 lg:grid-cols-[20rem_1fr]">
         {/* --- Left column: artwork + spec sheet --- */}
         <div className="space-y-4">
-          <div className="aspect-[3/4] overflow-hidden rounded-xl border border-border bg-surface-2">
-            <FigureThumb name={figure.name} slug={figure.slug} src={figure.primaryImageUrl} />
+          <div>
+            <div className="aspect-[3/4] overflow-hidden rounded-xl border border-border bg-surface-2">
+              <FigureThumb name={figure.name} slug={figure.slug} src={figure.primaryImageUrl} />
+            </div>
+
+            {/* Attribution is normally a condition of using a press image, so
+                it sits with the image rather than buried in a credits page. */}
+            {primaryImage?.credit && (
+              <p className="mt-1.5 text-[11px] text-muted">
+                {primaryImage.sourceUrl ? (
+                  <a
+                    href={primaryImage.sourceUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="hover:text-foreground hover:underline"
+                  >
+                    {primaryImage.credit}
+                  </a>
+                ) : (
+                  primaryImage.credit
+                )}
+              </p>
+            )}
           </div>
+
+          {figure.images.length > 1 && (
+            <ul className="grid grid-cols-4 gap-1.5">
+              {figure.images.map((img) => (
+                <li key={img.id} className="aspect-square overflow-hidden rounded-md border border-border bg-surface-2">
+                  {/* eslint-disable-next-line @next/next/no-img-element -- press image hosts vary */}
+                  <img
+                    src={img.url}
+                    alt={`${figure.name} — ${img.credit ?? "additional view"}`}
+                    loading="lazy"
+                    className="h-full w-full object-cover"
+                  />
+                </li>
+              ))}
+            </ul>
+          )}
 
           <dl className="rounded-xl border border-border bg-surface p-4 text-sm">
             <Spec label="Manufacturer">
@@ -198,6 +240,7 @@ export default async function FigurePage({ params, searchParams }: PageProps<"/f
               <ul className="divide-y divide-border">
                 {figure.listings.map((l) => (
                   <li key={l.id} className="flex items-center gap-3 py-2.5">
+                    <ListingThumb url={l.imageUrl} title={l.title} className="size-12" />
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-sm">{l.title}</span>
                       <span className="block text-xs text-muted">
@@ -282,6 +325,20 @@ export default async function FigurePage({ params, searchParams }: PageProps<"/f
               </div>
             )}
           </section>
+
+          {isModerator && (
+            <FigureImagesAdmin
+              figureId={figure.id}
+              images={figure.images.map((img) => ({
+                id: img.id,
+                url: img.url,
+                credit: img.credit,
+                sourceUrl: img.sourceUrl,
+                licenseNote: img.licenseNote,
+                isPrimary: img.url === figure.primaryImageUrl,
+              }))}
+            />
+          )}
         </div>
       </div>
     </div>

@@ -152,6 +152,24 @@ Signed-in users get:
   you own and their market value. **What you paid and your gain/loss are never
   shown**, even when your profile is public.
 
+## Images
+
+Two kinds, with opposite rules:
+
+- **Listing photos** are hotlinked from the marketplace's CDN and shown beside a
+  link to that listing — which is what the API terms permit, and self-correcting
+  when a listing ends. eBay encodes size in the filename, so `lib/images.ts`
+  upgrades their small default thumbnail to a 500px one.
+- **Catalog photos** — the picture representing the *product* — are manufacturer
+  press images used with permission. A listing photo can't do this job: that
+  listing will vanish and take your product shot with it.
+
+Moderators add catalog images from the figure's own page. The form requires a
+credit and asks who granted permission and when, because "we have permission" is
+worth nothing if nobody can say who gave it. See
+**[docs/PRESS_IMAGES.md](docs/PRESS_IMAGES.md)** for who to contact and a
+message you can send.
+
 ## Deploying
 
 Step-by-step instructions are in **[docs/SETUP.md](docs/SETUP.md)** — GitHub,

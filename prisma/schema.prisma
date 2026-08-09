@@ -141,14 +141,33 @@ model Figure {
   @@index([releaseDate])
 }
 
+/// A catalog image for a figure — the product photo, not a marketplace listing's.
+///
+/// These are used under permission granted by the manufacturer, which normally
+/// comes with conditions: display a credit, link back, don't alter the image.
+/// So provenance is stored alongside the URL rather than assumed. If someone
+/// later asks under what terms an image is being used, the answer is a row in
+/// this table, not a memory of an email.
 model FigureImage {
-  id       String @id @default(cuid())
-  figureId String
-  figure   Figure @relation(fields: [figureId], references: [id], onDelete: Cascade)
-  url      String
-  sortOrder Int   @default(0)
+  id        String @id @default(cuid())
+  figureId  String
+  figure    Figure @relation(fields: [figureId], references: [id], onDelete: Cascade)
+  url       String
+  sortOrder Int    @default(0)
 
-  @@index([figureId])
+  /// Attribution shown next to the image, e.g. "© Good Smile Company".
+  /// Usually a condition of the permission, so it is not optional in practice.
+  credit String?
+  /// The press kit or product page the image was supplied on.
+  sourceUrl String?
+  /// What was actually agreed, in our own words — who granted it and when.
+  licenseNote String?
+
+  addedById String?
+  addedBy   User?   @relation(fields: [addedById], references: [id], onDelete: SetNull)
+  createdAt DateTime @default(now())
+
+  @@index([figureId, sortOrder])
 }
 
 /// External IDs we can match marketplace listings against.
@@ -394,6 +413,7 @@ model User {
   priceAlerts     PriceAlert[]
   reportedSales   Sale[]           @relation("SalesReported")
   reviewedSales   Sale[]           @relation("SalesReviewed")
+  addedImages     FigureImage[]
 }
 
 model Account {
