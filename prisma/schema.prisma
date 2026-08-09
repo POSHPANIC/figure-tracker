@@ -392,6 +392,10 @@ model CollectionItem {
   /// What the user actually paid, for profit/loss against market value.
   paidAmount   Decimal? @db.Decimal(12, 2)
   paidCurrency String?  @db.VarChar(3)
+  /// `paidAmount` converted at the rate on the day it was entered. Stored so
+  /// portfolio totals can sum a mixed-currency collection without re-converting
+  /// (and silently re-valuing) every past purchase on each page load.
+  paidAmountUsd Decimal? @db.Decimal(12, 2)
   purchasedAt  DateTime?
   notes        String?
 

@@ -55,10 +55,18 @@ something to draw before any live data arrives.
 ## How the project is laid out
 
 ```
+auth.ts                  Auth.js config — providers, session, callbacks
+
 app/                     Pages and API routes
   page.tsx                 Homepage — trending, movers, browse by series
   figures/page.tsx         Search and filter
   figures/[slug]/page.tsx  Figure detail with the price chart
+  collection/page.tsx      Your collection + portfolio value
+  wishlist/page.tsx        Your wishlist
+  settings/page.tsx        Profile settings
+  signin/page.tsx          Sign in
+  u/[username]/page.tsx    Public profile
+  api/auth/                Auth.js route handler
   api/search/              Typeahead endpoint
   api/cron/                Scheduled ingestion + aggregation
 
@@ -66,9 +74,13 @@ components/              React components
   price-chart.tsx          Recharts price history
   filter-panel.tsx         URL-driven filters
   search-box.tsx           Typeahead search
+  figure-actions.tsx       Add to collection / wishlist
+  collection-row.tsx       One row of your collection
 
 lib/
-  queries.ts               Every read query the site makes
+  queries.ts               Public read queries
+  user-queries.ts          Signed-in reads: collection, wishlist, profiles
+  actions/                 Server actions (all writes go through here)
   money.ts                 Currency formatting, Decimal -> number
   ingest/
     ebay.ts                eBay Browse API client
@@ -115,22 +127,47 @@ npm run ingest
 With no keys configured, ingestion skips each source and logs why, rather than
 failing.
 
+## Accounts
+
+Sign-in uses Auth.js. Google and Discord are supported, and a provider whose
+credentials aren't set simply doesn't appear on the sign-in page.
+
+**In development you don't need either.** The sign-in page shows a local login
+box: type any email and you're signed in as that user, created on the spot. It's
+registered only when `NODE_ENV !== "production"`, so it can never reach the live
+site. Set up at least one real provider before launching — see
+[docs/SETUP.md](docs/SETUP.md).
+
+Signed-in users get:
+
+- **Collection** — what you own, in what condition, how many, and what you paid.
+  Purchase prices are converted to USD once, at entry time, so portfolio totals
+  don't silently re-value as exchange rates drift.
+- **Portfolio value** — market value, total paid, gain/loss and return. Items
+  with no recorded purchase price are excluded from the gain figures rather than
+  counted as pure profit, and the page says how many were left out.
+- **Wishlist** — figures you're hunting, with a running total.
+- **Public profile** at `/u/username`, off by default. It shows which figures
+  you own and their market value. **What you paid and your gain/loss are never
+  shown**, even when your profile is public.
+
 ## Deploying
 
-See the deployment section below — you'll need a hosted Postgres database
-(Neon's free tier is fine) and a Vercel account. `vercel.json` already defines
-the cron schedule: ingestion every 6 hours, aggregation nightly at 04:30 UTC.
+Step-by-step instructions are in **[docs/SETUP.md](docs/SETUP.md)** — GitHub,
+Neon Postgres, Vercel, environment variables and OAuth apps. `vercel.json`
+already defines the cron schedule: ingestion every 6 hours, aggregation nightly
+at 04:30 UTC.
 
 ## What isn't built yet
 
-The database schema already includes `User`, `CollectionItem`, `WishlistItem`
-and `PriceAlert` — so adding these needs no migration:
-
-- **Accounts** — sign in with Google/Discord via Auth.js
-- **Personal collection** — track what you own, what you paid, portfolio value
-- **Wishlists and price alerts** — email when a figure drops below your target
-- **Public profiles** — share your collection
-- **Community sale reporting** — the main path to real sold-price data
+- **Price alerts** — the `PriceAlert` model exists, but delivering alerts needs
+  an email provider (Resend or similar) wired up.
+- **Community sale reporting** — the `Sale` model already has `isUserReported`
+  and `reportedById`. This is the main path to real sold-price data until eBay
+  approves Marketplace Insights access.
+- **User-submitted catalog data** — the `MODERATOR` role exists for reviewing
+  submissions; there's no submission UI yet.
+- **Social features** — comments, following, a feed of recent sales.
 
 ---
 

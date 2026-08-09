@@ -1,0 +1,262 @@
+# Setup: API keys and going live
+
+Two separate jobs. Do them in this order — you can get real price data flowing
+locally before you put anything on the internet.
+
+1. [Get eBay API keys](#1-ebay-api-keys) (~15 minutes)
+2. [Deploy the site](#2-deploy) (~30 minutes)
+
+Everything here needs accounts you have to create yourself.
+
+---
+
+## 1. eBay API keys
+
+This gets you real listings and prices instead of the sample data.
+
+### Create the developer account
+
+1. Go to <https://developer.ebay.com> and click **Register**. It's free.
+   Use the same email as your normal eBay account if you have one.
+2. Confirm the email eBay sends you.
+3. Sign in, then open **Hi \<name\> → Application Keysets** in the top-right menu.
+
+### Create a keyset
+
+You'll see two sections, **Sandbox** and **Production**.
+
+- **Sandbox** is a fake eBay with fake listings. Useless for real prices.
+- **Production** is the real one. Use this.
+
+Under Production, click **Create a keyset**. eBay may ask you to confirm a
+business/contact detail first — fill it in and continue.
+
+You'll end up with several values. You need exactly two:
+
+| eBay calls it | Goes in `.env` as |
+| --- | --- |
+| **App ID (Client ID)** | `EBAY_CLIENT_ID` |
+| **Cert ID (Client Secret)** | `EBAY_CLIENT_SECRET` |
+
+Ignore Dev ID and the redirect/RuName settings — this app authenticates as
+itself, not on behalf of eBay users, so it never needs them.
+
+### Put them in `.env`
+
+Open the `.env` file in the project folder and fill in:
+
+```
+EBAY_CLIENT_ID="YourApp-Figure-PRD-abc123-def456"
+EBAY_CLIENT_SECRET="PRD-abc123def456-7890-abcd-ef01-2345"
+EBAY_ENV="PRODUCTION"
+```
+
+Keep the quotes. **Never commit this file** — it's already gitignored.
+
+### Test it
+
+Make sure the database is running (`npm run db:dev` in another terminal), then:
+
+```bash
+npm run ingest -- --source ebay --limit 3
+```
+
+You should see something like `ebay: 84 seen, 31 matched, 53 unmatched`.
+
+- **"seen"** — listings eBay returned.
+- **"matched"** — ones confidently tied to a figure in your catalog.
+- **"unmatched"** — stored but not linked. Normal. eBay searches return a lot of
+  loosely related junk, and the matcher deliberately refuses to guess. A wrong
+  match silently corrupts a figure's price history, which is worse than no match.
+
+Then open a figure page and you'll see real listings under "Live listings".
+
+### About sold prices
+
+**The free API does not include completed sales.** It returns active listings
+only. That's enough for "lowest ask" but not for price history.
+
+Real sold prices need eBay's **Marketplace Insights API**, which is
+access-restricted. To apply:
+
+1. In the developer portal, find **Application Growth Check** or the API access
+   request form for `buy.marketplace.insights`.
+2. Explain what you're building — a price-reference site for collectors.
+3. Wait. Approval is manual and can take weeks.
+
+Apply early. Until you're approved the code returns empty sold data and logs a
+note; nothing breaks. In the meantime, price history comes from the seeded
+sample data and, once you build it, community-reported sales.
+
+### Rate limits
+
+The free tier allows roughly 5,000 Browse API calls per day. Each figure costs
+about 2 calls per ingestion run. `vercel.json` runs ingestion every 6 hours with
+a limit of 25 figures, which is about 400 calls/day — comfortably inside the
+limit with room to grow. If you add thousands of figures, raise the frequency
+rather than the per-run limit, and watch the `IngestRun` table for errors.
+
+---
+
+## 2. Deploy
+
+You need three free accounts: **GitHub**, **Neon** (database), and **Vercel**
+(hosting).
+
+### Step 1 — Put the code on GitHub
+
+Create an empty repository at <https://github.com/new>. Name it whatever you
+like, **don't** add a README or .gitignore — the project already has both.
+
+Then, in the project folder:
+
+```bash
+git remote add origin https://github.com/YOUR-USERNAME/YOUR-REPO.git
+```
+
+```bash
+git push -u origin main
+```
+
+If it asks you to sign in, GitHub will open a browser window.
+
+> Make the repository **private** if you'd rather not have people reading your
+> code yet. It doesn't affect deployment.
+
+### Step 2 — Create the production database
+
+The local database from `npm run db:dev` only exists on your computer. You need
+a hosted one.
+
+1. Go to <https://neon.com> and sign up with your GitHub account.
+2. Create a project. Any name; pick the region closest to your users.
+3. On the dashboard, find **Connection string** and copy it. It looks like:
+   `postgresql://user:password@ep-something.aws.neon.tech/neondb?sslmode=require`
+
+Keep that tab open — you'll paste it in a moment.
+
+### Step 3 — Generate production secrets
+
+You need two random secrets, different from your local ones. Run each command
+and keep the output:
+
+```bash
+node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
+```
+
+That's your `AUTH_SECRET`. Run it again for `CRON_SECRET`.
+
+### Step 4 — Deploy on Vercel
+
+1. Go to <https://vercel.com> and sign up with GitHub.
+2. Click **Add New → Project** and import the repository you just pushed.
+3. **Before clicking Deploy**, expand **Environment Variables** and add:
+
+| Name | Value |
+| --- | --- |
+| `DATABASE_URL` | your Neon connection string |
+| `AUTH_SECRET` | the first random string you generated |
+| `CRON_SECRET` | the second random string |
+| `EBAY_CLIENT_ID` | from step 1 |
+| `EBAY_CLIENT_SECRET` | from step 1 |
+| `EBAY_ENV` | `PRODUCTION` |
+
+Leave `SHADOW_DATABASE_URL` out — it's only needed for creating migrations
+locally.
+
+4. Click **Deploy** and wait a couple of minutes.
+
+### Step 5 — Set up the database tables
+
+The deploy succeeds but the database is still empty. From your own machine,
+point the migration at production **once**:
+
+In PowerShell:
+
+```powershell
+$env:DATABASE_URL="paste-your-neon-connection-string-here"; npm run db:deploy
+```
+
+Then load the starter catalog:
+
+```powershell
+$env:DATABASE_URL="paste-your-neon-connection-string-here"; npm run db:seed
+```
+
+Close that terminal afterwards so the production URL doesn't linger in your
+shell history.
+
+Visit your Vercel URL — the site should be live with data.
+
+### Step 6 — Check the scheduled jobs
+
+`vercel.json` already schedules ingestion every 6 hours and aggregation nightly
+at 04:30 UTC. In your Vercel project, open **Settings → Cron Jobs** and confirm
+both appear.
+
+> Vercel's Hobby (free) plan allows cron jobs to run **once per day**. The
+> 6-hourly ingestion schedule needs the Pro plan. On Hobby, change the schedule
+> in `vercel.json` to `"0 4 * * *"` and raise the limit (`?limit=100`) so the
+> single daily run covers more of the catalog.
+
+To test a job manually, replacing both placeholders:
+
+```bash
+curl -H "Authorization: Bearer YOUR_CRON_SECRET" https://your-site.vercel.app/api/cron/ingest
+```
+
+---
+
+## Optional: sign in with Google or Discord
+
+Without these, the only way to sign in on the live site is… nothing. **Set up at
+least one before launching**, or nobody can create an account. (The development
+login box works locally only and is never registered in production.)
+
+Discord is the better first choice for this audience and takes about 3 minutes.
+
+### Discord
+
+1. Go to <https://discord.com/developers/applications> → **New Application**.
+2. Open **OAuth2** in the sidebar.
+3. Under **Redirects**, add:
+   `https://your-site.vercel.app/api/auth/callback/discord`
+   Also add `http://localhost:3000/api/auth/callback/discord` for local testing.
+4. Copy **Client ID** and **Client Secret**.
+5. Add to Vercel's environment variables as `AUTH_DISCORD_ID` and
+   `AUTH_DISCORD_SECRET`, then redeploy.
+
+### Google
+
+1. Go to <https://console.cloud.google.com/apis/credentials> and create a project.
+2. Configure the **OAuth consent screen** (External, fill in the basics).
+3. **Create Credentials → OAuth client ID → Web application**.
+4. Under **Authorized redirect URIs**, add:
+   `https://your-site.vercel.app/api/auth/callback/google`
+   and `http://localhost:3000/api/auth/callback/google`.
+5. Copy the client ID and secret into Vercel as `AUTH_GOOGLE_ID` and
+   `AUTH_GOOGLE_SECRET`, then redeploy.
+
+> Google shows an "unverified app" warning until you submit for verification.
+> Fine while testing; do the verification before you promote the site publicly.
+
+---
+
+## Troubleshooting
+
+**"Can't reach database server"** — the local Postgres isn't running. Start it
+with `npm run db:dev` in a separate terminal and leave it open.
+
+**Build fails on Vercel with a Prisma error** — the `postinstall` script runs
+`prisma generate` automatically. If it fails, check that `DATABASE_URL` is set
+in Vercel's environment variables.
+
+**Sign-in redirects in a loop** — `AUTH_SECRET` is missing or differs between
+deployments. Set it in Vercel and redeploy.
+
+**eBay returns 401** — the client ID/secret are wrong, or you created a Sandbox
+keyset while `EBAY_ENV` is `PRODUCTION`. They must match.
+
+**Cron job returns 401** — `CRON_SECRET` in Vercel doesn't match what you're
+sending, or it's still the placeholder value. The code refuses to run rather
+than defaulting to open.

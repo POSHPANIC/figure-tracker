@@ -2,9 +2,12 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { ExternalLink } from "lucide-react";
+import { currentUser } from "@/auth";
+import { FigureActions } from "@/components/figure-actions";
 import { FigureThumb } from "@/components/figure-thumb";
 import { PriceChart } from "@/components/price-chart";
 import { getFigureBySlug, getFigureStats, getPriceHistory } from "@/lib/queries";
+import { getFigureUserState } from "@/lib/user-queries";
 import { formatCurrency, formatPercent, formatUsd, trendOf } from "@/lib/money";
 import {
   CATEGORY_LABELS,
@@ -15,8 +18,8 @@ import {
 import type { ItemCondition } from "@/lib/generated/prisma/enums";
 import { cn } from "@/lib/utils";
 
-export const revalidate = 3600;
-
+// Renders per-user (collection state, wishlist), so it can't be cached across
+// visitors. The underlying price queries are indexed and cheap.
 const HISTORY_DAYS = 3650;
 
 export async function generateMetadata({
@@ -45,9 +48,11 @@ export default async function FigurePage({ params, searchParams }: PageProps<"/f
     ? (requested as ItemCondition)
     : "NEW_SEALED";
 
-  const [history, stats] = await Promise.all([
+  const user = await currentUser();
+  const [history, stats, userState] = await Promise.all([
     getPriceHistory(figure.id, condition, HISTORY_DAYS),
     getFigureStats(figure.id, condition),
+    user ? getFigureUserState(user.id, figure.id) : null,
   ]);
 
   const trend = trendOf(figure.change30dPct);
@@ -127,6 +132,19 @@ export default async function FigurePage({ params, searchParams }: PageProps<"/f
               {figure.name}
             </h1>
           </header>
+
+          <FigureActions
+            figureId={figure.id}
+            signedIn={user !== null}
+            owned={(userState?.collectionItems ?? []).map((item) => ({
+              id: item.id,
+              quantity: item.quantity,
+              condition: item.condition,
+              paidAmount: item.paidAmount?.toString() ?? null,
+              paidCurrency: item.paidCurrency,
+            }))}
+            onWishlist={Boolean(userState?.wishlistItem)}
+          />
 
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             <StatCard label="Market value" value={formatUsd(figure.marketValueUsd)} emphasis />

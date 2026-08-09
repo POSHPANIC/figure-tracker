@@ -4,9 +4,11 @@ import { FigureCardGrid } from "@/components/figure-card";
 import { SearchBox } from "@/components/search-box";
 import { getCatalogTotals, getFacets, getMostTracked, getTopMovers } from "@/lib/queries";
 
-// The catalog only changes when ingestion runs, so serve a cached render and
-// refresh it hourly rather than hitting the database on every visit.
-export const revalidate = 3600;
+// Note: this page renders dynamically, not statically. The site header reads
+// the session (and therefore cookies), which opts every route into dynamic
+// rendering. The queries below are all indexed and cheap, so this is fine at
+// current scale; if traffic makes it worth caching later, the fix is to cache
+// these three queries rather than the page.
 
 export default async function HomePage() {
   const [gainers, losers, tracked, facets, totals] = await Promise.all([

@@ -1,11 +1,20 @@
 import Link from "next/link";
 import { Boxes } from "lucide-react";
+import { auth, signOut } from "@/auth";
 import { SearchBox } from "./search-box";
+import { UserMenu } from "./user-menu";
 
-export function SiteHeader() {
+export async function SiteHeader() {
+  const session = await auth();
+
+  async function signOutAction() {
+    "use server";
+    await signOut({ redirectTo: "/" });
+  }
+
   return (
     <header className="sticky top-0 z-40 border-b border-border bg-background/85 backdrop-blur">
-      <div className="mx-auto flex max-w-7xl items-center gap-4 px-4 py-3">
+      <div className="mx-auto flex max-w-7xl items-center gap-3 px-4 py-3 sm:gap-4">
         <Link href="/" className="flex shrink-0 items-center gap-2 font-semibold tracking-tight">
           <span className="grid size-8 place-items-center rounded-lg bg-accent text-white">
             <Boxes className="size-4.5" />
@@ -13,12 +22,31 @@ export function SiteHeader() {
           <span className="hidden sm:inline">FigureTracker</span>
         </Link>
 
-        <SearchBox className="max-w-xl flex-1" />
+        <SearchBox className="min-w-0 max-w-xl flex-1" />
 
-        <nav className="hidden shrink-0 items-center gap-1 text-sm md:flex">
+        <nav className="hidden shrink-0 items-center gap-1 text-sm lg:flex">
           <NavLink href="/figures?sort=trending">Trending</NavLink>
           <NavLink href="/figures">Browse</NavLink>
         </nav>
+
+        {session?.user ? (
+          <UserMenu
+            user={{
+              name: session.user.name,
+              email: session.user.email,
+              image: session.user.image,
+              username: session.user.username,
+            }}
+            signOutAction={signOutAction}
+          />
+        ) : (
+          <Link
+            href="/signin"
+            className="shrink-0 rounded-lg bg-accent px-3 py-1.5 text-sm font-medium text-white transition hover:opacity-90"
+          >
+            Sign in
+          </Link>
+        )}
       </div>
     </header>
   );
