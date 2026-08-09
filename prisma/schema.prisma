@@ -324,6 +324,33 @@ model IngestRun {
   @@index([sourceId, startedAt])
 }
 
+/// Record that we received and acted on an eBay account-deletion notification.
+///
+/// eBay requires production apps to handle these, and being able to show you
+/// did is the whole point — so we keep proof of receipt.
+///
+/// Note what is NOT stored: the eBay username, user ID and eiasToken are all
+/// personal data belonging to someone who just asked to be forgotten. Keeping
+/// them to prove we deleted them would defeat the purpose. Instead we store a
+/// one-way hash, which still lets us recognise a retry of the same
+/// notification without retaining anything identifying.
+model EbayAccountDeletion {
+  id             String @id @default(cuid())
+  /// eBay's ID for the notification. Unique so retries are idempotent.
+  notificationId String @unique
+  /// SHA-256 of the eBay user ID. Not reversible to the user.
+  userRefHash    String
+
+  eventDate  DateTime?
+  receivedAt DateTime  @default(now())
+  /// Rows we erased in response. Expected to be 0 — we don't currently store
+  /// anything keyed to an eBay user — but it's recorded rather than assumed.
+  recordsErased Int @default(0)
+
+  @@index([userRefHash])
+  @@index([receivedAt])
+}
+
 /// Daily USD conversion rates, so historical prices stay reproducible.
 model FxRate {
   id       String   @id @default(cuid())

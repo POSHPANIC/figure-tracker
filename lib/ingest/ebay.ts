@@ -21,7 +21,7 @@ const HOSTS = {
   SANDBOX: "https://api.sandbox.ebay.com",
 } as const;
 
-const BASE = HOSTS[ENV];
+export const BASE = HOSTS[ENV];
 const MARKETPLACE = "EBAY_US";
 
 export function isEbayConfigured(): boolean {
@@ -35,8 +35,11 @@ let tokenCache: { token: string; expiresAt: number } | null = null;
 /**
  * Application access token via the client-credentials grant.
  * Cached in memory and refreshed a minute before expiry.
+ *
+ * Exported because the account-deletion endpoint needs it to fetch eBay's
+ * notification signing keys.
  */
-async function getAccessToken(): Promise<string> {
+export async function getAccessToken(): Promise<string> {
   if (tokenCache && Date.now() < tokenCache.expiresAt) return tokenCache.token;
 
   const id = process.env.EBAY_CLIENT_ID;

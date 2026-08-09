@@ -71,6 +71,69 @@ You should see something like `ebay: 84 seen, 31 matched, 53 unmatched`.
 
 Then open a figure page and you'll see real listings under "Live listings".
 
+### Enabling the keyset (account deletion notifications)
+
+eBay disables production keysets until you tell them what your app does when
+someone deletes their eBay account. You'll see this on the Application Keys
+page: *"Your Keyset is currently disabled."*
+
+Two ways out. **Do both** — the exemption is free and might land first, and the
+endpoint is already built either way.
+
+#### Option A: apply for the exemption
+
+Click the **exemption** link in that message. Exemptions are for apps that don't
+store eBay *user* data, and FigureTracker genuinely doesn't — it stores item
+listings (title, price, condition, image, URL) and never the identity of a
+buyer or seller. Say exactly that. It goes into a review queue.
+
+#### Option B: register the endpoint (already built)
+
+`/api/ebay/account-deletion` is implemented and tested. It needs your site
+deployed first, because eBay validates the URL the moment you save it.
+
+1. **Deploy** (see the next section), then note your URL, e.g.
+   `https://your-site.vercel.app/api/ebay/account-deletion`
+
+2. **Set two environment variables in Vercel:**
+
+   | Name | Value |
+   | --- | --- |
+   | `EBAY_VERIFICATION_TOKEN` | the token from your local `.env` (already generated) |
+   | `EBAY_DELETION_ENDPOINT` | the full URL above, exactly |
+
+   Redeploy so they take effect.
+
+   > `EBAY_DELETION_ENDPOINT` must match what you give eBay **character for
+   > character** — it's mixed into the validation hash. A trailing slash or
+   > `http` instead of `https` will fail validation with no useful error.
+
+3. **Register it with eBay.** On the Application Keys page, open the
+   marketplace deletion settings and enter:
+   - **Notification endpoint**: your URL
+   - **Verification token**: the same `EBAY_VERIFICATION_TOKEN` value
+
+4. **Save.** eBay immediately sends a GET with a challenge code; the endpoint
+   answers with a hash proving it knows your token. If it validates, the keyset
+   turns on.
+
+You can sanity-check the endpoint yourself before registering:
+
+```bash
+curl "https://your-site.vercel.app/api/ebay/account-deletion?challenge_code=test123"
+```
+
+That should return `200` and a JSON body like
+`{"challengeResponse":"<64 hex characters>"}`. If you get a 500, the
+verification token isn't set in Vercel.
+
+**What it does with a real notification:** verifies eBay's signature, erases
+any data held about that user, and records that it happened. It deliberately
+stores only a salted hash of the eBay user ID — keeping the username to prove
+you deleted the username would rather defeat the point. If you ever add a
+seller username to the `Listing` model, add the deletion to `lib/ebay/erase.ts`;
+that's the one place that needs to change.
+
 ### About sold prices
 
 **The free API does not include completed sales.** It returns active listings
@@ -246,6 +309,24 @@ Discord is the better first choice for this audience and takes about 3 minutes.
 
 **"Can't reach database server"** — the local Postgres isn't running. Start it
 with `npm run db:dev` in a separate terminal and leave it open.
+
+**"Lock file is already being held"** when starting the database — a previous
+`prisma dev` was killed without shutting down cleanly and left a stale lock.
+Close any running copy, then delete the lock folder and start again:
+
+```powershell
+Remove-Item "$env:LOCALAPPDATA\prisma-dev-nodejs\Data\durable-streams\figuretracker\server.lock.lock" -Recurse -Force
+```
+
+**"Server has closed the connection" mid-command** — same root cause. The local
+dev database sometimes drops if its process gets interrupted. Stop it, clear
+the lock as above, then `npm run db:dev` again; your data lives on disk and
+survives. This only affects local development — hosted Postgres doesn't do it.
+
+**eBay challenge validation fails** — `EBAY_DELETION_ENDPOINT` doesn't exactly
+match the URL you gave eBay, or `EBAY_VERIFICATION_TOKEN` differs between
+Vercel and the portal. Both are mixed into the hash, so any difference at all
+produces a wrong answer.
 
 **Build fails on Vercel with a Prisma error** — the `postinstall` script runs
 `prisma generate` automatically. If it fails, check that `DATABASE_URL` is set
