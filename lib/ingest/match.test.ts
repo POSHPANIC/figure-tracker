@@ -3,6 +3,7 @@ import { describe, it } from "node:test";
 import {
   MATCH_ACCEPT_THRESHOLD,
   bestMatch,
+  descriptorTokens,
   normalizeCondition,
   scoreMatch,
   tokenize,
@@ -22,6 +23,7 @@ const marinScale: MatchCandidate = {
   name: "Marin Kitagawa 1/7 Swimsuit Ver.",
   nameJa: null,
   scale: "1/7",
+  category: "SCALE",
   manufacturerName: "Good Smile Company",
   seriesName: "My Dress-Up Darling",
   characterNames: ["Marin Kitagawa"],
@@ -32,6 +34,7 @@ const marinNendo: MatchCandidate = {
   name: "Nendoroid Marin Kitagawa",
   nameJa: null,
   scale: null,
+  category: "NENDOROID",
   manufacturerName: "Good Smile Company",
   seriesName: "My Dress-Up Darling",
   characterNames: ["Marin Kitagawa"],
@@ -42,9 +45,32 @@ const powerScale: MatchCandidate = {
   name: "Power 1/7 Scale Figure",
   nameJa: null,
   scale: "1/7",
+  category: "SCALE",
   manufacturerName: "Good Smile Company",
   seriesName: "Chainsaw Man",
   characterNames: ["Power"],
+};
+
+const anyaElegant: MatchCandidate = {
+  id: "anya-elegant",
+  name: "Anya Forger 1/7 Elegant Ver.",
+  nameJa: null,
+  scale: "1/7",
+  category: "SCALE",
+  manufacturerName: "Kotobukiya",
+  seriesName: "Spy x Family",
+  characterNames: ["Anya Forger"],
+};
+
+const aiNendo: MatchCandidate = {
+  id: "ai-nendo",
+  name: "Nendoroid Ai Hoshino",
+  nameJa: null,
+  scale: null,
+  category: "NENDOROID",
+  manufacturerName: "Good Smile Company",
+  seriesName: "Oshi no Ko",
+  characterNames: ["Ai Hoshino"],
 };
 
 const ALL = [marinScale, marinNendo, powerScale];
@@ -110,6 +136,208 @@ describe("bestMatch", () => {
 
   it("returns null for an empty title", () => {
     assert.equal(bestMatch("", ALL), null);
+  });
+});
+
+describe("descriptorTokens", () => {
+  it("keeps the word that distinguishes a variant", () => {
+    assert.deepEqual([...descriptorTokens(marinScale)], ["swimsuit"]);
+  });
+
+  it("keeps the product line for a Nendoroid", () => {
+    assert.deepEqual([...descriptorTokens(marinNendo)], ["nendoroid"]);
+  });
+
+  it("drops character, series and manufacturer words", () => {
+    const tokens = descriptorTokens(anyaElegant);
+    assert.ok(tokens.has("elegant"));
+    for (const shared of ["anya", "forger", "spy", "family", "kotobukiya"]) {
+      assert.equal(tokens.has(shared), false, `${shared} should not be distinguishing`);
+    }
+  });
+
+  it("is empty when a name has nothing beyond generic words", () => {
+    // "Power 1/7 Scale Figure" — there is genuinely only one, so demanding a
+    // distinguishing word would reject honest listings.
+    assert.equal(descriptorTokens(powerScale).size, 0);
+  });
+});
+
+/**
+ * Every title below is a real eBay listing pulled during a live ingestion run.
+ * The first four were matched to the wrong figure before the distinguishing-word
+ * gate existed — same character, same series, same scale, different product.
+ */
+describe("real listings that previously matched the wrong figure", () => {
+  it("rejects a different outfit variant (Winter Uniform vs Swimsuit)", () => {
+    const title = "PREORDER Aniplex Marin Kitagawa Winter Uniform 1/7 Figure My Dress-Up Darling";
+    assert.equal(scoreMatch(title, marinScale), 0);
+  });
+
+  it("rejects a different outfit variant (Race Queen vs Swimsuit)", () => {
+    // This one mattered: the listing was $690 against a $332 figure.
+    const title = "Aniplex Marin Kitagawa Race Queen Ver 1/7 Figure My Dress-Up Darling 2026";
+    assert.equal(scoreMatch(title, marinScale), 0);
+  });
+
+  it("rejects a different Nendoroid of the same character", () => {
+    const title =
+      "Good Smile Company Nendoroid Liz Cosplay by Marin My Dress-Up Darling Figure";
+    assert.ok(
+      scoreMatch(title, marinNendo) < MATCH_ACCEPT_THRESHOLD,
+      "an unexplained variant word should drop this below the threshold",
+    );
+  });
+
+  it("rejects a two-character figure matching a solo one", () => {
+    const title = "SPY x FAMILY Anya Forger&Bond Forger 1/7scale PVC Figure White PV063 Kotobukiya";
+    assert.equal(scoreMatch(title, anyaElegant), 0);
+  });
+
+  // The corrections must not come at the cost of the matches that were right.
+  it("still accepts a wording variant of the same product", () => {
+    const title = "Good Smile My Dress-Up Darling Kitagawa Marin Swimwear PVC Figure In Stock";
+    assert.ok(
+      scoreMatch(title, marinScale) >= MATCH_ACCEPT_THRESHOLD,
+      "swimwear and swimsuit are the same product",
+    );
+  });
+
+  it("still accepts the correct Nendoroid", () => {
+    const title = "Nendoroid #1935 My Dress-Up Darling Marin Kitagawa Q. PVC Action Figure";
+    assert.ok(scoreMatch(title, marinNendo) >= MATCH_ACCEPT_THRESHOLD);
+  });
+
+  it("still accepts a terse but correct title", () => {
+    const title = "Good Smile Oshi no Ko Ai Nendoroid JAPAN Import New & Sealed";
+    assert.ok(scoreMatch(title, aiNendo) >= MATCH_ACCEPT_THRESHOLD);
+  });
+
+  it("accepts a bare title with no maker, series or scale", () => {
+    // Scores only 0.6 — nothing but the name matches — but every gate passes,
+    // so rejecting it was losing a genuine listing.
+    assert.ok(scoreMatch("Marin Kitagawa Swimsuit Ver. Figure", marinScale) >= MATCH_ACCEPT_THRESHOLD);
+  });
+});
+
+describe("things that aren't the figure at all", () => {
+  it("rejects merchandise carrying the character's name", () => {
+    const title = "Nendoroid My Dress-Up Darling Marin Kitagawa Nuru Girl Full Graphic T-Shirt";
+    assert.equal(scoreMatch(title, marinNendo), 0);
+  });
+
+  it("rejects other merchandise types", () => {
+    for (const item of ["Acrylic Standee", "Keychain", "Poster", "Tapestry", "Mousepad"]) {
+      assert.equal(
+        scoreMatch(`My Dress-Up Darling Marin Kitagawa ${item}`, marinNendo),
+        0,
+        `${item} is not a figure`,
+      );
+    }
+  });
+
+  it("rejects blind-box multi-packs", () => {
+    const titles = [
+      'Box of 6 Nendoroid Surprise: My Dress-Up Darling - Marin Kitagawa Figure',
+      'Nendoroid Surprise "My Dress-Up Darling" Marin Kitagawa Figure Set of 6',
+      "My Dress-Up Darling Marin Kitagawa Figure lot of 3",
+    ];
+    for (const title of titles) {
+      assert.equal(scoreMatch(title, marinNendo), 0, title);
+    }
+  });
+
+  it("does not mistake a Nendoroid listing for the scale figure", () => {
+    // Same character, same outfit, same maker — but a different product line,
+    // and the title carries no 1/7 marker to catch it any other way.
+    const title = "Nendoroid 2433 My Dress-Up Darling Marin Kitagawa Swimsuit Ver. Used Figure";
+    assert.equal(scoreMatch(title, marinScale), 0);
+  });
+
+  it("does not mistake a figma listing for a Nendoroid", () => {
+    assert.equal(scoreMatch("figma My Dress-Up Darling Marin Kitagawa", marinNendo), 0);
+  });
+
+  it("rejects accessory packs whose individual words all look innocent", () => {
+    const anyaNendo: MatchCandidate = {
+      id: "anya-nendo",
+      name: "Nendoroid Anya Forger",
+      nameJa: null,
+      scale: null,
+      category: "NENDOROID",
+      manufacturerName: "Good Smile Company",
+      seriesName: "Spy x Family",
+      characterNames: ["Anya Forger"],
+    };
+    // A pack of spare face plates, not the figure.
+    const title = "Nendoroid More Exchange Face Anya Forger SPY×FAMILY Unopened Set";
+    assert.equal(scoreMatch(title, anyaNendo), 0);
+  });
+
+  it("still accepts a plain Nendoroid listing", () => {
+    const title = "Nendoroid No. 1935 My Dress-Up Darling Marin Kitagawa PVC Figure From Japan";
+    assert.ok(scoreMatch(title, marinNendo) >= MATCH_ACCEPT_THRESHOLD);
+  });
+});
+
+/**
+ * The hardest case: a variant contains every word of the base product's name,
+ * so name overlap is a perfect 1.0 and every other signal agrees too. Only the
+ * extra word distinguishes them.
+ */
+describe("base product vs. a variant of it", () => {
+  it("rejects the Swimsuit Nendoroid for the base Nendoroid", () => {
+    const titles = [
+      "NEW Nendoroid Marin Kitagawa Swimsuit Ver My Dress-Up Darling Good Smile",
+      "GOOD SMILE COMPANY NENDOROID #2433 MY DRESS-UP DARLING MARIN KITAGAWA SWIMSUIT",
+    ];
+    for (const title of titles) {
+      assert.ok(
+        scoreMatch(title, marinNendo) < MATCH_ACCEPT_THRESHOLD,
+        `should not match the base Nendoroid: ${title}`,
+      );
+    }
+  });
+
+  it("rejects other outfit variants of a base Nendoroid", () => {
+    const anyaNendo: MatchCandidate = {
+      id: "anya-nendo",
+      name: "Nendoroid Anya Forger",
+      nameJa: null,
+      scale: null,
+      category: "NENDOROID",
+      manufacturerName: "Good Smile Company",
+      seriesName: "Spy x Family",
+      characterNames: ["Anya Forger"],
+    };
+
+    for (const title of [
+      "Good Smile Nendoroid 2623 Anya Forger Casual Outfit Ver. SPY x FAMILY",
+      "Good Smile Company Spy x Family Anya Forger Winter Ver. Nendoroid Figure",
+    ]) {
+      assert.ok(scoreMatch(title, anyaNendo) < MATCH_ACCEPT_THRESHOLD, title);
+    }
+
+    // ...but the base product itself must still match.
+    assert.ok(
+      scoreMatch("Good Smile Company Nendoroid Anya Forger Spy x Family", anyaNendo) >=
+        MATCH_ACCEPT_THRESHOLD,
+    );
+  });
+});
+
+describe("normalization of run-together text", () => {
+  it("splits numbers from words so scale markers survive", () => {
+    const tokens = tokenize("Anya Forger 1/7scale PVC");
+    assert.ok(tokens.has("anya"));
+    assert.ok(tokens.has("forger"));
+    // "1/7scale" must not become one opaque token.
+    assert.equal(tokens.has("7scale"), false);
+  });
+
+  it("folds synonyms onto a canonical form", () => {
+    assert.ok(tokenize("Marin Swimwear ver").has("swimsuit"));
+    assert.ok(tokenize("Marin Nendo").has("nendoroid"));
   });
 });
 
