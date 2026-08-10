@@ -370,6 +370,27 @@ model EbayAccountDeletion {
   @@index([receivedAt])
 }
 
+/// Fixed-window request counters.
+///
+/// Postgres-backed rather than in-memory because serverless functions don't
+/// share memory — an in-memory counter would reset every cold start and be
+/// enforced separately per instance, which is close to no limit at all.
+///
+/// One row per (key, window). Rows are disposable; the nightly job deletes old
+/// ones. If traffic ever makes a database write per request the bottleneck,
+/// this is the piece to move to Redis.
+model RateLimit {
+  id          String   @id @default(cuid())
+  /// Bucket identity — e.g. "search:203.0.113.4".
+  key         String
+  /// Start of the window this count belongs to.
+  windowStart DateTime
+  count       Int      @default(0)
+
+  @@unique([key, windowStart])
+  @@index([windowStart])
+}
+
 /// Daily USD conversion rates, so historical prices stay reproducible.
 model FxRate {
   id       String   @id @default(cuid())

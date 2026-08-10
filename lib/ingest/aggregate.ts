@@ -1,4 +1,5 @@
 import { prisma } from "../prisma";
+import { pruneRateLimits } from "../rate-limit-store";
 import type { ItemCondition } from "../generated/prisma/enums";
 
 /**
@@ -101,6 +102,14 @@ export async function runAggregation(forDay?: Date): Promise<AggregateResult> {
   }
 
   const figuresUpdated = await recomputeFigureStats();
+
+  // Rate-limit counters are disposable once their window has closed, and
+  // nothing else deletes them.
+  const prunedCounters = await pruneRateLimits();
+  if (prunedCounters > 0) {
+    console.info(`[aggregate] pruned ${prunedCounters} expired rate-limit counters`);
+  }
+
   return { snapshotsWritten, figuresUpdated };
 }
 
