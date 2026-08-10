@@ -1,13 +1,18 @@
 import Link from "next/link";
 import { TrendingDown, TrendingUp } from "lucide-react";
 import type { FigureCard as FigureCardData } from "@/lib/queries";
-import { formatPercent, formatUsd, trendOf } from "@/lib/money";
+import { formatPercent, trendOf } from "@/lib/money";
+import { formatMoney } from "@/lib/currency";
+import { getDisplayMoney } from "@/lib/currency-server";
 import { CATEGORY_LABELS } from "@/lib/labels";
 import { cn } from "@/lib/utils";
 import { FigureThumb } from "./figure-thumb";
 
-export function FigureCard({ figure }: { figure: FigureCardData }) {
+export async function FigureCard({ figure }: { figure: FigureCardData }) {
   const trend = trendOf(figure.change30dPct);
+  // Server component, so it reads the preference itself rather than having it
+  // threaded down through every grid and page that renders a card.
+  const money = await getDisplayMoney();
 
   return (
     <Link
@@ -41,7 +46,9 @@ export function FigureCard({ figure }: { figure: FigureCardData }) {
         <div className="mt-auto flex items-end justify-between pt-2">
           <div>
             <p className="text-[10px] uppercase tracking-wide text-muted">Market value</p>
-            <p className="tabular text-base font-semibold">{formatUsd(figure.marketValueUsd)}</p>
+            <p className="tabular text-base font-semibold">
+              {formatMoney(figure.marketValueUsd, money)}
+            </p>
           </div>
           {figure.change30dPct !== null && (
             <span

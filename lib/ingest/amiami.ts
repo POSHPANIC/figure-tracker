@@ -17,6 +17,8 @@
  * feed instead. See docs/DATA_SOURCES.md.
  */
 
+import { USER_AGENT } from "../site";
+
 const API = "https://api.amiami.com/api/v1.0";
 const IMAGE_BASE = "https://img.amiami.jp";
 const DELAY_MS = 1200;
@@ -101,7 +103,7 @@ export async function searchAmiAmi(keywords: string, limit = 30): Promise<AmiAmi
       headers: {
         "X-User-Key": "amiami_dev",
         Accept: "application/json",
-        "User-Agent": "FigureTracker/0.1 (price aggregator; contact via site footer)",
+        "User-Agent": USER_AGENT,
       },
       cache: "no-store",
       signal: AbortSignal.timeout(15_000),

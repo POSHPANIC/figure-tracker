@@ -7,7 +7,8 @@ import { Loader2, Trash2 } from "lucide-react";
 import { removeFromCollection } from "@/lib/actions/collection";
 import { CONDITION_LABELS } from "@/lib/labels";
 import type { ItemCondition } from "@/lib/generated/prisma/enums";
-import { formatCurrency, formatUsd, toNumber } from "@/lib/money";
+import { formatCurrency, toNumber } from "@/lib/money";
+import { formatMoney, type DisplayMoney } from "@/lib/currency";
 import { cn } from "@/lib/utils";
 import { FigureThumb } from "./figure-thumb";
 
@@ -29,7 +30,13 @@ export type CollectionRowData = {
   };
 };
 
-export function CollectionRow({ item }: { item: CollectionRowData }) {
+export function CollectionRow({
+  item,
+  money,
+}: {
+  item: CollectionRowData;
+  money: DisplayMoney;
+}) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [confirming, setConfirming] = useState(false);
@@ -99,7 +106,7 @@ export function CollectionRow({ item }: { item: CollectionRowData }) {
         </div>
 
         <div className="shrink-0 text-right">
-          <p className="tabular text-sm font-semibold">{formatUsd(lineValue)}</p>
+          <p className="tabular text-sm font-semibold">{formatMoney(lineValue, money)}</p>
           {gain !== null && (
             <p
               className={cn(
@@ -108,7 +115,7 @@ export function CollectionRow({ item }: { item: CollectionRowData }) {
               )}
             >
               {gain > 0 ? "+" : ""}
-              {formatUsd(gain)}
+              {formatMoney(gain, money)}
             </p>
           )}
         </div>

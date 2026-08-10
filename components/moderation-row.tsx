@@ -7,7 +7,8 @@ import { AlertTriangle, Check, ExternalLink, Loader2, X } from "lucide-react";
 import { reviewSale } from "@/lib/actions/sales";
 import { CONDITION_LABELS } from "@/lib/labels";
 import type { ItemCondition } from "@/lib/generated/prisma/enums";
-import { formatCurrency, formatUsd } from "@/lib/money";
+import { formatCurrency } from "@/lib/money";
+import { formatMoney, type DisplayMoney } from "@/lib/currency";
 
 export type ModerationRowData = {
   id: string;
@@ -38,7 +39,13 @@ export type ModerationRowData = {
  * leaving the page: the claimed price against the figure's current market
  * value, why screening flagged it, and the reporter's track record.
  */
-export function ModerationRow({ item }: { item: ModerationRowData }) {
+export function ModerationRow({
+  item,
+  money,
+}: {
+  item: ModerationRowData;
+  money: DisplayMoney;
+}) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [rejecting, setRejecting] = useState(false);
@@ -90,7 +97,11 @@ export function ModerationRow({ item }: { item: ModerationRowData }) {
         </div>
 
         <div className="text-right">
-          <p className="tabular text-lg font-semibold">{formatUsd(item.amountUsd)}</p>
+          <p className="tabular text-lg font-semibold">
+            {formatMoney(item.amountUsd, money, {
+              original: { amount: item.amount, currency: item.currency },
+            })}
+          </p>
           {item.currency !== "USD" && (
             <p className="tabular text-xs text-muted">
               {formatCurrency(item.amount, item.currency)}
@@ -101,7 +112,7 @@ export function ModerationRow({ item }: { item: ModerationRowData }) {
 
       <div className="mt-3 grid gap-2 sm:grid-cols-3">
         <Cell label="Current market value">
-          {market ? formatUsd(market) : "no data"}
+          {market ? formatMoney(market, money) : "no data"}
           {ratio !== null && (
             <span className="ml-1.5 text-xs text-muted">({ratio.toFixed(1)}×)</span>
           )}

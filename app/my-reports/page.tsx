@@ -5,6 +5,7 @@ import { ClipboardList } from "lucide-react";
 import { currentUser } from "@/auth";
 import { ReportRow } from "@/components/report-row";
 import { getMyReports, getReporterHistory } from "@/lib/user-queries";
+import { getDisplayMoney } from "@/lib/currency-server";
 
 export const metadata: Metadata = {
   title: "My sale reports",
@@ -15,9 +16,10 @@ export default async function MyReportsPage() {
   const user = await currentUser();
   if (!user) redirect("/signin?callbackUrl=%2Fmy-reports");
 
-  const [reports, history] = await Promise.all([
+  const [reports, history, money] = await Promise.all([
     getMyReports(user.id),
     getReporterHistory(user.id),
+    getDisplayMoney(),
   ]);
 
   return (
@@ -53,6 +55,7 @@ export default async function MyReportsPage() {
           {reports.map((r) => (
             <ReportRow
               key={r.id}
+              money={money}
               report={{
                 id: r.id,
                 condition: r.condition,

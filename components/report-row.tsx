@@ -7,7 +7,8 @@ import { CheckCircle2, Clock, Loader2, Trash2, XCircle } from "lucide-react";
 import { deleteMyReport } from "@/lib/actions/sales";
 import { CONDITION_LABELS } from "@/lib/labels";
 import type { ItemCondition, SaleStatus } from "@/lib/generated/prisma/enums";
-import { formatCurrency, formatUsd } from "@/lib/money";
+import { formatCurrency } from "@/lib/money";
+import { formatMoney, type DisplayMoney } from "@/lib/currency";
 import { cn } from "@/lib/utils";
 
 export type ReportRowData = {
@@ -44,7 +45,13 @@ const STATUS_META: Record<
   },
 };
 
-export function ReportRow({ report }: { report: ReportRowData }) {
+export function ReportRow({
+  report,
+  money,
+}: {
+  report: ReportRowData;
+  money: DisplayMoney;
+}) {
   const router = useRouter();
   const [confirming, setConfirming] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -87,7 +94,11 @@ export function ReportRow({ report }: { report: ReportRowData }) {
         </div>
 
         <div className="text-right">
-          <p className="tabular text-sm font-semibold">{formatUsd(report.amountUsd)}</p>
+          <p className="tabular text-sm font-semibold">
+            {formatMoney(report.amountUsd, money, {
+              original: { amount: report.amount, currency: report.currency },
+            })}
+          </p>
           {report.currency !== "USD" && (
             <p className="tabular text-xs text-muted">
               {formatCurrency(report.amount, report.currency)}

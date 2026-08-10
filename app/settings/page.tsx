@@ -4,10 +4,11 @@ import type { Metadata } from "next";
 import { currentUser } from "@/auth";
 import { SettingsForm } from "@/components/settings-form";
 import { prisma } from "@/lib/prisma";
+import { SITE_NAME } from "@/lib/site";
 
 export const metadata: Metadata = {
   title: "Settings",
-  description: "Manage your FigureTracker profile.",
+  description: `Manage your ${SITE_NAME} profile.`,
 };
 
 export default async function SettingsPage() {

@@ -152,6 +152,26 @@ Signed-in users get:
   you own and their market value. **What you paid and your gain/loss are never
   shown**, even when your profile is public.
 
+## Currency
+
+Visitors pick a display currency from the header; the choice lives in a cookie,
+so it works signed-out and survives a reload. Conversion happens during server
+rendering, so there's no flash of the wrong currency.
+
+Two rules worth knowing:
+
+- **MSRP is always shown in the currency the manufacturer set it in**, with the
+  display currency beside it marked approximate (`¥21,800 ≈ $138.04`).
+  Converting it away would misquote them.
+- **Where the original amount is on record and already matches the display
+  currency, it's shown verbatim.** Round-tripping a ¥25,000 purchase through USD
+  and back gives ¥24,997, which reads as a bug to whoever typed 25,000.
+
+Aggregates — market value, chart points, all-time high — exist only in USD,
+because averaging across mixed currencies isn't meaningful. Those are always a
+conversion, and the rate comes from the same daily `FxRate` table the ingestion
+uses. Rename the site itself in `lib/site.ts`.
+
 ## Images
 
 Two kinds, with opposite rules:

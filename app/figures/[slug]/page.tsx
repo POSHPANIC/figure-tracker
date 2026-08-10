@@ -12,6 +12,8 @@ import { PriceChart } from "@/components/price-chart";
 import { getFigureBySlug, getFigureStats, getPriceHistory } from "@/lib/queries";
 import { getFigureUserState } from "@/lib/user-queries";
 import { formatCurrency, formatPercent, formatUsd, trendOf } from "@/lib/money";
+import { approx, formatMoney } from "@/lib/currency";
+import { getDisplayMoney, nativeToUsd } from "@/lib/currency-server";
 import {
   CATEGORY_LABELS,
   CHARTABLE_CONDITIONS,
@@ -52,11 +54,24 @@ export default async function FigurePage({ params, searchParams }: PageProps<"/f
     : "NEW_SEALED";
 
   const user = await currentUser();
-  const [history, stats, userState] = await Promise.all([
+  const [history, stats, userState, money] = await Promise.all([
     getPriceHistory(figure.id, condition, HISTORY_DAYS),
     getFigureStats(figure.id, condition),
     user ? getFigureUserState(user.id, figure.id) : null,
+    getDisplayMoney(),
   ]);
+
+  // MSRP is the one price we always show in the currency the manufacturer
+  // actually set it in — converting it away would misquote them. The display
+  // currency appears beside it, marked approximate.
+  const msrpUsd =
+    figure.msrpAmount && figure.msrpCurrency
+      ? await nativeToUsd(Number(figure.msrpAmount), figure.msrpCurrency)
+      : null;
+  const msrpConverted =
+    msrpUsd !== null && figure.msrpCurrency?.toUpperCase() !== money.currency
+      ? approx(formatMoney(msrpUsd, money))
+      : null;
 
   const trend = trendOf(figure.change30dPct);
   const isModerator = user?.role === "MODERATOR" || user?.role === "ADMIN";
@@ -160,9 +175,18 @@ export default async function FigurePage({ params, searchParams }: PageProps<"/f
             </Spec>
             <Spec label="Status">{STATUS_LABELS[figure.status]}</Spec>
             <Spec label="MSRP">
-              {figure.msrpAmount && figure.msrpCurrency
-                ? formatCurrency(figure.msrpAmount, figure.msrpCurrency)
-                : "—"}
+              {figure.msrpAmount && figure.msrpCurrency ? (
+                <>
+                  <span className="tabular">
+                    {formatCurrency(figure.msrpAmount, figure.msrpCurrency)}
+                  </span>
+                  {msrpConverted && (
+                    <span className="tabular ml-1.5 text-muted">{msrpConverted}</span>
+                  )}
+                </>
+              ) : (
+                "—"
+              )}
             </Spec>
           </dl>
         </div>
@@ -190,14 +214,18 @@ export default async function FigurePage({ params, searchParams }: PageProps<"/f
           />
 
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-            <StatCard label="Market value" value={formatUsd(figure.marketValueUsd)} emphasis />
+            <StatCard
+              label="Market value"
+              value={formatMoney(figure.marketValueUsd, money)}
+              emphasis
+            />
             <StatCard
               label="30-day change"
               value={formatPercent(figure.change30dPct)}
               tone={trend}
             />
-            <StatCard label="All-time high" value={formatUsd(stats.allTimeHigh)} />
-            <StatCard label="All-time low" value={formatUsd(stats.allTimeLow)} />
+            <StatCard label="All-time high" value={formatMoney(stats.allTimeHigh, money)} />
+            <StatCard label="All-time low" value={formatMoney(stats.allTimeLow, money)} />
           </div>
 
           <section className="rounded-xl border border-border bg-surface p-4">
@@ -211,7 +239,7 @@ export default async function FigurePage({ params, searchParams }: PageProps<"/f
               <ConditionTabs slug={figure.slug} active={condition} />
             </div>
 
-            <PriceChart data={history} maxDays={HISTORY_DAYS} />
+            <PriceChart data={history} maxDays={HISTORY_DAYS} money={money} />
 
             <p className="mt-3 text-xs text-muted">
               Based on <span className="tabular">{stats.totalSales.toLocaleString()}</span> recorded{" "}
@@ -226,7 +254,7 @@ export default async function FigurePage({ params, searchParams }: PageProps<"/f
                 <p className="text-xs text-muted">
                   Lowest ask{" "}
                   <span className="tabular font-medium text-foreground">
-                    {formatUsd(stats.lowestAsk.amountUsd)}
+                    {formatMoney(stats.lowestAsk.amountUsd, money)}
                   </span>
                 </p>
               )}
@@ -245,11 +273,17 @@ export default async function FigurePage({ params, searchParams }: PageProps<"/f
                       <span className="block truncate text-sm">{l.title}</span>
                       <span className="block text-xs text-muted">
                         {l.source.name} · {CONDITION_LABELS[l.condition]}
-                        {l.shippingUsd ? ` · +${formatUsd(l.shippingUsd)} shipping` : ""}
+                        {l.shippingUsd
+                          ? ` · +${formatMoney(l.shippingUsd, money)} shipping`
+                          : ""}
                       </span>
                     </span>
                     <span className="tabular shrink-0 text-sm font-medium">
-                      {formatUsd(l.amountUsd)}
+                      {formatMoney(l.amountUsd, money, {
+                        // The seller's own price, when it's already in the
+                        // currency being shown — no round trip through USD.
+                        original: { amount: l.amount, currency: l.currency },
+                      })}
                     </span>
                     <a
                       href={l.url}
@@ -316,7 +350,9 @@ export default async function FigurePage({ params, searchParams }: PageProps<"/f
                           )}
                         </td>
                         <td className="tabular py-2 text-right font-medium">
-                          {formatUsd(s.amountUsd)}
+                          {formatMoney(s.amountUsd, money, {
+                            original: { amount: s.amount, currency: s.currency },
+                          })}
                         </td>
                       </tr>
                     ))}

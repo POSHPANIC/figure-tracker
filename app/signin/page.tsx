@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { AuthError } from "next-auth";
 import { Boxes } from "lucide-react";
 import { auth, availableProviders, signIn } from "@/auth";
+import { SITE_NAME } from "@/lib/site";
 
 export const metadata: Metadata = {
   title: "Sign in",
@@ -32,7 +33,7 @@ export default async function SignInPage({ searchParams }: PageProps<"/signin">)
       <span className="grid size-12 place-items-center rounded-xl bg-accent text-white">
         <Boxes className="size-6" />
       </span>
-      <h1 className="mt-4 text-2xl font-semibold tracking-tight">Sign in to FigureTracker</h1>
+      <h1 className="mt-4 text-2xl font-semibold tracking-tight">Sign in to {SITE_NAME}</h1>
       <p className="mt-1.5 text-center text-sm text-muted">
         Track what you own, what you paid, and what it's worth now.
       </p>

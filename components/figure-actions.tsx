@@ -8,6 +8,7 @@ import { CONDITION_LABELS } from "@/lib/labels";
 import type { ItemCondition } from "@/lib/generated/prisma/enums";
 import { formatCurrency } from "@/lib/money";
 import { cn } from "@/lib/utils";
+import { SITE_NAME } from "@/lib/site";
 
 type OwnedItem = {
   id: string;
@@ -207,7 +208,7 @@ export function FigureActions({ figureId, signedIn, owned, onWishlist }: Props) 
           </button>
 
           <p className="text-[11px] leading-tight text-muted">
-            Recording what you paid lets FigureTracker show profit and loss. It's private —
+            Recording what you paid lets {SITE_NAME} show profit and loss. It's private —
             never shown on your public profile.
           </p>
         </form>

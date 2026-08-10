@@ -12,7 +12,7 @@ import {
   YAxis,
 } from "recharts";
 import type { PricePoint } from "@/lib/queries";
-import { formatUsd } from "@/lib/money";
+import { formatMoney, type DisplayMoney } from "@/lib/currency";
 import { RANGE_OPTIONS } from "@/lib/labels";
 import { cn } from "@/lib/utils";
 
@@ -29,9 +29,14 @@ type Props = {
   data: PricePoint[];
   /** Days of history available; used to hide range buttons we can't fill. */
   maxDays: number;
+  /**
+   * Snapshots are stored in USD only — averaging across mixed currencies
+   * isn't meaningful — so every point on this chart is converted for display.
+   */
+  money: DisplayMoney;
 };
 
-export function PriceChart({ data, maxDays }: Props) {
+export function PriceChart({ data, maxDays, money }: Props) {
   const [range, setRange] = useState<number>(90);
 
   const visible = useMemo(() => {
@@ -110,9 +115,9 @@ export function PriceChart({ data, maxDays }: Props) {
               tickLine={false}
               axisLine={false}
               width={56}
-              tickFormatter={(v: number) => formatUsd(v, { compact: true })}
+              tickFormatter={(v: number) => formatMoney(v, money, { compact: true })}
             />
-            <Tooltip content={<PriceTooltip />} />
+            <Tooltip content={<PriceTooltip money={money} />} />
 
             <Area
               type="monotone"
@@ -143,9 +148,13 @@ type TooltipPayload = { payload: PricePoint & { band: [number, number] | null } 
 function PriceTooltip({
   active,
   payload,
+  money,
 }: {
   active?: boolean;
   payload?: TooltipPayload[];
+  // Recharts clones this element and injects `active`/`payload`; `money` is
+  // whatever we passed when constructing it.
+  money: DisplayMoney;
 }) {
   if (!active || !payload?.length) return null;
   const p = payload[0].payload;
@@ -160,8 +169,11 @@ function PriceTooltip({
         })}
       </p>
       <dl className="space-y-0.5">
-        <Row label="Median" value={formatUsd(p.median)} strong />
-        <Row label="Range" value={`${formatUsd(p.min)} – ${formatUsd(p.max)}`} />
+        <Row label="Median" value={formatMoney(p.median, money)} strong />
+        <Row
+          label="Range"
+          value={`${formatMoney(p.min, money)} – ${formatMoney(p.max, money)}`}
+        />
         <Row label="Sales" value={String(p.volume)} />
       </dl>
       {p.volume <= 2 && (

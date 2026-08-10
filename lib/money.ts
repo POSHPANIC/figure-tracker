@@ -34,16 +34,25 @@ export function formatUsd(value: DecimalLike, opts?: { compact?: boolean }): str
   }).format(n);
 }
 
-export function formatCurrency(value: DecimalLike, currency: string): string {
+export function formatCurrency(
+  value: DecimalLike,
+  currency: string,
+  opts?: { compact?: boolean },
+): string {
   const n = toNumber(value);
   if (n === null) return "—";
-  const digits = ZERO_DECIMAL.has(currency.toUpperCase()) ? 0 : 2;
+
+  // Yen has no minor unit, so "¥21,800.00" is simply wrong.
+  const zeroDecimal = ZERO_DECIMAL.has(currency.toUpperCase());
+  const digits = zeroDecimal ? 0 : 2;
+
   try {
     return new Intl.NumberFormat("en-US", {
       style: "currency",
       currency: currency.toUpperCase(),
-      maximumFractionDigits: digits,
-      minimumFractionDigits: digits,
+      notation: opts?.compact ? "compact" : "standard",
+      maximumFractionDigits: opts?.compact ? 1 : digits,
+      minimumFractionDigits: opts?.compact ? 0 : digits,
     }).format(n);
   } catch {
     // Unknown/invalid ISO code — fall back to a plain number plus the raw code.

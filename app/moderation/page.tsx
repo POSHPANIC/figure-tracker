@@ -4,6 +4,7 @@ import { ShieldCheck } from "lucide-react";
 import { currentUser } from "@/auth";
 import { ModerationRow } from "@/components/moderation-row";
 import { getModerationQueue, getReporterHistory } from "@/lib/user-queries";
+import { getDisplayMoney } from "@/lib/currency-server";
 
 export const metadata: Metadata = {
   title: "Moderation queue",
@@ -18,7 +19,10 @@ export default async function ModerationPage() {
   // can't use it.
   if (user.role !== "MODERATOR" && user.role !== "ADMIN") notFound();
 
-  const { items, pendingCount } = await getModerationQueue();
+  const [{ items, pendingCount }, money] = await Promise.all([
+    getModerationQueue(),
+    getDisplayMoney(),
+  ]);
 
   // Reporter track record, fetched once per distinct reporter.
   const reporterIds = [...new Set(items.map((i) => i.reportedBy?.id).filter(Boolean))] as string[];
@@ -65,6 +69,7 @@ export default async function ModerationPage() {
             return (
               <ModerationRow
                 key={item.id}
+                money={money}
                 item={{
                   id: item.id,
                   condition: item.condition,

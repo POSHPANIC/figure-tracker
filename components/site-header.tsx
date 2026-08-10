@@ -2,10 +2,13 @@ import Link from "next/link";
 import { Boxes } from "lucide-react";
 import { auth, signOut } from "@/auth";
 import { SearchBox } from "./search-box";
+import { SITE_NAME } from "@/lib/site";
+import { getDisplayMoney } from "@/lib/currency-server";
+import { CurrencySwitcher } from "./currency-switcher";
 import { UserMenu } from "./user-menu";
 
 export async function SiteHeader() {
-  const session = await auth();
+  const [session, money] = await Promise.all([auth(), getDisplayMoney()]);
 
   async function signOutAction() {
     "use server";
@@ -19,15 +22,17 @@ export async function SiteHeader() {
           <span className="grid size-8 place-items-center rounded-lg bg-accent text-white">
             <Boxes className="size-4.5" />
           </span>
-          <span className="hidden sm:inline">FigureTracker</span>
+          <span className="hidden sm:inline">{SITE_NAME}</span>
         </Link>
 
-        <SearchBox className="min-w-0 max-w-xl flex-1" />
+        <SearchBox className="min-w-0 max-w-xl flex-1" money={money} />
 
         <nav className="hidden shrink-0 items-center gap-1 text-sm lg:flex">
           <NavLink href="/figures?sort=trending">Trending</NavLink>
           <NavLink href="/figures">Browse</NavLink>
         </nav>
+
+        <CurrencySwitcher current={money.currency} className="hidden sm:block" />
 
         {session?.user ? (
           <UserMenu
@@ -70,7 +75,7 @@ export function SiteFooter() {
     <footer className="mt-16 border-t border-border">
       <div className="mx-auto flex max-w-7xl flex-col gap-2 px-4 py-8 text-xs text-muted sm:flex-row sm:items-center sm:justify-between">
         <p>
-          FigureTracker — price data aggregated from public marketplace listings and community
+          {SITE_NAME} — price data aggregated from public marketplace listings and community
           reports. Values are estimates, not appraisals.
         </p>
         <p>Not affiliated with any manufacturer or retailer.</p>

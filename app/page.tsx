@@ -3,6 +3,8 @@ import { ArrowRight, TrendingDown, TrendingUp } from "lucide-react";
 import { FigureCardGrid } from "@/components/figure-card";
 import { SearchBox } from "@/components/search-box";
 import { getCatalogTotals, getFacets, getMostTracked, getTopMovers } from "@/lib/queries";
+import { formatMoney, type DisplayMoney } from "@/lib/currency";
+import { getDisplayMoney } from "@/lib/currency-server";
 
 // Note: this page renders dynamically, not statically. The site header reads
 // the session (and therefore cookies), which opts every route into dynamic
@@ -11,12 +13,13 @@ import { getCatalogTotals, getFacets, getMostTracked, getTopMovers } from "@/lib
 // these three queries rather than the page.
 
 export default async function HomePage() {
-  const [gainers, losers, tracked, facets, totals] = await Promise.all([
+  const [gainers, losers, tracked, facets, totals, money] = await Promise.all([
     getTopMovers("up", 5),
     getTopMovers("down", 5),
     getMostTracked(10),
     getFacets(),
     getCatalogTotals(),
+    getDisplayMoney(),
   ]);
 
   return (
@@ -49,11 +52,13 @@ export default async function HomePage() {
           title="Rising this month"
           icon={<TrendingUp className="size-4 text-up" />}
           figures={gainers}
+          money={money}
         />
         <MoverPanel
           title="Falling this month"
           icon={<TrendingDown className="size-4 text-down" />}
           figures={losers}
+          money={money}
         />
       </section>
 
@@ -96,10 +101,12 @@ function MoverPanel({
   title,
   icon,
   figures,
+  money,
 }: {
   title: string;
   icon: React.ReactNode;
   figures: Awaited<ReturnType<typeof getTopMovers>>;
+  money: DisplayMoney;
 }) {
   return (
     <div className="rounded-xl border border-border bg-surface p-4">
@@ -122,7 +129,7 @@ function MoverPanel({
                   <span className="block truncate text-sm">{f.name}</span>
                   <span className="block truncate text-xs text-muted">{f.series?.name}</span>
                 </span>
-                <MoverPrice figure={f} />
+                <MoverPrice figure={f} money={money} />
               </Link>
             </li>
           ))}
@@ -132,18 +139,18 @@ function MoverPanel({
   );
 }
 
-function MoverPrice({ figure }: { figure: Awaited<ReturnType<typeof getTopMovers>>[number] }) {
+function MoverPrice({
+  figure,
+  money,
+}: {
+  figure: Awaited<ReturnType<typeof getTopMovers>>[number];
+  money: DisplayMoney;
+}) {
   const change = figure.change30dPct === null ? null : Number(figure.change30dPct);
   return (
     <span className="shrink-0 text-right">
       <span className="tabular block text-sm font-medium">
-        {figure.marketValueUsd
-          ? new Intl.NumberFormat("en-US", {
-              style: "currency",
-              currency: "USD",
-              maximumFractionDigits: 0,
-            }).format(Number(figure.marketValueUsd))
-          : "—"}
+        {formatMoney(figure.marketValueUsd, money)}
       </span>
       {change !== null && (
         <span

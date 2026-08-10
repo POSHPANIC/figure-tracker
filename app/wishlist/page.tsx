@@ -5,7 +5,8 @@ import { Heart } from "lucide-react";
 import { currentUser } from "@/auth";
 import { FigureCard } from "@/components/figure-card";
 import { getWishlist } from "@/lib/user-queries";
-import { formatUsd } from "@/lib/money";
+import { formatMoney } from "@/lib/currency";
+import { getDisplayMoney } from "@/lib/currency-server";
 
 export const metadata: Metadata = {
   title: "Wishlist",
@@ -16,7 +17,7 @@ export default async function WishlistPage() {
   const user = await currentUser();
   if (!user) redirect("/signin?callbackUrl=%2Fwishlist");
 
-  const items = await getWishlist(user.id);
+  const [items, money] = await Promise.all([getWishlist(user.id), getDisplayMoney()]);
   const total = items.reduce(
     (sum, item) => sum + Number(item.figure.marketValueUsd ?? 0),
     0,
@@ -33,7 +34,7 @@ export default async function WishlistPage() {
             <>
               <span className="tabular">{items.length}</span>{" "}
               {items.length === 1 ? "figure" : "figures"} · about{" "}
-              <span className="tabular font-medium text-foreground">{formatUsd(total)}</span> at
+              <span className="tabular font-medium text-foreground">{formatMoney(total, money)}</span> at
               today's prices
             </>
           )}

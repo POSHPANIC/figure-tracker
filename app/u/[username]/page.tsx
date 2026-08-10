@@ -2,8 +2,10 @@ import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { FigureCard } from "@/components/figure-card";
 import { getPublicProfile } from "@/lib/user-queries";
-import { formatUsd } from "@/lib/money";
+import { formatMoney } from "@/lib/currency";
+import { getDisplayMoney } from "@/lib/currency-server";
 import { CONDITION_LABELS } from "@/lib/labels";
+import { SITE_NAME } from "@/lib/site";
 
 export async function generateMetadata({
   params,
@@ -17,13 +19,13 @@ export async function generateMetadata({
     title: `${name}'s collection`,
     description:
       profile.user.bio ??
-      `${name} collects ${profile.publicTotals.uniqueFigures} anime figures on FigureTracker.`,
+      `${name} collects ${profile.publicTotals.uniqueFigures} anime figures on ${SITE_NAME}.`,
   };
 }
 
 export default async function PublicProfilePage({ params }: PageProps<"/u/[username]">) {
   const { username } = await params;
-  const profile = await getPublicProfile(username);
+  const [profile, money] = await Promise.all([getPublicProfile(username), getDisplayMoney()]);
 
   // A private profile and a nonexistent one look identical from outside —
   // otherwise 404-vs-403 would leak which usernames are taken.
@@ -58,7 +60,7 @@ export default async function PublicProfilePage({ params }: PageProps<"/u/[usern
           <div>
             <dt className="text-[10px] uppercase tracking-wide text-muted">Collection value</dt>
             <dd className="tabular text-lg font-semibold">
-              {formatUsd(publicTotals.marketValueUsd)}
+              {formatMoney(publicTotals.marketValueUsd, money)}
             </dd>
           </div>
         </dl>

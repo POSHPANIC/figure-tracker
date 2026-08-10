@@ -5,8 +5,11 @@ import { Boxes, Plus } from "lucide-react";
 import { currentUser } from "@/auth";
 import { CollectionRow } from "@/components/collection-row";
 import { getCollection } from "@/lib/user-queries";
-import { formatPercent, formatUsd } from "@/lib/money";
+import { formatPercent } from "@/lib/money";
+import { formatMoney } from "@/lib/currency";
+import { getDisplayMoney } from "@/lib/currency-server";
 import { cn } from "@/lib/utils";
+import { SITE_NAME } from "@/lib/site";
 
 export const metadata: Metadata = {
   title: "My collection",
@@ -17,7 +20,10 @@ export default async function CollectionPage() {
   const user = await currentUser();
   if (!user) redirect("/signin?callbackUrl=%2Fcollection");
 
-  const { items, totals } = await getCollection(user.id);
+  const [{ items, totals }, money] = await Promise.all([
+    getCollection(user.id),
+    getDisplayMoney(),
+  ]);
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-8">
@@ -44,11 +50,11 @@ export default async function CollectionPage() {
       ) : (
         <>
           <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
-            <Stat label="Market value" value={formatUsd(totals.marketValueUsd)} emphasis />
-            <Stat label="Total paid" value={formatUsd(totals.paidUsd)} />
+            <Stat label="Market value" value={formatMoney(totals.marketValueUsd, money)} emphasis />
+            <Stat label="Total paid" value={formatMoney(totals.paidUsd, money)} />
             <Stat
               label="Gain / loss"
-              value={formatUsd(totals.gainUsd)}
+              value={formatMoney(totals.gainUsd, money)}
               tone={totals.gainUsd > 0 ? "up" : totals.gainUsd < 0 ? "down" : undefined}
             />
             <Stat
@@ -79,7 +85,7 @@ export default async function CollectionPage() {
 
           <ul className="space-y-2">
             {items.map((item) => (
-              <CollectionRow key={item.id} item={serialize(item)} />
+              <CollectionRow key={item.id} item={serialize(item)} money={money} />
             ))}
           </ul>
         </>
@@ -121,7 +127,7 @@ function EmptyState() {
       <p className="mt-4 font-medium">Your collection is empty</p>
       <p className="mx-auto mt-1 max-w-sm text-sm text-muted">
         Find a figure you own and hit “Add to collection”. Record what you paid and
-        FigureTracker will track your gain or loss against the market.
+        {SITE_NAME} will track your gain or loss against the market.
       </p>
       <Link
         href="/figures"

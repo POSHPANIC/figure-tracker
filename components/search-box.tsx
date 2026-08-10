@@ -3,7 +3,7 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2, Search } from "lucide-react";
-import { formatUsd } from "@/lib/money";
+import { formatMoney, USD_MONEY, type DisplayMoney } from "@/lib/currency";
 import { cn } from "@/lib/utils";
 
 type Suggestion = {
@@ -24,11 +24,14 @@ export function SearchBox({
   autoFocus = false,
   placeholder = "Search figures, characters, series…",
   className,
+  money = USD_MONEY,
 }: {
   defaultValue?: string;
   autoFocus?: boolean;
   placeholder?: string;
   className?: string;
+  /** The API returns USD; suggestions are converted for display like everything else. */
+  money?: DisplayMoney;
 }) {
   const router = useRouter();
   const listId = useId();
@@ -160,7 +163,7 @@ export function SearchBox({
                   </span>
                 </span>
                 <span className="tabular shrink-0 text-sm font-medium">
-                  {formatUsd(item.marketValueUsd)}
+                  {formatMoney(item.marketValueUsd, money)}
                 </span>
               </button>
             </li>
