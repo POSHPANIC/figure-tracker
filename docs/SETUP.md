@@ -257,10 +257,13 @@ Visit your Vercel URL — the site should be live with data.
 at 04:30 UTC. In your Vercel project, open **Settings → Cron Jobs** and confirm
 both appear.
 
-> Vercel's Hobby (free) plan allows cron jobs to run **once per day**. The
-> 6-hourly ingestion schedule needs the Pro plan. On Hobby, change the schedule
-> in `vercel.json` to `"0 4 * * *"` and raise the limit (`?limit=100`) so the
-> single daily run covers more of the catalog.
+`vercel.json` is already set for the **Hobby (free) plan**, which only allows
+cron jobs to run once per day: ingestion at 04:00 UTC covering 100 figures, then
+aggregation at 04:30.
+
+> On the Pro plan you can run ingestion far more often. Change the schedule to
+> `"0 */6 * * *"` and drop the limit back to `?limit=25` — more frequent, smaller
+> runs keep prices fresher and stay well inside eBay's daily API quota.
 
 To test a job manually, replacing both placeholders:
 
