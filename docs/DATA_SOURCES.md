@@ -9,7 +9,7 @@ trouble, so read it before flipping anything on in production.
 | --- | --- | --- | --- |
 | **eBay Browse API** | Active listings (lowest ask, live inventory) | Implemented | None — official, free |
 | **eBay Marketplace Insights** | Real *sold* prices, last 90 days | Implemented, needs approval | None — official |
-| **AmiAmi** | Retail + preorder prices, MSRP, JPY | Implemented, off by default | Grey area — undocumented endpoint |
+| **AmiAmi** | Retail + preorder prices, MSRP, JPY | **Blocked by Cloudflare** — affiliate route only | — |
 | **Community reports** | User-submitted sale prices | Implemented, with screening + moderation | None |
 | **MyFigureCollection** | Best catalog data anywhere | Not implemented | **Their ToS forbids scraping** |
 | **Mandarake / Mercari / Yahoo Auctions** | Deep Japanese secondary market | Not implemented | Needs proxies; ToS varies |
@@ -46,21 +46,44 @@ Rate limits on the free tier are roughly 5,000 Browse calls/day, which is why
 
 ## AmiAmi
 
-Gives you Japanese retail prices and, importantly, MSRP — which is hard to get
-anywhere else.
+Japanese retail prices and, importantly, MSRP — which is hard to get anywhere
+else. Worth having. You can't have it this way.
 
-**Before enabling `AMIAMI_ENABLED=true`, understand what you're doing.** AmiAmi
-publishes no documented public API. `lib/ingest/amiami.ts` calls the endpoint
-their own storefront uses. Lots of community projects do this, but:
+### The endpoint is closed
 
-- It is not a contract. It can change or start blocking you at any time.
-- Heavy automated use may breach their terms of service.
-- If your site becomes popular, you are a visible, identifiable traffic source.
+`lib/ingest/amiami.ts` calls the endpoint AmiAmi's own storefront uses, because
+they publish no documented public API. **Tested live on 2026-08-13: it sits
+behind Cloudflare bot protection and returns 403 with a challenge page.**
 
-The client already serializes requests with a 1.2s delay and sends an honest
-User-Agent. If you plan to run this at any real scale, **contact AmiAmi about an
-affiliate or partner feed instead.** That converts a grey-area dependency into a
-supported one, and affiliate links are a plausible revenue model for this site.
+This was previously described here as a grey area. It isn't one any more — the
+owner has put a door on it. That's a clear answer, and the right response is to
+respect it.
+
+**Do not try to get around it.** Impersonating a browser to defeat bot detection
+is a terms-of-service breach, and it's a bad engineering bet regardless: you'd
+be founding your price data on an access method the owner is actively working to
+prevent, and it will break again at a time you don't choose. For a public site
+with your name on it, that risk isn't worth Japanese MSRP.
+
+The client stays in the tree, off by default, and now fails with an explanatory
+error rather than a bare 403. The surrounding work — throttling, JPY conversion,
+matching, upserts — carries over to a feed that *is* permitted.
+
+### The legitimate route: affiliate
+
+AmiAmi runs an affiliate programme, listed through networks such as VigLink /
+Sovrn. Affiliate programmes frequently come with a **product data feed** —
+structured catalogue data you're licensed to use, which is exactly what's
+wanted here, and better than scraped data because it's a supported contract.
+
+Worth asking for explicitly:
+
+1. Access to a product data feed, not just tracking links.
+2. What it contains — do prices and stock status update, and how often?
+3. Whether MSRP / list price is included.
+
+Same conversation as the press-image request in docs/PRESS_IMAGES.md, and worth
+combining: you're asking to send buyers to their store.
 
 ## MyFigureCollection
 

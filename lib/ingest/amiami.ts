@@ -5,16 +5,25 @@
  * in-stock, and their pre-owned section) in JPY — a useful floor to compare
  * against eBay resale, and the best source of MSRP.
  *
- * ⚠️ Read before enabling in production:
- * AmiAmi publishes no documented public API. The endpoint below is the one
- * their own storefront calls, and it is widely used by community projects, but
- * it is not a contract — it can change or start refusing traffic at any time,
- * and heavy use may violate their terms of service. This client therefore:
- *   • serializes requests with a delay between them (no parallel hammering),
- *   • identifies itself honestly in the User-Agent,
- *   • is off by default unless AMIAMI_ENABLED=true.
- * If you plan to run this at scale, contact AmiAmi about a partner/affiliate
- * feed instead. See docs/DATA_SOURCES.md.
+ * ⚠️ THIS DOES NOT CURRENTLY WORK, AND THAT IS THE CORRECT OUTCOME.
+ *
+ * Tested against the live endpoint on 2026-08-13: it sits behind Cloudflare bot
+ * protection and answers 403 with a challenge page. AmiAmi publishes no
+ * documented public API; this was the endpoint their own storefront calls, and
+ * they have since put a door on it.
+ *
+ * Getting past that would mean impersonating a browser to defeat bot detection.
+ * Don't. Beyond being a straightforward terms-of-service breach, it's a poor
+ * bet for a public site: you'd be building price data on an access method the
+ * owner has actively moved to prevent, and it would break again.
+ *
+ * The legitimate route is AmiAmi's affiliate programme, which can come with a
+ * product feed. See docs/DATA_SOURCES.md.
+ *
+ * The client is kept because the shape of the work — throttling, parsing, JPY
+ * conversion, matching — carries over to an affiliate feed. It stays off unless
+ * AMIAMI_ENABLED=true, and fails loudly rather than silently when it can't get
+ * through.
  */
 
 import { USER_AGENT } from "../site";
@@ -110,7 +119,18 @@ export async function searchAmiAmi(keywords: string, limit = 30): Promise<AmiAmi
     });
 
     if (!res.ok) {
-      console.warn(`[amiami] search returned ${res.status}`);
+      // A 403 here is almost always the Cloudflare challenge rather than a
+      // problem with the query. Say so, because "403" alone sends people off
+      // trying different headers — which is precisely what not to do.
+      if (res.status === 403) {
+        console.error(
+          "[amiami] blocked (403) — the endpoint is behind Cloudflare bot protection. " +
+            "This is not a bug to work around: see docs/DATA_SOURCES.md for the " +
+            "affiliate route. Set AMIAMI_ENABLED=false to stop trying.",
+        );
+      } else {
+        console.warn(`[amiami] search returned ${res.status}`);
+      }
       return [];
     }
 
