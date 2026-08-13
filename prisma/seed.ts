@@ -12,6 +12,7 @@ import "dotenv/config";
 import type { FigureCategory, ReleaseStatus } from "../lib/generated/prisma/enums";
 import { prisma } from "../lib/prisma";
 import { median, recomputeFigureStats } from "../lib/ingest/aggregate";
+import { rebuildAllSearchText } from "../lib/ingest/search-index";
 import { slugify } from "../lib/utils";
 
 // --- Deterministic PRNG so re-seeding produces the same charts -------------
@@ -637,6 +638,11 @@ async function main() {
 
   console.log("Aggregating figure stats…");
   await recomputeFigureStats();
+
+  // Without this a freshly seeded database has an empty search index, and
+  // nothing is findable until the nightly job runs.
+  const indexed = await rebuildAllSearchText();
+  console.log(`Search text built for ${indexed} figures.`);
   console.log("Done.");
 }
 

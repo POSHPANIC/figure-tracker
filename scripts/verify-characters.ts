@@ -23,6 +23,7 @@ import {
   type AniListCharacter,
   type AniListSeries,
 } from "../lib/ingest/anilist";
+import { rebuildAllSearchText } from "../lib/ingest/search-index";
 
 const WRITE = process.argv.includes("--write");
 
@@ -177,7 +178,12 @@ async function main() {
   }
 
   console.log(`  ${seriesUpdated} series and ${charactersUpdated} characters enriched`);
-  console.log("  Japanese names now feed the matcher; aliases are stored for search.");
+
+  // The aliases are only reachable through the denormalized search column, so
+  // enriching without rebuilding it would store data nothing can find.
+  const reindexed = await rebuildAllSearchText();
+  console.log(`  search text rebuilt for ${reindexed} figures`);
+  console.log("  Japanese names feed the matcher; aliases are now searchable.");
 
   await prisma.$disconnect();
 }

@@ -1,5 +1,6 @@
 import { prisma } from "../prisma";
 import { pruneRateLimits } from "../rate-limit-store";
+import { rebuildAllSearchText } from "./search-index";
 import type { ItemCondition } from "../generated/prisma/enums";
 
 /**
@@ -109,6 +110,10 @@ export async function runAggregation(forDay?: Date): Promise<AggregateResult> {
   if (prunedCounters > 0) {
     console.info(`[aggregate] pruned ${prunedCounters} expired rate-limit counters`);
   }
+
+  // Keep search in step with any catalogue metadata that changed today.
+  const reindexed = await rebuildAllSearchText();
+  if (reindexed > 0) console.info(`[aggregate] refreshed search text for ${reindexed} figures`);
 
   return { snapshotsWritten, figuresUpdated };
 }

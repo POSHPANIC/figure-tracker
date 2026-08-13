@@ -147,6 +147,18 @@ model Figure {
   salesVolume90d    Int      @default(0)
   lastAggregatedAt  DateTime?
 
+  /// Everything this figure can be found by, in one lowercase blob: its own
+  /// names, its manufacturer, its series under every title, and every character
+  /// with their Japanese name and nicknames.
+  ///
+  /// Denormalized for two reasons. Searching the relations directly meant five
+  /// OR'd joins on every keystroke; and Prisma cannot do partial matching inside
+  /// a Postgres array at all, so character aliases were unreachable — someone
+  /// searching "Saber" could not find Altria Pendragon.
+  ///
+  /// Rebuilt by the nightly job and whenever catalogue metadata changes.
+  searchText String?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -160,6 +172,9 @@ model Figure {
   @@index([category])
   @@index([marketValueUsd])
   @@index([releaseDate])
+  // Prefix searches use this. A substring match ("%marin%") can't, and wants a
+  // pg_trgm GIN index instead — worth adding when the catalogue outgrows a scan.
+  @@index([searchText])
 }
 
 /// A catalog image for a figure — the product photo, not a marketplace listing's.

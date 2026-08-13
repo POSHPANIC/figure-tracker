@@ -1,5 +1,6 @@
 import "server-only";
 import { prisma } from "./prisma";
+import { normalizeQuery } from "./search-text";
 import type { Prisma } from "./generated/prisma/client";
 import type { FigureCategory, ItemCondition } from "./generated/prisma/enums";
 
@@ -53,15 +54,17 @@ function buildWhere(f: FigureFilters): Prisma.FigureWhereInput {
   const where: Prisma.FigureWhereInput = {};
 
   if (f.q?.trim()) {
-    const q = f.q.trim();
-    // Postgres ILIKE via `mode: insensitive`. Good enough up to ~100k rows;
-    // swap for a tsvector column + GIN index when the catalog outgrows it.
+    const q = normalizeQuery(f.q);
+    // One indexed column rather than five OR'd joins. searchText is stored
+    // lowercase, so no `mode: "insensitive"` — that forces a sequential scan.
+    //
+    // It also reaches things the joins couldn't: character aliases and series
+    // synonyms live in Postgres arrays, and Prisma has no partial match for
+    // array elements, so "Saber" could never find Altria Pendragon before.
     where.OR = [
+      { searchText: { contains: q } },
+      // Safety net for a figure created since the last index rebuild.
       { name: { contains: q, mode: "insensitive" } },
-      { nameJa: { contains: q, mode: "insensitive" } },
-      { series: { name: { contains: q, mode: "insensitive" } } },
-      { manufacturer: { name: { contains: q, mode: "insensitive" } } },
-      { characters: { some: { name: { contains: q, mode: "insensitive" } } } },
     ];
   }
   if (f.category) where.category = f.category;
