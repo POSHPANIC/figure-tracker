@@ -16,6 +16,7 @@
     "ingest": "tsx scripts/ingest.ts",
     "set-role": "tsx scripts/set-role.ts",
     "verify:characters": "tsx scripts/verify-characters.ts",
+    "purge:demo": "tsx scripts/purge-demo-data.ts",
     "test": "tsx --test lib/**/*.test.ts",
     "db:reset": "prisma migrate reset --force"
   },

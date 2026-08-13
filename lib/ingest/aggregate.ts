@@ -159,9 +159,21 @@ export async function recomputeFigureStatsFor(figureId: string): Promise<boolean
   });
 
   if (recent.length === 0) {
+    // Clear the price rather than leaving the last known one sitting there.
+    //
+    // "What did this sell for at some unstated point in the past" is not what a
+    // market value claims to be, and a figure that stops trading would
+    // otherwise keep quoting a number forever with nothing marking it stale.
+    // No recent sales means we don't know — say so, and let the chart show the
+    // history that does exist.
     await prisma.figure.update({
       where: { id: figureId },
-      data: { salesVolume90d: 0, lastAggregatedAt: new Date() },
+      data: {
+        marketValueUsd: null,
+        change30dPct: null,
+        salesVolume90d: 0,
+        lastAggregatedAt: new Date(),
+      },
     });
     return false;
   }

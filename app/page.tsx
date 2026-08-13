@@ -22,6 +22,9 @@ export default async function HomePage() {
     getDisplayMoney(),
   ]);
 
+  // Whether there's enough real trading behind the numbers to be worth showing.
+  const hasMarketData = gainers.length > 0 || losers.length > 0;
+
   return (
     <div className="mx-auto max-w-7xl px-4">
       <section className="py-12 sm:py-20">
@@ -29,16 +32,32 @@ export default async function HomePage() {
           <h1 className="text-3xl font-semibold tracking-tight sm:text-5xl">
             What is your figure collection worth?
           </h1>
+          {/* Reads honestly before any sales exist, rather than boasting about
+              zero. A price site with no prices should say so plainly. */}
           <p className="mt-4 text-muted">
-            Real sale prices, historical charts and live listings for{" "}
-            <span className="tabular font-medium text-foreground">
-              {totals.figures.toLocaleString()}
-            </span>{" "}
-            figures — built from{" "}
-            <span className="tabular font-medium text-foreground">
-              {totals.sales.toLocaleString()}
-            </span>{" "}
-            recorded sales.
+            {totals.sales > 0 ? (
+              <>
+                Real sale prices, historical charts and live listings for{" "}
+                <span className="tabular font-medium text-foreground">
+                  {totals.figures.toLocaleString()}
+                </span>{" "}
+                figures — built from{" "}
+                <span className="tabular font-medium text-foreground">
+                  {totals.sales.toLocaleString()}
+                </span>{" "}
+                recorded sales.
+              </>
+            ) : (
+              <>
+                Tracking{" "}
+                <span className="tabular font-medium text-foreground">
+                  {totals.figures.toLocaleString()}
+                </span>{" "}
+                figures. Price history is built from real marketplace sales and
+                collector reports — there isn't any yet, so charts will be empty
+                until it accumulates.
+              </>
+            )}
           </p>
           <SearchBox
             className="mx-auto mt-8 max-w-lg"
@@ -47,23 +66,30 @@ export default async function HomePage() {
         </div>
       </section>
 
-      <section className="grid gap-6 lg:grid-cols-2">
-        <MoverPanel
-          title="Rising this month"
-          icon={<TrendingUp className="size-4 text-up" />}
-          figures={gainers}
-          money={money}
-        />
-        <MoverPanel
-          title="Falling this month"
-          icon={<TrendingDown className="size-4 text-down" />}
-          figures={losers}
-          money={money}
-        />
-      </section>
+      {/* The movers panels are meaningless with no trades behind them, and two
+          empty boxes look like a broken page rather than a new one. */}
+      {hasMarketData && (
+        <section className="grid gap-6 lg:grid-cols-2">
+          <MoverPanel
+            title="Rising this month"
+            icon={<TrendingUp className="size-4 text-up" />}
+            figures={gainers}
+            money={money}
+          />
+          <MoverPanel
+            title="Falling this month"
+            icon={<TrendingDown className="size-4 text-down" />}
+            figures={losers}
+            money={money}
+          />
+        </section>
+      )}
 
-      <section className="mt-14">
-        <SectionHeading title="Most traded" href="/figures?sort=trending" />
+      <section className={hasMarketData ? "mt-14" : ""}>
+        <SectionHeading
+          title={hasMarketData ? "Most traded" : "In the catalogue"}
+          href={hasMarketData ? "/figures?sort=trending" : "/figures"}
+        />
         <FigureCardGrid figures={tracked} />
       </section>
 

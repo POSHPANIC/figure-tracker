@@ -440,8 +440,24 @@ function dayUtc(daysAgo: number): Date {
   return d;
 }
 
+/**
+ * Synthetic price history is opt-in.
+ *
+ * It exists so the charts have something to draw during development. It must
+ * never reach a public database: fabricated prices presented as a price
+ * reference are a lie to anyone reading them, and an instant rejection from any
+ * marketplace or retailer reviewing the site.
+ */
+const DEMO_PRICES = process.argv.includes("--demo-prices");
+
 async function main() {
-  console.log("Seeding…");
+  if (DEMO_PRICES) {
+    console.log("Seeding catalogue WITH SYNTHETIC PRICES (--demo-prices).");
+    console.log("Local development only. Never run this against a public database.\n");
+  } else {
+    console.log("Seeding catalogue only — no prices.");
+    console.log("Price history comes from real ingestion and community reports.\n");
+  }
 
   // --- Sources ------------------------------------------------------------
   const sources = [
@@ -520,9 +536,15 @@ async function main() {
       },
     });
 
+    if (!DEMO_PRICES) {
+      console.log(`  ${figure.name}`);
+      continue;
+    }
+
     // --- Synthetic price history ----------------------------------------
-    // Walk backwards from today's known market value so the newest point is
-    // exactly `marketUsd`, then let drift + noise generate the past.
+    // Only with --demo-prices. Walk backwards from today's known market value
+    // so the newest point is exactly `marketUsd`, then let drift + noise
+    // generate the past.
     const rng = makeRng(0x5eed + figureIndex * 7919);
     const dailyDrift = f.drift / 365;
 

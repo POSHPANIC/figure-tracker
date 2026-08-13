@@ -35,8 +35,21 @@ First time only, load the sample catalog:
 npm run db:seed
 ```
 
-That inserts 24 real figures with ~15,000 synthetic sales, so the charts have
-something to draw before any live data arrives.
+That inserts 24 real figures — **catalogue only, no prices**. Price history comes
+from real ingestion and community reports; the charts stay empty until it
+accumulates, which is the honest state for a new site.
+
+If you want prices locally to work on the charts:
+
+```bash
+npm run db:seed -- --demo-prices
+```
+
+That generates a synthetic random-walk history. **Never run it against a public
+database.** Fabricated prices on a price reference are a lie to whoever reads
+them, and an instant rejection from any marketplace or retailer reviewing the
+site. If demo data has already reached a database, `npm run purge:demo -- --yes`
+removes it and leaves the catalogue intact.
 
 ## Useful commands
 
