@@ -63,6 +63,13 @@ model Series {
   slug      String   @unique
   createdAt DateTime @default(now())
 
+  /// Japanese title, e.g. その着せ替え人形は恋をする.
+  titleJa String?
+  /// Alternate titles AniList knows. Sellers use these interchangeably — the
+  /// romaji "Sono Bisque Doll" turns up in listings far more than you'd expect.
+  synonyms String[]
+  anilistId Int?
+
   figures    Figure[]
   characters Character[]
 
@@ -75,6 +82,20 @@ model Character {
   slug     String  @unique
   seriesId String?
   series   Series? @relation(fields: [seriesId], references: [id], onDelete: SetNull)
+
+  /// Japanese name, e.g. 喜多川海夢. Sourced from AniList.
+  /// Used by the matcher: Japanese text in a listing title is a strong, safe
+  /// signal because it can't collide with English words by accident.
+  nameJa String?
+
+  /// Nicknames and alternate spellings — "Marine", "Thorn Princess", "Powy".
+  /// Stored for search and display. Deliberately NOT used to gate matching:
+  /// AniList lists epithets like "Number One" and "Chihuahua Girl", and a gate
+  /// that accepts "one" or "girl" would undo the precision work in match.ts.
+  aliases String[]
+
+  /// AniList's ID, so re-syncing doesn't depend on names staying stable.
+  anilistId Int?
 
   figures Figure[] @relation("FigureCharacters")
 

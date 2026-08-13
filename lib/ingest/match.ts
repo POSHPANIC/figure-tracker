@@ -213,6 +213,14 @@ export type MatchCandidate = {
   manufacturerName: string | null;
   seriesName: string | null;
   characterNames: string[];
+  /**
+   * Japanese character names, from AniList. Safe to gate on in a way the
+   * romaji aliases are not: 喜多川海夢 cannot collide with an English word by
+   * accident, whereas an alias like "Number One" tokenizes to "one".
+   */
+  characterNamesJa?: string[];
+  /** Alternate series titles — sellers write "Sono Bisque Doll" as often as the English name. */
+  seriesAliases?: string[];
 };
 
 /**
@@ -266,11 +274,16 @@ export function scoreMatch(title: string, figure: MatchCandidate): number {
   const titleTokens = tokenize(title);
   if (titleTokens.size === 0) return 0;
 
-  // --- Gate 1: the character must be named. ---
+  // --- Gate 1: the character must be named, in some language. ---
   const characterTokens = figure.characterNames.flatMap((n) => [...tokenize(n)]);
   if (characterTokens.length > 0) {
-    const hit = characterTokens.some((t) => titleTokens.has(t));
-    if (!hit) return 0;
+    const namedInEnglish = characterTokens.some((t) => titleTokens.has(t));
+    // Japanese sellers write the character's name in Japanese and nothing else.
+    // Substring rather than token match, because Japanese doesn't use spaces.
+    const namedInJapanese = (figure.characterNamesJa ?? []).some(
+      (ja) => ja.length > 1 && title.includes(ja),
+    );
+    if (!namedInEnglish && !namedInJapanese) return 0;
   }
 
   // --- Gate 2: it has to be a figure, and one of them. ---
@@ -325,12 +338,18 @@ export function scoreMatch(title: string, figure: MatchCandidate): number {
     if (forms.some((f) => normalizedTitle.includes(f))) score += 0.15;
   }
 
-  // Series name.
-  if (figure.seriesName) {
-    const seriesTokens = tokenize(figure.seriesName);
-    const seriesHits = [...seriesTokens].filter((t) => titleTokens.has(t)).length;
-    if (seriesTokens.size && seriesHits / seriesTokens.size >= 0.5) score += 0.12;
-  }
+  // Series name, under any of its titles. A listing saying "Sono Bisque Doll"
+  // is as much a My Dress-Up Darling listing as one saying so in English.
+  const seriesTitles = [figure.seriesName, ...(figure.seriesAliases ?? [])].filter(
+    (t): t is string => Boolean(t),
+  );
+  const seriesMatched = seriesTitles.some((title) => {
+    const seriesTokens = tokenize(title);
+    if (seriesTokens.size === 0) return false;
+    const hits = [...seriesTokens].filter((t) => titleTokens.has(t)).length;
+    return hits / seriesTokens.size >= 0.5;
+  });
+  if (seriesMatched) score += 0.12;
 
   // Scale is a strong disambiguator between a 1/7 scale and a Nendoroid of the
   // same character — reward agreement, punish an explicit mismatch.

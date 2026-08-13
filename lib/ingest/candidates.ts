@@ -22,8 +22,8 @@ export async function loadCandidates(force = false): Promise<MatchCandidate[]> {
       scale: true,
       category: true,
       manufacturer: { select: { name: true } },
-      series: { select: { name: true } },
-      characters: { select: { name: true } },
+      series: { select: { name: true, synonyms: true } },
+      characters: { select: { name: true, nameJa: true } },
     },
   });
 
@@ -35,7 +35,9 @@ export async function loadCandidates(force = false): Promise<MatchCandidate[]> {
     category: f.category,
     manufacturerName: f.manufacturer?.name ?? null,
     seriesName: f.series?.name ?? null,
+    seriesAliases: f.series?.synonyms ?? [],
     characterNames: f.characters.map((c) => c.name),
+    characterNamesJa: f.characters.map((c) => c.nameJa).filter((n): n is string => Boolean(n)),
   }));
 
   cache = { at: Date.now(), rows };
