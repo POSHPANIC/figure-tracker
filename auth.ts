@@ -46,11 +46,22 @@ declare module "@auth/core/jwt" {
 function buildProviders(): Provider[] {
   const providers: Provider[] = [];
 
+  // Automatic linking by email address is deliberately OFF.
+  //
+  // With it on, signing in with a second provider that reports the same email
+  // silently joins that account. It's named "dangerous" because a provider that
+  // doesn't verify email ownership then becomes an account takeover: register
+  // someone's address there, sign in, inherit their account.
+  //
+  // Google and Discord both verify, so the practical risk is low — but the cost
+  // of leaving it off is only a confusing error for someone who switches
+  // provider, and that can't happen at all until a second provider exists.
+  // Free to be strict now; revisit deliberately if Google is ever added.
   if (process.env.AUTH_GOOGLE_ID && process.env.AUTH_GOOGLE_SECRET) {
-    providers.push(Google({ allowDangerousEmailAccountLinking: true }));
+    providers.push(Google);
   }
   if (process.env.AUTH_DISCORD_ID && process.env.AUTH_DISCORD_SECRET) {
-    providers.push(Discord({ allowDangerousEmailAccountLinking: true }));
+    providers.push(Discord);
   }
 
   // Local development escape hatch. Type any email and you're signed in as that
