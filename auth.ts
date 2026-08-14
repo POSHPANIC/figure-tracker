@@ -4,7 +4,9 @@ import type { Provider } from "next-auth/providers";
 import Credentials from "next-auth/providers/credentials";
 import Discord from "next-auth/providers/discord";
 import Google from "next-auth/providers/google";
+import Resend from "next-auth/providers/resend";
 import { prisma } from "@/lib/prisma";
+import { isEmailConfigured, sendMagicLink } from "@/lib/email";
 import type { UserRole } from "@/lib/generated/prisma/enums";
 
 /**
@@ -43,6 +45,9 @@ declare module "@auth/core/jwt" {
   }
 }
 
+/** How long a sign-in link stays valid. Short enough to limit a leaked inbox. */
+const MAGIC_LINK_MAX_AGE_SECONDS = 15 * 60;
+
 function buildProviders(): Provider[] {
   const providers: Provider[] = [];
 
@@ -62,6 +67,30 @@ function buildProviders(): Provider[] {
   }
   if (process.env.AUTH_DISCORD_ID && process.env.AUTH_DISCORD_SECRET) {
     providers.push(Discord);
+  }
+
+  // Email sign-in link. Offered in production only when it can actually send,
+  // and always in development — where sendMagicLink prints the link to the
+  // terminal instead, so the flow is testable with no email service at all.
+  if (isEmailConfigured() || process.env.NODE_ENV !== "production") {
+    providers.push(
+      Resend({
+        // Unused when we override sendVerificationRequest, but the provider
+        // requires them to be present.
+        apiKey: process.env.AUTH_RESEND_KEY ?? "unset",
+        from: process.env.EMAIL_FROM ?? "onboarding@resend.dev",
+        // Auth.js defaults to 24 hours. A sign-in link sitting valid in an inbox
+        // for a day is a long window for a forwarded or leaked email.
+        maxAge: MAGIC_LINK_MAX_AGE_SECONDS,
+        async sendVerificationRequest({ identifier, url }) {
+          await sendMagicLink({
+            to: identifier,
+            url,
+            expiresInMinutes: MAGIC_LINK_MAX_AGE_SECONDS / 60,
+          });
+        },
+      }),
+    );
   }
 
   // Local development escape hatch. Type any email and you're signed in as that
@@ -98,7 +127,16 @@ function buildProviders(): Provider[] {
 export const { handlers, auth, signIn, signOut } = NextAuth({
   adapter: PrismaAdapter(prisma),
   session: { strategy: "jwt" },
-  pages: { signIn: "/signin" },
+  pages: {
+    signIn: "/signin",
+    // Auth.js's own "check your email" screen is unstyled and mentions
+    // NextAuth by name.
+    verifyRequest: "/signin/check-email",
+    // Errors come back to our sign-in page with ?error=…, so an expired link
+    // lands somewhere the user can immediately try again rather than on a
+    // dead-end default page.
+    error: "/signin",
+  },
   providers: buildProviders(),
   callbacks: {
     async jwt({ token, user, trigger }) {
@@ -153,7 +191,7 @@ export async function requireUser() {
   return user;
 }
 
-/** Which sign-in buttons the sign-in page should render. */
+/** Which OAuth buttons the sign-in page should render. */
 export function availableProviders(): { id: string; name: string }[] {
   const out: { id: string; name: string }[] = [];
   if (process.env.AUTH_GOOGLE_ID && process.env.AUTH_GOOGLE_SECRET) {
@@ -163,4 +201,12 @@ export function availableProviders(): { id: string; name: string }[] {
     out.push({ id: "discord", name: "Discord" });
   }
   return out;
+}
+
+/**
+ * Whether to show the email sign-in form. True in development even without an
+ * email service, because the link is printed to the terminal there.
+ */
+export function emailSignInAvailable(): boolean {
+  return isEmailConfigured() || process.env.NODE_ENV !== "production";
 }

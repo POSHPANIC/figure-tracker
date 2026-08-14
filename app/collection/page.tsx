@@ -126,7 +126,7 @@ function EmptyState() {
       </span>
       <p className="mt-4 font-medium">Your collection is empty</p>
       <p className="mx-auto mt-1 max-w-sm text-sm text-muted">
-        Find a figure you own and hit “Add to collection”. Record what you paid and
+        Find a figure you own and hit “Add to collection”. Record what you paid and{" "}
         {SITE_NAME} will track your gain or loss against the market.
       </p>
       <Link
