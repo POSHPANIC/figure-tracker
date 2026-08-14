@@ -15,7 +15,7 @@ import type { ActionResult } from "./collection";
  */
 const RESERVED = new Set([
   "admin", "administrator", "moderator", "mod", "staff", "support", "help",
-  "official", "vitrine", "figuretracker", "api", "settings", "collection",
+  "official", "figureindex", "figuretracker", "api", "settings", "collection",
   "wishlist", "figures", "signin", "signout", "login", "logout", "new",
   "me", "you",
 ]);

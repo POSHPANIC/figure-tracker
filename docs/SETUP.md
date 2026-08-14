@@ -83,7 +83,7 @@ endpoint is already built either way.
 #### Option A: apply for the exemption
 
 Click the **exemption** link in that message. Exemptions are for apps that don't
-store eBay *user* data, and Vitrine genuinely doesn't — it stores item
+store eBay *user* data, and FigureIndex genuinely doesn't — it stores item
 listings (title, price, condition, image, URL) and never the identity of a
 buyer or seller. Say exactly that. It goes into a review queue.
 
