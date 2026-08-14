@@ -1,4 +1,4 @@
-# FigureTracker
+# Vitrine
 
 A price-tracking site for anime figures — market values, price history charts,
 and live listings, in the spirit of PriceCharting or Collectr.

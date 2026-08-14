@@ -6,11 +6,18 @@ import { requireUser } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import type { ActionResult } from "./collection";
 
-/** Names that would be confusing or misleading as a public handle. */
+/**
+ * Names that would be confusing or misleading as a public handle.
+ *
+ * "figuretracker" stays reserved alongside the current name — the site was
+ * called that publicly, and a handle under the old name could still be used to
+ * pass as official.
+ */
 const RESERVED = new Set([
   "admin", "administrator", "moderator", "mod", "staff", "support", "help",
-  "official", "figuretracker", "api", "settings", "collection", "wishlist",
-  "figures", "signin", "signout", "login", "logout", "new", "me", "you",
+  "official", "vitrine", "figuretracker", "api", "settings", "collection",
+  "wishlist", "figures", "signin", "signout", "login", "logout", "new",
+  "me", "you",
 ]);
 
 const profileSchema = z.object({

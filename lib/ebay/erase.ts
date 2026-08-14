@@ -4,7 +4,7 @@ import { prisma } from "../prisma";
  * Erase everything we hold about one eBay user.
  *
  * Right now this genuinely finds nothing, and that's not an oversight — it's
- * the reason FigureTracker also qualifies for eBay's exemption. We store item
+ * the reason Vitrine also qualifies for eBay's exemption. We store item
  * data from listings (title, price, condition, image, URL) and never the
  * identity of the person selling or buying.
  *

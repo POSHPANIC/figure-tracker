@@ -7,7 +7,7 @@
  * three quarters of.
  */
 
-export const SITE_NAME = "FigureTracker";
+export const SITE_NAME = "Vitrine";
 
 export const SITE_TAGLINE = "anime figure price guide";
 
