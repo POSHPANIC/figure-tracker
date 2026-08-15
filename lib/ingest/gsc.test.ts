@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
   classify,
+  listingUrl,
   parseHeightMm,
   parseListing,
   parsePriceJpy,
@@ -94,6 +95,18 @@ const SPECS = {
   Specifications:
     "Painted plastic non-scale articulated figure with stand included. Approximately 100mm in height.",
 };
+
+describe("listingUrl", () => {
+  it("uses the bare path for page one", () => {
+    // /en/products/page/1 is a 404; the newest products are only here.
+    assert.equal(listingUrl(1), "https://www.goodsmile.info/en/products");
+  });
+
+  it("uses the paged path from two onwards", () => {
+    assert.equal(listingUrl(2), "https://www.goodsmile.info/en/products/page/2");
+    assert.equal(listingUrl(290), "https://www.goodsmile.info/en/products/page/290");
+  });
+});
 
 describe("parseListing", () => {
   it("pulls id, path, name and classes from a tile", () => {

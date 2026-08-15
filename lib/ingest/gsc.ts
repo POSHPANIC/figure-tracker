@@ -30,8 +30,16 @@ import { namesSomethingOtherThanAFigure, normalize } from "./match";
 
 export const GSC_ARCHIVE_ORIGIN = "https://www.goodsmile.info";
 
+/**
+ * The archive's first page has no /page/1 form — that URL 404s, and the
+ * newest thirty-six products live at the bare path instead. Getting this
+ * wrong loses the most recent releases silently, which is the worst way to
+ * lose anything.
+ */
 export function listingUrl(page: number): string {
-  return `${GSC_ARCHIVE_ORIGIN}/en/products/page/${page}`;
+  return page <= 1
+    ? `${GSC_ARCHIVE_ORIGIN}/en/products`
+    : `${GSC_ARCHIVE_ORIGIN}/en/products/page/${page}`;
 }
 
 export function productUrl(path: string): string {
