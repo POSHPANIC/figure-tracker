@@ -41,6 +41,34 @@ const DELAY_MS = 2_500;
  */
 export const CAST_PAGE_SIZE = 25;
 
+/**
+ * Look a character up by name, and ask what they appear in.
+ *
+ * The fallback for when a figure's character is not in the series' cast list.
+ * That happens more than the cast endpoint suggests: AniList files characters
+ * per media entry, so a character introduced in season three is absent from
+ * season one's list however far you page. Endeavour is not in Boku no Hero
+ * Academia's cast at any depth, yet AniList knows him perfectly well as "Enji
+ * Todoroki" with "Endeavor" among his alternative names.
+ *
+ * The media list is what makes this safe to use. Searching a name alone would
+ * happily return a character from an unrelated show — "Endeavor" also matches
+ * "Tera Endeavor" and a hero called "Endeavorman" — so the caller confirms the
+ * character appears in the series the figure claims.
+ */
+const CHARACTER_SEARCH_QUERY = `
+query ($search: String, $perPage: Int) {
+  Page(page: 1, perPage: $perPage) {
+    characters(search: $search) {
+      id
+      name { full native alternative }
+      media(perPage: 12, sort: POPULARITY_DESC) {
+        nodes { id title { romaji english native } synonyms }
+      }
+    }
+  }
+}`;
+
 /** One page of a single series' cast, for reaching past the first 25. */
 const CHARACTERS_QUERY = `
 query ($id: Int, $page: Int) {
@@ -278,6 +306,93 @@ export async function loadMoreCharacters(
   }
 
   return collected;
+}
+
+/** A character found by name, with the works they appear in. */
+export type AniListCharacterMatch = {
+  id: number;
+  name: string;
+  native: string | null;
+  alternatives: string[];
+  media: { id: number; titles: string[] }[];
+};
+
+type RawCharacterSearch = {
+  id?: number;
+  name?: { full?: string; native?: string | null; alternative?: (string | null)[] };
+  media?: {
+    nodes?: {
+      id?: number;
+      title?: Record<string, string | null>;
+      synonyms?: (string | null)[];
+    }[];
+  };
+};
+
+/**
+ * Characters whose name matches `search`, most relevant first.
+ *
+ * Returns [] when AniList knows nobody by that name, which is an ordinary
+ * outcome — plenty of figures depict characters from games and light novels
+ * that AniList has never indexed.
+ */
+export async function findCharacters(
+  search: string,
+  perPage = 5,
+): Promise<AniListCharacterMatch[]> {
+  await throttle();
+
+  let res: Response;
+  try {
+    res = await fetch(ENDPOINT, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      body: JSON.stringify({ query: CHARACTER_SEARCH_QUERY, variables: { search, perPage } }),
+      signal: AbortSignal.timeout(20_000),
+    });
+  } catch (err) {
+    console.warn(`[anilist] character search failed for "${search}":`, err);
+    return [];
+  }
+
+  if (res.status === 429) {
+    const retryAfter = Number(res.headers.get("retry-after") ?? 60);
+    console.warn(`[anilist] rate limited, waiting ${retryAfter}s`);
+    await new Promise((r) => setTimeout(r, retryAfter * 1000));
+    return findCharacters(search, perPage);
+  }
+  if (!res.ok) return [];
+
+  const body = (await res.json()) as {
+    data?: { Page?: { characters?: RawCharacterSearch[] } };
+    errors?: { message?: string }[];
+  };
+  if (body.errors?.length || !body.data?.Page?.characters) return [];
+
+  return body.data.Page.characters
+    .map((c) => {
+      if (!c.id || !c.name?.full) return null;
+      return {
+        id: c.id,
+        name: c.name.full,
+        native: c.name.native ?? null,
+        alternatives: (c.name.alternative ?? [])
+          .filter((a): a is string => Boolean(a))
+          .flatMap(expandAlternative),
+        media: (c.media?.nodes ?? [])
+          .filter((m) => m.id)
+          .map((m) => ({
+            id: m.id!,
+            titles: [
+              m.title?.romaji,
+              m.title?.english,
+              m.title?.native,
+              ...(m.synonyms ?? []),
+            ].filter((t): t is string => Boolean(t)),
+          })),
+      };
+    })
+    .filter((c): c is AniListCharacterMatch => c !== null);
 }
 
 /**

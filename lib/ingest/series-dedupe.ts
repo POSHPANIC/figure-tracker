@@ -133,6 +133,33 @@ export function duplicateEvidence(a: SeriesLike, b: SeriesLike): Evidence | null
 }
 
 /**
+ * Whether a set of media titles refers to the series we already hold.
+ *
+ * Used to confirm a character found by name really belongs to the figure's
+ * series. Deliberately exact on the normalized key — no containment. Merging
+ * two series on a shared word is recoverable and gets a human's eye first;
+ * attaching a character on one is neither, and "Fate" would hand Fate/stay
+ * night's cast to Fate/Grand Order without anyone noticing.
+ *
+ * An AniList ID in common short-circuits it, since that is the same question
+ * answered by AniList itself.
+ */
+export function titlesMatchSeries(
+  media: { id?: number | null; titles: string[] }[],
+  series: SeriesLike,
+): boolean {
+  if (series.anilistId != null && media.some((m) => m.id === series.anilistId)) return true;
+
+  const keys = seriesKeys(series);
+  return media.some((m) =>
+    m.titles.some((title) => {
+      const key = normalizeSeriesName(title);
+      return key.length > 0 && keys.has(key);
+    }),
+  );
+}
+
+/**
  * Which row a group should collapse into.
  *
  * Prefers the one already tied to AniList, since that carries the Japanese

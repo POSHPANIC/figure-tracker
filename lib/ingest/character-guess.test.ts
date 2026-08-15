@@ -3,6 +3,7 @@ import { describe, it } from "node:test";
 import {
   characterCandidates,
   sameCharacter,
+  sameCharacterWithinSeries,
   stripProductLine,
   stripQualifiers,
 } from "./character-guess";
@@ -35,6 +36,31 @@ describe("sameCharacter", () => {
   it("rejects unrelated names", () => {
     assert.equal(sameCharacter("Marin Kitagawa", "Yor Forger"), false);
     assert.equal(sameCharacter("", "Marin Kitagawa"), false);
+  });
+});
+
+describe("sameCharacterWithinSeries", () => {
+  it("accepts a given name once the series is known", () => {
+    // Good Smile call the figure "Schwi"; AniList calls her "Schwi Dola".
+    assert.ok(sameCharacterWithinSeries("Schwi Dola", "Schwi"));
+    assert.ok(sameCharacterWithinSeries("Enji Todoroki", "Todoroki"));
+  });
+
+  it("still needs the word to actually be in the name", () => {
+    assert.equal(sameCharacterWithinSeries("Schwi Dola", "Sora"), false);
+  });
+
+  it("does not rescue a multi-word guess that disagrees", () => {
+    // Two words that differ is a different person, not a shortened name.
+    assert.equal(sameCharacterWithinSeries("Nana Deviluke", "Momo Deviluke"), false);
+  });
+
+  it("ignores a word too short to mean anything", () => {
+    assert.equal(sameCharacterWithinSeries("Ai Hoshino", "Ai"), false);
+  });
+
+  it("keeps everything sameCharacter already accepted", () => {
+    assert.ok(sameCharacterWithinSeries("Mia Tearmoon", "Mia Luna Tearmoon"));
   });
 });
 

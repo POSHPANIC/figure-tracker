@@ -48,6 +48,30 @@ export function sameCharacter(a: string, b: string): boolean {
 }
 
 /**
+ * A looser name test, safe *only* once the series has been confirmed.
+ *
+ * `sameCharacter` refuses a single-word match, and rightly so across the whole
+ * of AniList: "Rin" would agree with Rin Tohsaka, Rin Okumura and a hundred
+ * others. Inside one confirmed series that reasoning inverts — Good Smile name
+ * a figure "Schwi" and AniList calls her "Schwi Dola", and within No Game No
+ * Life there is exactly one of her.
+ *
+ * The caller must have established the series first, and must still refuse
+ * when more than one character qualifies. Those two conditions are what make
+ * this defensible; on its own it would be far too generous.
+ */
+export function sameCharacterWithinSeries(characterName: string, guess: string): boolean {
+  if (sameCharacter(characterName, guess)) return true;
+
+  const words = romajiKey(guess).split(" ").filter(Boolean);
+  // One word only — a multi-word guess that failed sameCharacter disagrees
+  // about more than a middle name, and shouldn't be rescued here.
+  if (words.length !== 1 || words[0].length < 3) return false;
+
+  return new Set(romajiKey(characterName).split(" ").filter(Boolean)).has(words[0]);
+}
+
+/**
  * Product line names that prefix a figure's title.
  *
  * Longest first, so "Nendoroid Doll" is stripped before "Nendoroid" and doesn't

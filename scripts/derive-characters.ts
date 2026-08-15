@@ -25,14 +25,20 @@
  */
 import "dotenv/config";
 import { prisma } from "../lib/prisma";
-import { characterCandidates, sameCharacter } from "../lib/ingest/character-guess";
 import {
+  characterCandidates,
+  sameCharacter,
+  sameCharacterWithinSeries,
+} from "../lib/ingest/character-guess";
+import {
+  findCharacters,
   findSeriesCandidates,
   loadMoreCharacters,
   pickBestSeries,
   type AniListCharacter,
   type AniListSeries,
 } from "../lib/ingest/anilist";
+import { titlesMatchSeries } from "../lib/ingest/series-dedupe";
 import { rebuildSearchTextFor } from "../lib/ingest/search-index";
 import { slugify } from "../lib/utils";
 
@@ -49,7 +55,7 @@ type Resolution = {
   figureName: string;
   seriesName: string;
   characterName: string;
-  via: "catalogue" | "anilist";
+  via: "catalogue" | "anilist" | "anilist search";
   nameJa: string | null;
   aliases: string[];
   anilistId: number | null;
@@ -90,13 +96,58 @@ async function resolveSeries(
   }
 }
 
+
+/**
+ * Last resort: find the character by name, then check they belong here.
+ *
+ * Two gates, and both are needed. Searching "Endeavor" also returns "Tera
+ * Endeavor" from an unrelated show and a hero called "Endeavorman", so the
+ * name has to match properly; and a name can be shared outright across
+ * franchises, so the character's own media list has to name the series the
+ * figure claims. Either gate alone would eventually attach somebody else.
+ *
+ * Ambiguity is refused rather than resolved. If two different AniList
+ * characters both pass, we do not know which the figure depicts, and guessing
+ * is precisely the failure this whole path exists to avoid.
+ */
+async function searchByName(
+  candidates: string[],
+  series: { name: string; titleJa: string | null; synonyms: string[]; anilistId: number | null },
+) {
+  for (const guess of candidates) {
+    const cached = nameSearchCache.get(guess.toLowerCase());
+    const matches = cached ?? (await findCharacters(guess));
+    nameSearchCache.set(guess.toLowerCase(), matches);
+
+    // Series first, deliberately. Only once a character is confirmed to appear
+    // in this series is the looser one-word name test safe to apply.
+    const plausible = matches
+      .filter((c) => titlesMatchSeries(c.media, { id: "", ...series }))
+      .filter(
+        (c) =>
+          sameCharacterWithinSeries(c.name, guess) ||
+          c.alternatives.some((a) => sameCharacterWithinSeries(a, guess)),
+      );
+
+    const distinct = new Map(plausible.map((c) => [c.id, c]));
+    if (distinct.size === 1) return [...distinct.values()][0];
+    if (distinct.size > 1) return null; // Ambiguous — say nothing.
+  }
+  return null;
+}
+
+/** One lookup per distinct name, however many figures ask for it. */
+const nameSearchCache = new Map<string, Awaited<ReturnType<typeof findCharacters>>>();
+
 async function main() {
   const figures = await prisma.figure.findMany({
     where: { characters: { none: {} } },
     select: {
       id: true,
       name: true,
-      series: { select: { id: true, name: true } },
+      series: {
+        select: { id: true, name: true, titleJa: true, synonyms: true, anilistId: true },
+      },
     },
     orderBy: { createdAt: "asc" },
     ...(Number.isFinite(LIMIT) ? { take: LIMIT } : {}),
@@ -127,10 +178,13 @@ async function main() {
   const unresolved: Unresolved[] = [];
   /** How many were only found by paging past AniList's first 25. */
   let deepCastHits = 0;
+  /** How many needed the by-name search rather than the series' cast. */
+  let nameSearchHits = 0;
 
   // --- Pass 1: guess, and group the work by series ------------------------
   type Pending = { id: string; name: string; candidates: string[] };
-  const bySeriesId = new Map<string, { seriesName: string; figures: Pending[] }>();
+  type SeriesRow = NonNullable<(typeof figures)[number]["series"]>;
+  const bySeriesId = new Map<string, { series: SeriesRow; figures: Pending[] }>();
 
   for (const figure of figures) {
     const candidates = characterCandidates(figure.name);
@@ -153,7 +207,7 @@ async function main() {
       continue;
     }
     const group = bySeriesId.get(figure.series.id) ?? {
-      seriesName: figure.series.name,
+      series: figure.series,
       figures: [],
     };
     group.figures.push({ id: figure.id, name: figure.name, candidates });
@@ -165,6 +219,7 @@ async function main() {
 
   // --- Pass 2: resolve each series once, then match its figures -----------
   for (const [seriesId, group] of bySeriesId) {
+    const seriesRow = group.series;
     const known = bySeries.get(seriesId) ?? [];
 
     // Anyone we already hold needs no lookup at all.
@@ -179,7 +234,7 @@ async function main() {
         resolved.push({
           figureId: pending.id,
           figureName: pending.name,
-          seriesName: group.seriesName,
+          seriesName: seriesRow.name,
           characterName: local.name,
           via: "catalogue",
           nameJa: null,
@@ -198,13 +253,13 @@ async function main() {
       ...known.map((c) => c.name),
       ...stillUnknown.flatMap((p) => p.candidates),
     ];
-    const cast = await resolveSeries(group.seriesName, expected);
+    const cast = await resolveSeries(seriesRow.name, expected);
 
     for (const pending of stillUnknown) {
       if (!cast) {
         unresolved.push({
           figureName: pending.name,
-          seriesName: group.seriesName,
+          seriesName: seriesRow.name,
           candidates: pending.candidates,
           why: "AniList doesn't know this series",
         });
@@ -235,10 +290,34 @@ async function main() {
         }
       }
 
+      // Still nothing. AniList files characters per media entry, so someone
+      // introduced in a later season is absent from this entry's cast at any
+      // page depth — Endeavour is nowhere in Boku no Hero Academia's list, yet
+      // AniList knows him as "Enji Todoroki" with "Endeavor" among his other
+      // names. Look him up by name instead, and confirm from his own media
+      // list that he belongs to this series.
+      if (!remote) {
+        const found = await searchByName(pending.candidates, seriesRow);
+        if (found) {
+          resolved.push({
+            figureId: pending.id,
+            figureName: pending.name,
+            seriesName: seriesRow.name,
+            characterName: found.name,
+            via: "anilist search",
+            nameJa: found.native,
+            aliases: found.alternatives,
+            anilistId: found.id,
+          });
+          nameSearchHits += 1;
+          continue;
+        }
+      }
+
       if (!remote) {
         unresolved.push({
           figureName: pending.name,
-          seriesName: group.seriesName,
+          seriesName: seriesRow.name,
           candidates: pending.candidates,
           why: "no one in the cast matches",
         });
@@ -248,7 +327,7 @@ async function main() {
       resolved.push({
         figureId: pending.id,
         figureName: pending.name,
-        seriesName: group.seriesName,
+        seriesName: seriesRow.name,
         characterName: remote.name,
         via: "anilist",
         nameJa: remote.native,
@@ -266,7 +345,10 @@ async function main() {
   console.log(`${"=".repeat(62)}`);
   console.log(`resolved   : ${resolved.length}  (${viaCatalogue} from the catalogue, ${viaAniList} from AniList)`);
   if (deepCastHits > 0) {
-    console.log(`             ${deepCastHits} of those needed more than AniList's first 25 cast members`);
+    console.log(`             ${deepCastHits} needed more than AniList's first 25 cast members`);
+  }
+  if (nameSearchHits > 0) {
+    console.log(`             ${nameSearchHits} were absent from the cast and found by name search`);
   }
   console.log(`unresolved : ${unresolved.length}`);
 

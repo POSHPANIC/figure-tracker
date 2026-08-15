@@ -7,6 +7,7 @@ import {
   normalizeSeriesName,
   pickCanonical,
   seriesKeys,
+  titlesMatchSeries,
   type SeriesLike,
 } from "./series-dedupe";
 
@@ -116,6 +117,51 @@ describe("seriesKeys", () => {
     assert.ok(keys.has("demon slayer"));
     assert.ok(keys.has("鬼滅の刃"));
     assert.ok(keys.has("kimetsu no yaiba"));
+  });
+});
+
+describe("titlesMatchSeries", () => {
+  const mha = series({ id: "1", name: "My Hero Academia" });
+
+  it("confirms a character whose media names our series", () => {
+    // Enji Todoroki's real media list from AniList.
+    const media = [
+      { id: 21856, titles: ["Boku no Hero Academia 2nd Season", "My Hero Academia Season 2"] },
+      { id: 21459, titles: ["Boku no Hero Academia", "My Hero Academia"] },
+    ];
+    assert.equal(titlesMatchSeries(media, mha), true);
+  });
+
+  it("confirms on a shared AniList ID even when no title matches", () => {
+    const withId = series({ id: "1", name: "Anything At All", anilistId: 21459 });
+    assert.equal(titlesMatchSeries([{ id: 21459, titles: ["Boku no Hero Academia"] }], withId), true);
+  });
+
+  it("rejects a same-named character from another franchise", () => {
+    // "Tera Endeavor" is a real AniList character in an unrelated show.
+    const media = [{ id: 99999, titles: ["Twinstar Cyclone Runaway"] }];
+    assert.equal(titlesMatchSeries(media, mha), false);
+  });
+
+  it("does not accept a title that merely shares a word", () => {
+    const fgo = series({ id: "1", name: "Fate/Grand Order" });
+    assert.equal(titlesMatchSeries([{ id: 356, titles: ["Fate/stay night"] }], fgo), false);
+  });
+
+  it("matches through the series' synonyms", () => {
+    const dressUp = series({
+      id: "1",
+      name: "My Dress-Up Darling",
+      synonyms: ["Sono Bisque Doll wa Koi wo Suru"],
+    });
+    assert.equal(
+      titlesMatchSeries([{ id: 132405, titles: ["Sono Bisque Doll wa Koi wo Suru"] }], dressUp),
+      true,
+    );
+  });
+
+  it("rejects an empty media list", () => {
+    assert.equal(titlesMatchSeries([], mha), false);
   });
 });
 
