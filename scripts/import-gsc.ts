@@ -216,6 +216,69 @@ function printReport(report: Report) {
 // --- Writing ---------------------------------------------------------------
 
 /**
+ * Find a slug nobody else is using.
+ *
+ * Slugs are unique, and slugify is lossy: "IDOLiSH7" and "Idolish7" are two
+ * different series names in the archive that both reduce to "idolish7". Left
+ * alone that is not a bad row, it is a crash partway through an import — which
+ * is how it was found.
+ *
+ * The suffix is deliberately dull. Two rows that collide here are usually the
+ * same franchise spelled differently, and `npm run dedupe:series` will offer to
+ * merge them on conclusive evidence; this only has to get the import finished
+ * without inventing anything.
+ */
+async function freeSlug(
+  base: string,
+  isTaken: (slug: string) => Promise<boolean>,
+): Promise<string> {
+  if (!(await isTaken(base))) return base;
+  for (let n = 2; n < 50; n++) {
+    const candidate = `${base}-${n}`;
+    if (!(await isTaken(candidate))) return candidate;
+  }
+  throw new Error(`no free slug for "${base}" after 50 tries`);
+}
+
+/**
+ * Get the series by name, creating it with a free slug if it is new.
+ *
+ * Checks synonyms as well as the name, and that is not a nicety — it is what
+ * stops an import undoing a merge. `dedupe:series` keeps the name it merged
+ * away as a synonym of the surviving row, but the archive still calls the
+ * product "Character Vocal Series 01: Hatsune Miku" on every run. Matching on
+ * name alone would recreate that row each time, quietly unpicking the
+ * de-duplication between one import and the next.
+ */
+async function ensureSeries(name: string): Promise<string> {
+  const found = await prisma.series.findUnique({ where: { name }, select: { id: true } });
+  if (found) return found.id;
+
+  const merged = await prisma.series.findFirst({
+    where: { synonyms: { has: name } },
+    select: { id: true, name: true },
+  });
+  if (merged) {
+    console.log(`  "${name}" was merged into "${merged.name}" — keeping it there`);
+    return merged.id;
+  }
+  const slug = await freeSlug(slugify(name), async (s) =>
+    Boolean(await prisma.series.findUnique({ where: { slug: s }, select: { id: true } })),
+  );
+  return (await prisma.series.create({ data: { name, slug }, select: { id: true } })).id;
+}
+
+/** Same, for manufacturers. */
+async function ensureManufacturer(name: string): Promise<string> {
+  const found = await prisma.manufacturer.findUnique({ where: { name }, select: { id: true } });
+  if (found) return found.id;
+  const slug = await freeSlug(slugify(name), async (s) =>
+    Boolean(await prisma.manufacturer.findUnique({ where: { slug: s }, select: { id: true } })),
+  );
+  return (await prisma.manufacturer.create({ data: { name, slug }, select: { id: true } })).id;
+}
+
+/**
  * Slugs have to survive duplicate names.
  *
  * Good Smile have released more than one figure called "Saber", years apart.
@@ -226,7 +289,9 @@ function printReport(report: Report) {
  */
 async function uniqueSlug(base: string, productId: string): Promise<string> {
   const taken = await prisma.figure.findUnique({ where: { slug: base }, select: { id: true } });
-  return taken ? `${base}-${productId}` : base;
+  if (!taken) return base;
+  // The archive's product ID is already unique, so one suffix always suffices.
+  return `${base}-${productId}`;
 }
 
 async function write(figures: ParsedFigure[]) {
@@ -234,25 +299,8 @@ async function write(figures: ParsedFigure[]) {
   let updated = 0;
 
   for (const f of figures) {
-    const manufacturerId = f.manufacturer
-      ? (
-          await prisma.manufacturer.upsert({
-            where: { name: f.manufacturer },
-            update: {},
-            create: { name: f.manufacturer, slug: slugify(f.manufacturer) },
-          })
-        ).id
-      : null;
-
-    const seriesId = f.series
-      ? (
-          await prisma.series.upsert({
-            where: { name: f.series },
-            update: {},
-            create: { name: f.series, slug: slugify(f.series) },
-          })
-        ).id
-      : null;
+    const manufacturerId = f.manufacturer ? await ensureManufacturer(f.manufacturer) : null;
+    const seriesId = f.series ? await ensureSeries(f.series) : null;
 
     const releaseDate =
       f.releaseYear && f.releaseMonth
