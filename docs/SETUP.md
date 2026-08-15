@@ -338,6 +338,19 @@ in Vercel's environment variables.
 **Sign-in redirects in a loop** — `AUTH_SECRET` is missing or differs between
 deployments. Set it in Vercel and redeploy.
 
+**"Invalid OAuth2 redirect_uri"** — you signed in from a deployment-specific
+Vercel URL (`figure-tracker-abc123-you.vercel.app`) rather than your canonical
+one. Vercel mints a new URL every push, Auth.js builds the callback from
+whichever host you arrived on, and the provider has never seen that one.
+
+Registering them all is impossible. Set `AUTH_URL` in Vercel to your canonical
+public URL, for **Production only**, and redeploy — Auth.js then always builds
+callbacks from that host. Leave it unset locally so development keeps inferring
+`localhost:3000`.
+
+`AUTH_URL` and the redirect URI registered with each provider must always match
+each other. When you move to a custom domain, change both together.
+
 **eBay returns 401** — the client ID/secret are wrong, or you created a Sandbox
 keyset while `EBAY_ENV` is `PRODUCTION`. They must match.
 
