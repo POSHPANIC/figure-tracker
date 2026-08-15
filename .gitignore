@@ -52,3 +52,6 @@ skills-lock.json
 next-env.d.ts
 
 /app/generated/prisma
+
+# Cached pages from the Good Smile archive import (scripts/import-gsc.ts)
+.gsc-cache/
