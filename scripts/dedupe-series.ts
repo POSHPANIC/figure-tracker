@@ -272,13 +272,26 @@ async function main() {
   let figures = 0;
   let characters = 0;
   let reindexed = 0;
+
+  // Say what is happening. Merging prints nothing until it finishes, and
+  // against a remote database that silence lasts long enough to look like a
+  // hang — every merged group rebuilds the search text of every figure in the
+  // surviving series, and Hatsune Miku alone is three hundred of them.
+  console.log(`\nMerging ${groups.length} group(s)…`);
+  let done = 0;
   for (const { canonical, others } of groups) {
     for (const other of others) {
       const moved = await merge(other, canonical);
       figures += moved.figures;
       characters += moved.characters;
     }
-    reindexed += await reindexSeries(canonical.id);
+    const rows = await reindexSeries(canonical.id);
+    reindexed += rows;
+    done += 1;
+    console.log(
+      `  [${String(done).padStart(3)}/${groups.length}] ${canonical.name.slice(0, 44)}` +
+        ` — ${figures} figure(s) moved, ${reindexed} reindexed`,
+    );
   }
 
   console.log(`\nMerged ${groups.length} group(s): moved ${figures} figure(s), merged ${characters} character(s).`);
