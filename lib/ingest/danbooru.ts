@@ -48,12 +48,18 @@ export function danbooruConfigured(): boolean {
 function authHeaders(): Record<string, string> {
   const login = process.env.DANBOORU_LOGIN ?? "";
   const key = process.env.DANBOORU_API_KEY ?? "";
+  const userId = process.env.DANBOORU_USER_ID?.trim();
+
   return {
     // Basic auth rather than query parameters, so the key never appears in a
-    // URL that might be logged.
+    // URL that might end up in a log.
     Authorization: `Basic ${Buffer.from(`${login}:${key}`).toString("base64")}`,
-    // They ask that clients identify themselves by account.
-    "User-Agent": `FigureIndex/0.1 (by ${login} on danbooru)`,
+    // Their documentation asks for "YourBotName/1.0 (user #id)" — the numeric
+    // account id, not the username. Falling back to the username still
+    // identifies us, which is the point, but the id is what they asked for.
+    "User-Agent": userId
+      ? `FigureIndex/0.1 (user #${userId})`
+      : `FigureIndex/0.1 (danbooru user ${login})`,
     Accept: "application/json",
   };
 }
