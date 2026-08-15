@@ -333,16 +333,32 @@ export function scoreMatch(title: string, figure: MatchCandidate): number {
   if (titleTokens.size === 0) return 0;
 
   // --- Gate 1: the character must be named, in some language. ---
+  //
+  // A figure with no characters recorded fails outright. This used to skip the
+  // gate instead, which was harmless while every figure in the catalogue had a
+  // character and became a serious fault the moment thousands didn't: the gate
+  // is what anchors a match to a person, and without it a figure matches on
+  // name overlap alone.
+  //
+  // "Nendoroid L 2.0" is what made it obvious. Tokenised it is little more than
+  // "nendoroid", so with no character to check it scored a perfect name match
+  // against *every* Nendoroid listing — and a dry run showed it taking Anya
+  // Forger's, Ai Hoshino's and several others at 0.75 apiece.
+  //
+  // The cost is that genuinely character-less products — mecha, dioramas,
+  // originals — can never match a listing. That is the right trade: they are
+  // rare, they are hard to identify from a title anyway, and an unmatched
+  // figure merely lacks prices where a mismatched one publishes wrong ones.
   const characterTokens = figure.characterNames.flatMap((n) => [...tokenize(n)]);
-  if (characterTokens.length > 0) {
-    const namedInEnglish = characterTokens.some((t) => titleTokens.has(t));
-    // Japanese sellers write the character's name in Japanese and nothing else.
-    // Substring rather than token match, because Japanese doesn't use spaces.
-    const namedInJapanese = (figure.characterNamesJa ?? []).some(
-      (ja) => ja.length > 1 && title.includes(ja),
-    );
-    if (!namedInEnglish && !namedInJapanese) return 0;
-  }
+  if (characterTokens.length === 0) return 0;
+
+  const namedInEnglish = characterTokens.some((t) => titleTokens.has(t));
+  // Japanese sellers write the character's name in Japanese and nothing else.
+  // Substring rather than token match, because Japanese doesn't use spaces.
+  const namedInJapanese = (figure.characterNamesJa ?? []).some(
+    (ja) => ja.length > 1 && title.includes(ja),
+  );
+  if (!namedInEnglish && !namedInJapanese) return 0;
 
   // --- Gate 2: it has to be a figure, and one of them. ---
   const normalizedTitle = normalize(title);
@@ -427,12 +443,39 @@ export function scoreMatch(title: string, figure: MatchCandidate): number {
 export type MatchResult = { figureId: string; score: number } | null;
 
 /** Best match for a title, or null when nothing clears the threshold. */
+/**
+ * How much of the figure's own name the title actually accounts for.
+ *
+ * The tie-break, and it decides real cases. "Nendoroid Hatsune Miku" and
+ * "Nendoroid Hatsune Miku: Beauty Looking Back Ver." both score 0.87 against a
+ * listing for the latter — the generic name matches perfectly because every one
+ * of its words is present, and the score is a ratio so being shorter costs it
+ * nothing. Counting matched words instead of proportioning them prefers the
+ * figure that explains more of the title, which is the more specific product.
+ */
+function matchedNameTokens(title: string, figure: MatchCandidate): number {
+  const titleTokens = tokenize(title);
+  let matched = 0;
+  for (const token of tokenize(figure.name)) {
+    if (titleTokens.has(token)) matched += 1;
+  }
+  return matched;
+}
+
 export function bestMatch(title: string, candidates: MatchCandidate[]): MatchResult {
   let best: MatchResult = null;
+  let bestSpecificity = -1;
+
   for (const c of candidates) {
     const score = scoreMatch(title, c);
-    if (score >= MATCH_ACCEPT_THRESHOLD && (!best || score > best.score)) {
+    if (score < MATCH_ACCEPT_THRESHOLD) continue;
+
+    const specificity = matchedNameTokens(title, c);
+    const better =
+      !best || score > best.score || (score === best.score && specificity > bestSpecificity);
+    if (better) {
       best = { figureId: c.id, score };
+      bestSpecificity = specificity;
     }
   }
   return best;

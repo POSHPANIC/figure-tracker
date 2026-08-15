@@ -89,6 +89,85 @@ describe("tokenize", () => {
   });
 });
 
+describe("ties between a general and a specific figure", () => {
+  /**
+   * Real case. A listing for the Beauty Looking Back Nendoroid scored 0.87
+   * against both that figure and the plain "Nendoroid Hatsune Miku" — the
+   * score is a ratio, so the shorter name matching completely is worth as much
+   * as the longer name matching completely. The tie has to go to the figure
+   * that accounts for more of the title.
+   */
+  const base = {
+    category: "NENDOROID" as const,
+    scale: null,
+    manufacturerName: "Good Smile Company",
+    nameJa: null,
+    seriesName: "Hatsune Miku",
+    characterNames: ["Hatsune Miku"],
+    characterNamesJa: [],
+  };
+  const generic: MatchCandidate = { ...base, id: "generic", name: "Nendoroid Hatsune Miku" };
+  const specific: MatchCandidate = {
+    ...base,
+    id: "specific",
+    name: "Nendoroid Hatsune Miku: Beauty Looking Back Ver.",
+  };
+
+  it("picks the figure that explains more of the listing", () => {
+    const title = "Good Smile Co. Vocaloid Hatsune Miku Beauty Looking Back Ver. Nendoroid";
+    assert.equal(bestMatch(title, [generic, specific])?.figureId, "specific");
+    // Order must not decide it.
+    assert.equal(bestMatch(title, [specific, generic])?.figureId, "specific");
+  });
+
+  it("still picks the general figure for a listing that names nothing more", () => {
+    const title = "Good Smile Company Nendoroid Hatsune Miku";
+    assert.equal(bestMatch(title, [generic, specific])?.figureId, "generic");
+  });
+});
+
+describe("a figure with no characters", () => {
+  /**
+   * Real regression. Importing the Good Smile archive brought in thousands of
+   * figures with no character attached, and gate 1 used to skip itself when a
+   * figure had none. "Nendoroid L 2.0" tokenises to little more than
+   * "nendoroid", so it matched every Nendoroid listing on the market — a dry
+   * run had it taking Anya Forger's listings, Ai Hoshino's and more.
+   */
+  const nameless: MatchCandidate = {
+    id: "nameless",
+    name: "Nendoroid L 2.0",
+    category: "NENDOROID",
+    scale: null,
+    manufacturerName: "Good Smile Company",
+    nameJa: null,
+    seriesName: "DEATH NOTE",
+    characterNames: [],
+    characterNamesJa: [],
+  };
+
+  it("never matches, however well the name lines up", () => {
+    assert.equal(scoreMatch("Good Smile Company Nendoroid Anya Forger", nameless), 0);
+    assert.equal(scoreMatch("Nendoroid L 2.0 Good Smile Company Death Note", nameless), 0);
+  });
+
+  it("does not outrank the figure that names the character", () => {
+    const anya: MatchCandidate = {
+      id: "anya",
+      name: "Nendoroid Anya Forger",
+      category: "NENDOROID",
+      scale: null,
+      manufacturerName: "Good Smile Company",
+      nameJa: null,
+      seriesName: "Spy x Family",
+      characterNames: ["Anya Forger"],
+      characterNamesJa: [],
+    };
+    const title = "Good Smile Company Nendoroid Anya Forger";
+    assert.ok(scoreMatch(title, anya) > scoreMatch(title, nameless));
+  });
+});
+
 describe("scoreMatch", () => {
   it("scores a clean title highly", () => {
     const score = scoreMatch(
