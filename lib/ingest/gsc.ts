@@ -126,6 +126,23 @@ const ACCESSORY_NAME_PATTERNS = [
   /\bstand\s+set\b/i,
 ];
 
+/**
+ * A specification that describes cloth, not a figure.
+ *
+ * Nendoroid Doll outfits are filed under the Nendoroid Doll figure category and
+ * named like figures — "Nendoroid Doll: Kigurumi Pajamas (Konnosuke)" — so
+ * neither the class nor the name rules them out. What gives them away is the
+ * spec: "Materials: Cotton, Polyester".
+ *
+ * Deliberately a negative test rather than requiring the spec to name a figure
+ * material. Checked against every product page captured while building this:
+ * the textile rule caught the one outfit and nothing else, while requiring
+ * "plastic/PVC/figure" would have thrown out seven genuine figures from the
+ * archive's early years, whose spec is terse ("Complete") or simply empty.
+ */
+const TEXTILE_SPEC =
+  /\b(cotton|polyester|nylon|rayon|fabric|felt|wool|silk|cloth material)\b/i;
+
 // ---------------------------------------------------------------------------
 // Listing pages
 // ---------------------------------------------------------------------------
@@ -351,6 +368,7 @@ export type RejectReason =
   | "unknown category"
   | "accessory name"
   | "not a figure by name"
+  | "outfit, not a figure"
   | "no spec table"
   | "no name";
 
@@ -394,6 +412,10 @@ export function classify(item: GscListItem, product: GscProduct | null): Classif
   }
 
   const spec = product["Specifications"];
+  if (spec && TEXTILE_SPEC.test(spec)) {
+    return { ok: false, reason: "outfit, not a figure", detail: spec.slice(0, 60) };
+  }
+
   const release = parseReleaseDate(product["Release Date"]);
   const { name, nameJa } = splitJapaneseReading(product["Product Name"] || item.name);
 

@@ -20,6 +20,7 @@
     "reindex": "tsx scripts/reindex.ts",
     "suggest:figures": "tsx scripts/suggest-figures.ts",
     "import:gsc": "tsx scripts/import-gsc.ts",
+    "derive:characters": "tsx scripts/derive-characters.ts",
     "rematch": "tsx scripts/rematch.ts",
     "test": "tsx --test lib/**/*.test.ts",
     "db:reset": "prisma migrate reset --force"

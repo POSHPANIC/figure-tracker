@@ -65,6 +65,32 @@ removes it and leaves the catalogue intact.
 | `npm run db:reset` | Wipe the database and re-run all migrations |
 | `npm run ingest` | Pull live data from configured sources, then aggregate |
 | `npm run set-role -- you@example.com ADMIN` | Make someone a moderator or admin |
+| `npm run import:gsc` | Read the Good Smile archive. Dry run unless given `--write` |
+| `npm run derive:characters` | Work out who imported figures depict. Dry run unless given `--yes` |
+| `npm run rematch` | Re-run matching over stored listings. Dry run unless given `--yes` |
+| `npm run reindex` | Rebuild the search index |
+| `npm run suggest:figures` | Propose catalogue additions from unmatched listings |
+
+### Growing the catalogue
+
+```bash
+npm run import:gsc -- --pages 2-4          # look first
+npm run import:gsc -- --pages 2-4 --write
+npm run derive:characters                  # look first
+npm run derive:characters -- --yes
+npm run reindex
+```
+
+Both steps are dry-run by default and both print why they refused things. The
+refusals are the interesting part — a category nobody has ruled on, or a name
+AniList can't confirm, is reported rather than guessed at.
+
+Characters matter more than they look. The matcher's first gate is "the
+character must be named", written as `if (characterTokens.length > 0)`, so a
+figure with no characters doesn't fail that gate — it skips it and matches on
+weaker signals. Importing figures without deriving their characters would
+loosen matching rather than tighten it, which is why these two steps belong
+together.
 
 ## How the project is laid out
 
