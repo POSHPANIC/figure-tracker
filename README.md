@@ -35,9 +35,9 @@ First time only, load the sample catalog:
 npm run db:seed
 ```
 
-That inserts 24 real figures — **catalogue only, no prices**. Price history comes
-from real ingestion and community reports; the charts stay empty until it
-accumulates, which is the honest state for a new site.
+That inserts real figures — **catalogue only, no prices**. Price history comes
+from ingestion alone; the charts stay empty until it accumulates, which is the
+honest state for a new site.
 
 If you want prices locally to work on the charts:
 
@@ -210,42 +210,32 @@ Neon Postgres, Vercel, environment variables and OAuth apps. `vercel.json`
 already defines the cron schedule: ingestion every 6 hours, aggregation nightly
 at 04:30 UTC.
 
-## Community sale reporting
+## Submissions
 
-Signed-in users can report what a figure actually sold for. This is the main
-source of real sold-price data until eBay approves Marketplace Insights access.
+Anyone can send feedback, report a bug, or ask for a missing figure at
+`/feedback`. Moderators work the queue at `/moderation`.
 
-It's also the only way a member of the public can move a number the site
-publishes, so it's the most security-sensitive part of the codebase.
+**No account required.** That's a deliberate difference from how sale reporting
+used to work, and it follows from what a submission can actually do: nothing.
+A submission is a message a person reads, so a bad one costs a wasted minute.
+A bad *price* would have moved a published number that people use to decide what
+to pay — which is why writing prices was never opened to the public, and why
+that feature was removed rather than hardened.
 
-**How a report is handled:**
+Requiring sign-in here would also have been self-defeating: somebody locked out
+by a broken sign-in still needs a way to report that sign-in is broken.
 
-1. **Rate limited** — 20 reports per user per day, 5 per figure per day.
-2. **Hard validated** — no negative prices, no future sale dates, nothing older
-   than 10 years, nothing above $100,000. These are rejected outright.
-3. **Screened** against what we already know about that figure *in that
-   condition*:
-   - If there are 3+ prior approved sales, the report must land within 0.25×–4×
-     of their median.
-   - Otherwise, if we know the MSRP, it must land within 0.2×–10× of it — a wide
-     band, because sought-after figures legitimately trade at many times retail.
-     It's only there to catch order-of-magnitude typos.
-   - With no reference at all, anything over $2,000 gets a human look.
-4. Reports that pass go live immediately and count toward market value. Reports
-   that don't are held for a moderator and **do not affect prices while they
-   wait**. The reporter is told exactly why.
+Abuse is handled without an account instead:
 
-Users see their own reports and each one's status at `/my-reports`, and can
-delete any of them. Moderators work the queue at `/moderation`, which shows the
-claimed price against current market value, why it was flagged, and the
-reporter's approve/reject history.
+- **Rate limited by IP** for anonymous senders (`LIMITS.write` — 30/minute).
+- **Honeypot field** that people never see, so anything filling it is a script.
+  Those submissions are accepted and silently discarded, because telling a bot
+  it failed only teaches whoever wrote it to try harder.
+- **Length bounds and URL validation** on everything stored.
 
-Approving or rejecting recomputes that figure's market value straight away
-rather than waiting for the nightly job.
-
-The screening thresholds live in `lib/sales/validate.ts` and are pure functions
-with thorough tests — change them there, and the tests will tell you what you
-broke.
+Submissions are never public. Sender text is rendered as plain text, never as
+markup. Handling one keeps the row rather than deleting it — a record of what's
+been reported is how the same bug doesn't get investigated twice.
 
 **Making the first moderator:** there's deliberately no UI for granting roles.
 Have the person sign in once, then run:

@@ -1,0 +1,248 @@
+"use client";
+
+import { useState, useTransition } from "react";
+import { Bug, CheckCircle2, Loader2, MessageSquare, PackagePlus } from "lucide-react";
+import { createSubmission } from "@/lib/actions/submissions";
+import { cn } from "@/lib/utils";
+
+type Kind = "FEEDBACK" | "BUG" | "FIGURE";
+
+const KINDS: {
+  value: Kind;
+  label: string;
+  icon: React.ReactNode;
+  blurb: string;
+  placeholder: string;
+}[] = [
+  {
+    value: "FEEDBACK",
+    label: "Feedback",
+    icon: <MessageSquare className="size-4" />,
+    blurb: "What works, what doesn't, what's missing. Blunt is fine.",
+    placeholder:
+      "The price chart is hard to read on my phone — the numbers overlap when I turn it sideways.",
+  },
+  {
+    value: "BUG",
+    label: "Bug",
+    icon: <Bug className="size-4" />,
+    blurb: "Something broken, or a page showing the wrong information.",
+    placeholder:
+      "Searching for “Nendoroid Rem” returns nothing, but the figure has its own page. Chrome on Windows.",
+  },
+  {
+    value: "FIGURE",
+    label: "Missing figure",
+    icon: <PackagePlus className="size-4" />,
+    blurb: "A figure that should be in the catalogue and isn't.",
+    placeholder:
+      "Anything else worth knowing — the release date, which version it is, where you saw it.",
+  },
+];
+
+/**
+ * One form, three shapes.
+ *
+ * Kept as a single form rather than three pages because most people arrive
+ * knowing they want to tell us something and not which box it belongs in. The
+ * selector is a hint to us, not a hurdle for them — every kind works if they
+ * pick the wrong one.
+ */
+export function SubmissionForm({
+  initialKind = "FEEDBACK",
+  initialPageUrl,
+  signedIn,
+}: {
+  initialKind?: Kind;
+  initialPageUrl?: string;
+  signedIn: boolean;
+}) {
+  const [kind, setKind] = useState<Kind>(initialKind);
+  const [error, setError] = useState<string | null>(null);
+  const [sent, setSent] = useState<string | null>(null);
+  const [pending, startTransition] = useTransition();
+
+  const active = KINDS.find((k) => k.value === kind)!;
+
+  function submit(formData: FormData) {
+    setError(null);
+    startTransition(async () => {
+      const result = await createSubmission(formData);
+      if (result.ok) setSent(result.message);
+      else setError(result.error);
+    });
+  }
+
+  if (sent) {
+    return (
+      <div className="rounded-xl border border-up/40 bg-up/10 p-5">
+        <p className="flex items-start gap-2 text-sm text-up">
+          <CheckCircle2 className="mt-px size-4 shrink-0" />
+          {sent}
+        </p>
+        <button
+          type="button"
+          onClick={() => setSent(null)}
+          className="mt-3 text-xs text-muted underline-offset-2 hover:text-foreground hover:underline"
+        >
+          Send another
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <form action={submit} className="space-y-5">
+      <input type="hidden" name="kind" value={kind} />
+
+      <fieldset>
+        <legend className="mb-2 text-xs uppercase tracking-wide text-muted">
+          What is this about?
+        </legend>
+        <div className="grid gap-2 sm:grid-cols-3">
+          {KINDS.map((k) => (
+            <button
+              key={k.value}
+              type="button"
+              onClick={() => setKind(k.value)}
+              aria-pressed={kind === k.value}
+              className={cn(
+                "flex items-center gap-2 rounded-lg border px-3 py-2.5 text-sm font-medium transition",
+                kind === k.value
+                  ? "border-accent bg-accent/10 text-foreground"
+                  : "border-border bg-surface text-muted hover:border-accent/60 hover:text-foreground",
+              )}
+            >
+              {k.icon}
+              {k.label}
+            </button>
+          ))}
+        </div>
+        <p className="mt-2 text-xs text-muted">{active.blurb}</p>
+      </fieldset>
+
+      {kind === "BUG" && (
+        <Field
+          label="Where did it happen?"
+          hint="The page address, or just a description of where you were."
+        >
+          <input
+            type="text"
+            name="pageUrl"
+            defaultValue={initialPageUrl}
+            placeholder="/figures/nendoroid-hatsune-miku"
+            className={inputClass}
+          />
+        </Field>
+      )}
+
+      {kind === "FIGURE" && (
+        <div className="space-y-4 rounded-xl border border-border bg-surface-2 p-4">
+          <Field label="Figure name" hint="As printed on the box, if you have it in front of you.">
+            <input
+              type="text"
+              name="figureName"
+              required
+              placeholder="Nendoroid Marin Kitagawa: Swimsuit Ver."
+              className={inputClass}
+            />
+          </Field>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label="Manufacturer">
+              <input
+                type="text"
+                name="manufacturer"
+                placeholder="Good Smile Company"
+                className={inputClass}
+              />
+            </Field>
+            <Field label="Series">
+              <input
+                type="text"
+                name="series"
+                placeholder="My Dress-Up Darling"
+                className={inputClass}
+              />
+            </Field>
+          </div>
+          <Field
+            label="Link to it"
+            hint="A product page, shop listing or announcement. This is what we check against, so it speeds things up a lot."
+          >
+            <input
+              type="url"
+              name="referenceUrl"
+              placeholder="https://…"
+              className={inputClass}
+            />
+          </Field>
+        </div>
+      )}
+
+      <Field label={kind === "FIGURE" ? "Anything else" : "Details"}>
+        <textarea
+          name="details"
+          required
+          minLength={10}
+          maxLength={4000}
+          rows={6}
+          placeholder={active.placeholder}
+          className={cn(inputClass, "resize-y leading-relaxed")}
+        />
+      </Field>
+
+      {!signedIn && (
+        <Field
+          label="Your email (optional)"
+          hint="Only used to reply to you. Leave it blank and we'll still read this — you just won't hear back."
+        >
+          <input type="email" name="contactEmail" placeholder="you@example.com" className={inputClass} />
+        </Field>
+      )}
+
+      {/* Honeypot: hidden from people, irresistible to form-filling bots. */}
+      <div aria-hidden className="absolute left-[-9999px] h-0 w-0 overflow-hidden">
+        <label>
+          Website
+          <input type="text" name="website" tabIndex={-1} autoComplete="off" />
+        </label>
+      </div>
+
+      {error && (
+        <p className="rounded-lg border border-down/40 bg-down/10 px-3 py-2 text-sm text-down">
+          {error}
+        </p>
+      )}
+
+      <button
+        type="submit"
+        disabled={pending}
+        className="flex items-center justify-center gap-2 rounded-lg bg-accent px-5 py-2.5 text-sm font-medium text-white transition hover:opacity-90 disabled:opacity-60"
+      >
+        {pending && <Loader2 className="size-4 animate-spin" />}
+        Send
+      </button>
+    </form>
+  );
+}
+
+const inputClass =
+  "w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm outline-none transition focus:border-accent";
+
+function Field({
+  label,
+  hint,
+  children,
+}: {
+  label: string;
+  hint?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <label className="block">
+      <span className="mb-1 block text-xs uppercase tracking-wide text-muted">{label}</span>
+      {hint && <span className="mb-1.5 block text-xs text-muted">{hint}</span>}
+      {children}
+    </label>
+  );
+}

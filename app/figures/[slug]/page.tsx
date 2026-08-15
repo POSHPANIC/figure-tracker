@@ -1,11 +1,10 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
-import { ExternalLink, Users } from "lucide-react";
+import { ExternalLink, Flag } from "lucide-react";
 import { currentUser } from "@/auth";
 import { FigureActions } from "@/components/figure-actions";
 import { FigureImagesAdmin } from "@/components/figure-images-admin";
-import { ReportSale } from "@/components/report-sale";
 import { FigureThumb } from "@/components/figure-thumb";
 import { PriceChart } from "@/components/price-chart";
 import { getFigureBySlug, getFigureStats, getPriceHistory } from "@/lib/queries";
@@ -306,11 +305,18 @@ export default async function FigurePage({ params, searchParams }: PageProps<"/f
                   Completed transactions — the basis for this figure's market value.
                 </p>
               </div>
-              <ReportSale figureId={figure.id} signedIn={user !== null} />
+              <Link
+                href={`/feedback?kind=bug&page=${encodeURIComponent(`/figures/${figure.slug}`)}`}
+                className="flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs font-medium transition hover:border-accent/60"
+              >
+                <Flag className="size-3.5" />
+                Report a problem
+              </Link>
             </div>
             {figure.sales.length === 0 ? (
               <p className="py-6 text-center text-sm text-muted">
-                No sales recorded yet. If you've bought or sold one, reporting it helps everyone.
+                No sales recorded yet. Sales arrive from marketplace data, so this fills in as
+                the figure trades.
               </p>
             ) : (
               <div className="overflow-x-auto">
@@ -334,19 +340,7 @@ export default async function FigurePage({ params, searchParams }: PageProps<"/f
                           })}
                         </td>
                         <td className="py-2">{CONDITION_LABELS[s.condition]}</td>
-                        <td className="py-2 text-muted">
-                          {s.isUserReported ? (
-                            <span
-                              title="Reported by a community member and checked by our screening"
-                              className="inline-flex items-center gap-1"
-                            >
-                              <Users className="size-3" />
-                              {s.reportedBy?.username ? `@${s.reportedBy.username}` : "Community"}
-                            </span>
-                          ) : (
-                            s.source.name
-                          )}
-                        </td>
+                        <td className="py-2 text-muted">{s.source.name}</td>
                         <td className="tabular py-2 text-right font-medium">
                           {formatMoney(s.amountUsd, money, {
                             original: { amount: s.amount, currency: s.currency },

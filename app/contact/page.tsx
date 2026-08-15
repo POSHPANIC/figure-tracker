@@ -31,7 +31,12 @@ export default function ContactPage() {
           it's right, and mistakes are easier to fix than to notice.
         </p>
         <p>
-          A link to the page and a line about what's wrong is plenty.
+          A link to the page and a line about what's wrong is plenty. There's also a{" "}
+          <a href="/feedback" className="text-accent hover:underline">
+            feedback form
+          </a>{" "}
+          if you'd rather not email — same queue, and it takes bug reports and missing figures
+          too.
         </p>
       </Section>
 
@@ -47,9 +52,8 @@ export default function ContactPage() {
             argument, no process.
           </li>
           <li>
-            <strong>Data.</strong> Prices come from public marketplace listings and reports from
-            collectors. If you believe something is being used improperly, get in touch and
-            we'll sort it out.
+            <strong>Data.</strong> Prices come from public marketplace listings. If you believe
+            something is being used improperly, get in touch and we'll sort it out.
           </li>
         </List>
         <p>

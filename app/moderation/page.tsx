@@ -1,13 +1,12 @@
 import { notFound, redirect } from "next/navigation";
 import type { Metadata } from "next";
-import { ShieldCheck } from "lucide-react";
+import { Inbox } from "lucide-react";
 import { currentUser } from "@/auth";
-import { ModerationRow } from "@/components/moderation-row";
-import { getModerationQueue, getReporterHistory } from "@/lib/user-queries";
-import { getDisplayMoney } from "@/lib/currency-server";
+import { SubmissionRow } from "@/components/submission-row";
+import { getSubmissionQueue } from "@/lib/user-queries";
 
 export const metadata: Metadata = {
-  title: "Moderation queue",
+  title: "Submissions",
   robots: { index: false, follow: false },
 };
 
@@ -19,34 +18,26 @@ export default async function ModerationPage() {
   // can't use it.
   if (user.role !== "MODERATOR" && user.role !== "ADMIN") notFound();
 
-  const [{ items, pendingCount }, money] = await Promise.all([
-    getModerationQueue(),
-    getDisplayMoney(),
-  ]);
-
-  // Reporter track record, fetched once per distinct reporter.
-  const reporterIds = [...new Set(items.map((i) => i.reportedBy?.id).filter(Boolean))] as string[];
-  const histories = new Map(
-    await Promise.all(
-      reporterIds.map(async (id) => [id, await getReporterHistory(id)] as const),
-    ),
-  );
+  const { items, openCount, counts } = await getSubmissionQueue();
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-8">
       <header className="mb-6">
         <h1 className="flex items-center gap-2 text-2xl font-semibold tracking-tight">
-          <ShieldCheck className="size-5 text-accent" />
-          Moderation queue
+          <Inbox className="size-5 text-accent" />
+          Submissions
         </h1>
         <p className="mt-1 text-sm text-muted">
-          {pendingCount === 0 ? (
+          {openCount === 0 ? (
             "Nothing waiting."
           ) : (
             <>
-              <span className="tabular">{pendingCount}</span>{" "}
-              {pendingCount === 1 ? "report" : "reports"} awaiting review. None of these affect
-              published prices until approved.
+              <span className="tabular">{openCount}</span> open —{" "}
+              <span className="tabular">{counts.BUG}</span>{" "}
+              {counts.BUG === 1 ? "bug" : "bugs"},{" "}
+              <span className="tabular">{counts.FIGURE}</span> figure{" "}
+              {counts.FIGURE === 1 ? "request" : "requests"},{" "}
+              <span className="tabular">{counts.FEEDBACK}</span> feedback. Oldest first.
             </>
           )}
         </p>
@@ -54,52 +45,20 @@ export default async function ModerationPage() {
 
       {items.length === 0 ? (
         <div className="rounded-xl border border-dashed border-border py-16 text-center">
-          <p className="font-medium">Queue is clear</p>
+          <p className="font-medium">Inbox is clear</p>
           <p className="mt-1 text-sm text-muted">
-            Reports only land here when they look unusual against a figure's existing prices.
+            Bug reports, figure requests and feedback from the{" "}
+            <a href="/feedback" className="text-accent hover:underline">
+              feedback form
+            </a>{" "}
+            land here.
           </p>
         </div>
       ) : (
         <ul className="space-y-3">
-          {items.map((item) => {
-            const history = item.reportedBy?.id
-              ? histories.get(item.reportedBy.id)
-              : undefined;
-
-            return (
-              <ModerationRow
-                key={item.id}
-                money={money}
-                item={{
-                  id: item.id,
-                  condition: item.condition,
-                  amount: item.amount.toString(),
-                  currency: item.currency,
-                  amountUsd: item.amountUsd.toString(),
-                  soldAt: item.soldAt.toISOString(),
-                  url: item.url,
-                  flagReason: item.flagReason,
-                  createdAt: item.createdAt.toISOString(),
-                  reporter: {
-                    label:
-                      item.reportedBy?.username ??
-                      item.reportedBy?.name ??
-                      item.reportedBy?.email ??
-                      "deleted account",
-                    username: item.reportedBy?.username ?? null,
-                    approved: history?.approved ?? 0,
-                    rejected: history?.rejected ?? 0,
-                  },
-                  figure: {
-                    slug: item.figure.slug,
-                    name: item.figure.name,
-                    marketValueUsd: item.figure.marketValueUsd?.toString() ?? null,
-                    salesVolume90d: item.figure.salesVolume90d,
-                  },
-                }}
-              />
-            );
-          })}
+          {items.map((item) => (
+            <SubmissionRow key={item.id} submission={item} />
+          ))}
         </ul>
       )}
     </div>

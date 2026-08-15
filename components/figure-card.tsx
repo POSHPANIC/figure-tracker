@@ -76,6 +76,14 @@ export function FigureCardGrid({ figures }: { figures: FigureCardData[] }) {
       <div className="rounded-xl border border-dashed border-border p-12 text-center">
         <p className="font-medium">No figures match those filters.</p>
         <p className="mt-1 text-sm text-muted">Try widening the price range or clearing the search.</p>
+        {/* The catalogue is hand-built, so "nothing found" often means "not added
+            yet" rather than "no such figure". Say so, and make it easy to tell us. */}
+        <p className="mt-3 text-sm text-muted">
+          Sure it should be here?{" "}
+          <Link href="/feedback?kind=figure" className="text-accent hover:underline">
+            Suggest a figure
+          </Link>
+        </p>
       </div>
     );
   }

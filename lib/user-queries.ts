@@ -135,75 +135,49 @@ export async function getFigureUserState(userId: string, figureId: string) {
   return { collectionItems, wishlistItem };
 }
 
-/** A user's own sale reports, including ones awaiting review. */
-export async function getMyReports(userId: string) {
-  return prisma.sale.findMany({
-    where: { reportedById: userId, isUserReported: true },
-    select: {
-      id: true,
-      condition: true,
-      amount: true,
-      currency: true,
-      amountUsd: true,
-      soldAt: true,
-      url: true,
-      status: true,
-      flagReason: true,
-      reviewNote: true,
-      reviewedAt: true,
-      createdAt: true,
-      figure: { select: { slug: true, name: true, primaryImageUrl: true } },
-    },
-    orderBy: { createdAt: "desc" },
-    take: 100,
-  });
-}
-
-/** Reports waiting on a moderator, oldest first so nothing gets stranded. */
-export async function getModerationQueue(take = 50) {
-  const [items, pendingCount] = await Promise.all([
-    prisma.sale.findMany({
-      where: { status: "PENDING_REVIEW" },
+/**
+ * The submissions inbox: open items, oldest first so nothing sits forever.
+ *
+ * Counts are returned per kind as well as in total, because a queue of forty
+ * missing-figure requests and a queue of forty bug reports call for different
+ * afternoons.
+ */
+export async function getSubmissionQueue(take = 50) {
+  const [items, openByKind] = await Promise.all([
+    prisma.submission.findMany({
+      where: { status: "OPEN" },
       select: {
         id: true,
-        condition: true,
-        amount: true,
-        currency: true,
-        amountUsd: true,
-        soldAt: true,
-        url: true,
-        flagReason: true,
+        kind: true,
+        details: true,
+        pageUrl: true,
+        figureName: true,
+        manufacturer: true,
+        series: true,
+        referenceUrl: true,
+        contactEmail: true,
         createdAt: true,
-        reportedBy: { select: { id: true, username: true, name: true, email: true } },
-        figure: {
-          select: { slug: true, name: true, marketValueUsd: true, salesVolume90d: true },
-        },
+        user: { select: { id: true, username: true, name: true, email: true } },
       },
       orderBy: { createdAt: "asc" },
       take,
     }),
-    prisma.sale.count({ where: { status: "PENDING_REVIEW" } }),
+    prisma.submission.groupBy({
+      by: ["kind"],
+      where: { status: "OPEN" },
+      _count: { _all: true },
+    }),
   ]);
 
-  return { items, pendingCount };
-}
-
-/**
- * How many reports this user has had approved vs rejected.
- * A high rejection rate is the signal to look at someone's submissions.
- */
-export async function getReporterHistory(userId: string) {
-  const counts = await prisma.sale.groupBy({
-    by: ["status"],
-    where: { reportedById: userId, isUserReported: true },
-    _count: { _all: true },
-  });
-
-  const byStatus = Object.fromEntries(counts.map((c) => [c.status, c._count._all]));
+  const counts = Object.fromEntries(openByKind.map((c) => [c.kind, c._count._all]));
   return {
-    approved: byStatus.APPROVED ?? 0,
-    pending: byStatus.PENDING_REVIEW ?? 0,
-    rejected: byStatus.REJECTED ?? 0,
+    items,
+    openCount: openByKind.reduce((sum, c) => sum + c._count._all, 0),
+    counts: {
+      FEEDBACK: counts.FEEDBACK ?? 0,
+      BUG: counts.BUG ?? 0,
+      FIGURE: counts.FIGURE ?? 0,
+    },
   };
 }
 

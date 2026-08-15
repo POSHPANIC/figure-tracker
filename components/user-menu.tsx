@@ -3,10 +3,10 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import {
-  ClipboardList,
   Heart,
   LayoutGrid,
   LogOut,
+  MessageSquarePlus,
   Settings,
   ShieldCheck,
   User as UserIcon,
@@ -87,15 +87,15 @@ export function UserMenu({
                 Public profile
               </MenuLink>
             )}
-            <MenuLink
-              href="/my-reports"
-              icon={<ClipboardList className="size-4" />}
-              onNavigate={() => setOpen(false)}
-            >
-              My sale reports
-            </MenuLink>
             <MenuLink href="/settings" icon={<Settings className="size-4" />} onNavigate={() => setOpen(false)}>
               Settings
+            </MenuLink>
+            <MenuLink
+              href="/feedback"
+              icon={<MessageSquarePlus className="size-4" />}
+              onNavigate={() => setOpen(false)}
+            >
+              Send feedback
             </MenuLink>
             {user.isModerator && (
               <MenuLink
@@ -103,7 +103,7 @@ export function UserMenu({
                 icon={<ShieldCheck className="size-4 text-accent" />}
                 onNavigate={() => setOpen(false)}
               >
-                Moderation queue
+                Submissions
               </MenuLink>
             )}
           </div>

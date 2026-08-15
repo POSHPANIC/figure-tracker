@@ -10,7 +10,7 @@ trouble, so read it before flipping anything on in production.
 | **eBay Browse API** | Active listings (lowest ask, live inventory) | Implemented | None — official, free |
 | **eBay Marketplace Insights** | Real *sold* prices, last 90 days | Implemented, needs approval | None — official |
 | **AmiAmi** | Retail + preorder prices, MSRP, JPY | **Blocked by Cloudflare** — affiliate route only | — |
-| **Community reports** | User-submitted sale prices | Implemented, with screening + moderation | None |
+| **Community reports** | User-submitted sale prices | **Removed** — see below | — |
 | **MyFigureCollection** | Best catalog data anywhere | Not implemented | **Their ToS forbids scraping** |
 | **Mandarake / Mercari / Yahoo Auctions** | Deep Japanese secondary market | Not implemented | Needs proxies; ToS varies |
 
@@ -38,8 +38,14 @@ note; nothing breaks.
 Until then, your options for real sold data are:
 
 - Apply for Marketplace Insights (worth doing early — approval takes time).
-- Build the community-reporting UI. The `Sale` model already has
-  `isUserReported` and `reportedById` fields for exactly this.
+- Wait for Marketplace Insights. There is currently no second path.
+
+Community sale reporting was built and then removed. It worked, but it made the
+published price index writable by the public, and screening that reliably is a
+larger problem than it first appears: the check that catches a made-up price is
+the same check that rejects a genuine bargain. Visitors can now report a
+*problem* through `/feedback`, which a person reads — nothing they send changes
+a published number.
 
 Rate limits on the free tier are roughly 5,000 Browse calls/day, which is why
 `runIngestion` processes a capped number of figures per run, oldest first.

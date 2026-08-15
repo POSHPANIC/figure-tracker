@@ -81,12 +81,13 @@ export function SiteFooter() {
           <FooterLink href="/contact">Contact</FooterLink>
           <FooterLink href="/privacy">Privacy</FooterLink>
           <FooterLink href="/figures">Browse figures</FooterLink>
+          <FooterLink href="/feedback">Feedback</FooterLink>
         </nav>
 
         <div className="mt-4 flex flex-col gap-2 text-xs text-muted sm:flex-row sm:items-center sm:justify-between">
           <p className="max-w-2xl">
-            {SITE_NAME} — price data aggregated from public marketplace listings and community
-            reports. Values are estimates, not appraisals.
+            {SITE_NAME} — price data aggregated from public marketplace listings. Values are
+            estimates, not appraisals.
           </p>
           <p className="shrink-0">Not affiliated with any manufacturer or retailer.</p>
         </div>

@@ -45,11 +45,11 @@ enum ReleaseStatus {
 }
 
 model Manufacturer {
-  id        String   @id @default(cuid())
-  name      String   @unique
-  slug      String   @unique
+  id         String   @id @default(cuid())
+  name       String   @unique
+  slug       String   @unique
   websiteUrl String?
-  createdAt DateTime @default(now())
+  createdAt  DateTime @default(now())
 
   figures Figure[]
 
@@ -64,10 +64,10 @@ model Series {
   createdAt DateTime @default(now())
 
   /// Japanese title, e.g. その着せ替え人形は恋をする.
-  titleJa String?
+  titleJa   String?
   /// Alternate titles AniList knows. Sellers use these interchangeably — the
   /// romaji "Sono Bisque Doll" turns up in listings far more than you'd expect.
-  synonyms String[]
+  synonyms  String[]
   anilistId Int?
 
   figures    Figure[]
@@ -140,12 +140,12 @@ model Figure {
   // --- Denormalized fields, recomputed nightly by the aggregation job. ---
   // Kept on the row so list/search pages need only one query.
   /// Median USD sale price over the trailing 90 days, NEW condition.
-  marketValueUsd    Decimal? @db.Decimal(12, 2)
+  marketValueUsd   Decimal?  @db.Decimal(12, 2)
   /// Percent change in marketValueUsd vs. 30 days ago. 12.5 means +12.5%.
-  change30dPct      Decimal? @db.Decimal(8, 2)
+  change30dPct     Decimal?  @db.Decimal(8, 2)
   /// Number of recorded sales in the trailing 90 days — our confidence signal.
-  salesVolume90d    Int      @default(0)
-  lastAggregatedAt  DateTime?
+  salesVolume90d   Int       @default(0)
+  lastAggregatedAt DateTime?
 
   /// Everything this figure can be found by, in one lowercase blob: its own
   /// names, its manufacturer, its series under every title, and every character
@@ -193,14 +193,14 @@ model FigureImage {
 
   /// Attribution shown next to the image, e.g. "© Good Smile Company".
   /// Usually a condition of the permission, so it is not optional in practice.
-  credit String?
+  credit      String?
   /// The press kit or product page the image was supplied on.
-  sourceUrl String?
+  sourceUrl   String?
   /// What was actually agreed, in our own words — who granted it and when.
   licenseNote String?
 
   addedById String?
-  addedBy   User?   @relation(fields: [addedById], references: [id], onDelete: SetNull)
+  addedBy   User?    @relation(fields: [addedById], references: [id], onDelete: SetNull)
   createdAt DateTime @default(now())
 
   @@index([figureId, sortOrder])
@@ -249,9 +249,9 @@ model Source {
 
 /// An item currently (or recently) offered for sale.
 model Listing {
-  id       String @id @default(cuid())
+  id       String  @id @default(cuid())
   sourceId String
-  source   Source @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+  source   Source  @relation(fields: [sourceId], references: [id], onDelete: Cascade)
   figureId String?
   figure   Figure? @relation(fields: [figureId], references: [id], onDelete: SetNull)
 
@@ -262,16 +262,16 @@ model Listing {
   imageUrl   String?
   condition  ItemCondition @default(UNKNOWN)
 
-  amount     Decimal  @db.Decimal(12, 2)
-  currency   String   @db.VarChar(3)
+  amount      Decimal  @db.Decimal(12, 2)
+  currency    String   @db.VarChar(3)
   /// `amount` converted to USD using fxRate at the time we saw it.
-  amountUsd  Decimal  @db.Decimal(12, 2)
-  fxRate     Decimal  @db.Decimal(18, 8)
+  amountUsd   Decimal  @db.Decimal(12, 2)
+  fxRate      Decimal  @db.Decimal(18, 8)
   shippingUsd Decimal? @db.Decimal(12, 2)
 
-  isActive  Boolean   @default(true)
-  firstSeen DateTime  @default(now())
-  lastSeen  DateTime  @default(now())
+  isActive  Boolean  @default(true)
+  firstSeen DateTime @default(now())
+  lastSeen  DateTime @default(now())
 
   /// Confidence that this listing really is the linked figure, 0..1.
   /// Anything below MATCH_REVIEW_THRESHOLD is excluded from price aggregation.
@@ -282,25 +282,19 @@ model Listing {
   @@index([lastSeen])
 }
 
-/// Whether a sale counts toward market value.
-///
-/// API-sourced sales are APPROVED on arrival. User-reported ones are screened
-/// (see lib/sales/validate.ts) and only held for review when they look wrong —
-/// holding everything would make reporting useless, auto-approving everything
-/// would let one person move a figure's published value.
-enum SaleStatus {
-  APPROVED
-  PENDING_REVIEW
-  REJECTED
-}
-
 /// A completed transaction. This is what actually drives market value.
+///
+/// Every row comes from a marketplace API. There is deliberately no path for a
+/// visitor to add one: a price index that anyone can write to is a price index
+/// anyone can move, and screening that reliably is a bigger problem than it
+/// first looks. Corrections come through Submission instead, where a person
+/// reads them before anything published changes.
 model Sale {
-  id       String  @id @default(cuid())
+  id       String @id @default(cuid())
   sourceId String
-  source   Source  @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+  source   Source @relation(fields: [sourceId], references: [id], onDelete: Cascade)
   figureId String
-  figure   Figure  @relation(fields: [figureId], references: [id], onDelete: Cascade)
+  figure   Figure @relation(fields: [figureId], references: [id], onDelete: Cascade)
 
   externalId String?
   title      String?
@@ -314,29 +308,13 @@ model Sale {
 
   soldAt DateTime
 
-  /// True when a signed-in user reported this sale rather than an API.
-  isUserReported Boolean @default(false)
-  reportedById   String?
-  reportedBy     User?   @relation("SalesReported", fields: [reportedById], references: [id], onDelete: SetNull)
-
-  status       SaleStatus @default(APPROVED)
-  /// Why the screening held this one back, shown to the reporter and moderator.
-  flagReason   String?
-  reviewedAt   DateTime?
-  reviewedById String?
-  reviewedBy   User?      @relation("SalesReviewed", fields: [reviewedById], references: [id], onDelete: SetNull)
-  reviewNote   String?
-
   createdAt DateTime @default(now())
 
   @@unique([sourceId, externalId])
   @@index([figureId, soldAt])
   @@index([soldAt])
-  // Aggregation reads by (figure, status, condition, date) — this covers it.
-  @@index([figureId, status, condition, soldAt])
-  // The moderation queue reads pending items oldest-first.
-  @@index([status, createdAt])
-  @@index([reportedById, createdAt])
+  // Aggregation reads by (figure, condition, date) — this covers it.
+  @@index([figureId, condition, soldAt])
 }
 
 /// One pre-aggregated row per figure/condition/day. The price chart reads only
@@ -349,10 +327,10 @@ model PriceSnapshot {
   /// Midnight UTC of the day being summarized.
   date      DateTime      @db.Date
 
-  minUsd    Decimal @db.Decimal(12, 2)
-  medianUsd Decimal @db.Decimal(12, 2)
-  avgUsd    Decimal @db.Decimal(12, 2)
-  maxUsd    Decimal @db.Decimal(12, 2)
+  minUsd     Decimal @db.Decimal(12, 2)
+  medianUsd  Decimal @db.Decimal(12, 2)
+  avgUsd     Decimal @db.Decimal(12, 2)
+  maxUsd     Decimal @db.Decimal(12, 2)
   /// How many sales went into this row. 1-2 means treat the point with suspicion.
   sampleSize Int
 
@@ -365,16 +343,16 @@ model PriceSnapshot {
 
 /// Audit log for ingestion jobs, so failures are visible instead of silent.
 model IngestRun {
-  id        String    @id @default(cuid())
-  sourceId  String
-  source    Source    @relation(fields: [sourceId], references: [id], onDelete: Cascade)
-  startedAt DateTime  @default(now())
-  finishedAt DateTime?
+  id            String    @id @default(cuid())
+  sourceId      String
+  source        Source    @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+  startedAt     DateTime  @default(now())
+  finishedAt    DateTime?
   /// "running" | "success" | "error"
-  status    String    @default("running")
-  itemsSeen Int       @default(0)
-  itemsUpserted Int   @default(0)
-  error     String?
+  status        String    @default("running")
+  itemsSeen     Int       @default(0)
+  itemsUpserted Int       @default(0)
+  error         String?
 
   @@index([sourceId, startedAt])
 }
@@ -396,14 +374,81 @@ model EbayAccountDeletion {
   /// SHA-256 of the eBay user ID. Not reversible to the user.
   userRefHash    String
 
-  eventDate  DateTime?
-  receivedAt DateTime  @default(now())
+  eventDate     DateTime?
+  receivedAt    DateTime  @default(now())
   /// Rows we erased in response. Expected to be 0 — we don't currently store
   /// anything keyed to an eBay user — but it's recorded rather than assumed.
-  recordsErased Int @default(0)
+  recordsErased Int       @default(0)
 
   @@index([userRefHash])
   @@index([receivedAt])
+}
+
+// ---------------------------------------------------------------------------
+// Submissions — the one way the public can tell us something
+// ---------------------------------------------------------------------------
+
+enum SubmissionKind {
+  /// General thoughts on the site.
+  FEEDBACK
+  /// Something is broken, or a page shows the wrong information.
+  BUG
+  /// A figure that ought to be in the catalogue and isn't.
+  FIGURE
+}
+
+enum SubmissionStatus {
+  OPEN
+  RESOLVED
+  DECLINED
+}
+
+/// Something a visitor sent us: feedback, a bug, or a figure to add.
+///
+/// Nothing here changes the site by itself. A submission is a message that a
+/// person reads and acts on, which is what makes it safe to accept from anyone
+/// — including people who aren't signed in. Somebody blocked by a broken
+/// sign-in still needs a way to say so, and requiring an account to report that
+/// account creation is broken would be a poor joke.
+model Submission {
+  id     String           @id @default(cuid())
+  kind   SubmissionKind
+  status SubmissionStatus @default(OPEN)
+
+  /// What they wrote, in their own words. Always required.
+  details String
+
+  /// Bug reports: the page it happened on.
+  pageUrl String?
+
+  /// Figure submissions. Kept as loose text on purpose — asking a visitor to
+  /// pick our exact manufacturer spelling from a dropdown gets us worse data
+  /// than letting them type what's on the box.
+  figureName   String?
+  manufacturer String?
+  series       String?
+  /// A link backing the request up: a product page, a shop, a listing.
+  referenceUrl String?
+
+  /// Set when the sender was signed in. Null for anonymous submissions.
+  userId       String?
+  user         User?   @relation("SubmissionsSent", fields: [userId], references: [id], onDelete: SetNull)
+  /// Where to reply, for senders with no account. Optional — a bug report
+  /// worth acting on is worth having even with no way to reply.
+  contactEmail String?
+
+  handledAt   DateTime?
+  handledById String?
+  handledBy   User?     @relation("SubmissionsHandled", fields: [handledById], references: [id], onDelete: SetNull)
+  /// Note from whoever dealt with it, for the next person reading the queue.
+  handlerNote String?
+
+  createdAt DateTime @default(now())
+
+  // The inbox reads open items oldest-first, so nothing sits forever.
+  @@index([status, createdAt])
+  @@index([kind, status])
+  @@index([userId, createdAt])
 }
 
 /// Fixed-window request counters.
@@ -429,11 +474,11 @@ model RateLimit {
 
 /// Daily USD conversion rates, so historical prices stay reproducible.
 model FxRate {
-  id       String   @id @default(cuid())
-  currency String   @db.VarChar(3)
-  date     DateTime @db.Date
+  id        String   @id @default(cuid())
+  currency  String   @db.VarChar(3)
+  date      DateTime @db.Date
   /// Multiply an amount in `currency` by this to get USD.
-  rateToUsd Decimal @db.Decimal(18, 8)
+  rateToUsd Decimal  @db.Decimal(18, 8)
 
   @@unique([currency, date])
 }
@@ -463,14 +508,14 @@ model User {
   publicProfile Boolean   @default(false)
   createdAt     DateTime  @default(now())
 
-  accounts        Account[]
-  sessions        Session[]
-  collectionItems CollectionItem[]
-  wishlistItems   WishlistItem[]
-  priceAlerts     PriceAlert[]
-  reportedSales   Sale[]           @relation("SalesReported")
-  reviewedSales   Sale[]           @relation("SalesReviewed")
-  addedImages     FigureImage[]
+  accounts           Account[]
+  sessions           Session[]
+  collectionItems    CollectionItem[]
+  wishlistItems      WishlistItem[]
+  priceAlerts        PriceAlert[]
+  addedImages        FigureImage[]
+  submissions        Submission[]     @relation("SubmissionsSent")
+  handledSubmissions Submission[]     @relation("SubmissionsHandled")
 }
 
 model Account {
@@ -517,17 +562,17 @@ model CollectionItem {
   figureId String
   figure   Figure @relation(fields: [figureId], references: [id], onDelete: Cascade)
 
-  quantity  Int           @default(1)
-  condition ItemCondition @default(NEW_SEALED)
+  quantity      Int           @default(1)
+  condition     ItemCondition @default(NEW_SEALED)
   /// What the user actually paid, for profit/loss against market value.
-  paidAmount   Decimal? @db.Decimal(12, 2)
-  paidCurrency String?  @db.VarChar(3)
+  paidAmount    Decimal?      @db.Decimal(12, 2)
+  paidCurrency  String?       @db.VarChar(3)
   /// `paidAmount` converted at the rate on the day it was entered. Stored so
   /// portfolio totals can sum a mixed-currency collection without re-converting
   /// (and silently re-valuing) every past purchase on each page load.
-  paidAmountUsd Decimal? @db.Decimal(12, 2)
-  purchasedAt  DateTime?
-  notes        String?
+  paidAmountUsd Decimal?      @db.Decimal(12, 2)
+  purchasedAt   DateTime?
+  notes         String?
 
   createdAt DateTime @default(now())
 

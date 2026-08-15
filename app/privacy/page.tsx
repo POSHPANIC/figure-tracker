@@ -69,7 +69,10 @@ export default function PrivacyPage() {
             <strong>Your wishlist</strong> — figures and how badly you want them.
           </li>
           <li>
-            <strong>Sale reports</strong> — price, condition, date, and optionally a link.
+            <strong>Anything you send us</strong> — feedback, bug reports, and figures you'd
+            like added, along with whatever you typed into those forms. If you're signed in it's
+            linked to your account; if you're not, only the email address you chose to give,
+            and only if you gave one.
           </li>
         </List>
       </Section>
@@ -86,9 +89,9 @@ export default function PrivacyPage() {
           alone.
         </Callout>
         <p>
-          Sale reports appear on the figure's page attributed to your username, because a price
-          index that can't be traced isn't worth much. The report shows a price, condition and
-          date — nothing about you beyond the name you chose.
+          What you send through the feedback form is <strong>not public</strong>. It's read by
+          the people who run the site and nobody else. If a figure you suggested gets added,
+          the catalogue entry doesn't say who asked for it.
         </p>
       </Section>
 
@@ -131,9 +134,9 @@ export default function PrivacyPage() {
             <strong>Sign-in links</strong> — 15 minutes, and they work once.
           </li>
           <li>
-            <strong>Sale reports</strong> — kept indefinitely, because they're part of the price
-            history other people rely on. If you delete your account, your reports stay but stop
-            being linked to you: they become anonymous data points rather than yours.
+            <strong>Feedback, bug reports and figure suggestions</strong> — kept, because a
+            record of what's been reported is how the same bug doesn't get investigated twice.
+            If you delete your account they stay but stop being linked to you.
           </li>
         </List>
       </Section>

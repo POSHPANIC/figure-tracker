@@ -149,7 +149,7 @@ access-restricted. To apply:
 
 Apply early. Until you're approved the code returns empty sold data and logs a
 note; nothing breaks. In the meantime, price history comes from the seeded
-sample data and, once you build it, community-reported sales.
+sample data.
 
 ### Rate limits
 

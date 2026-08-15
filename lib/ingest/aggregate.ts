@@ -45,9 +45,7 @@ export async function runAggregation(forDay?: Date): Promise<AggregateResult> {
   const dayEnd = new Date(day.getTime() + 86400_000);
 
   const sales = await prisma.sale.findMany({
-    // Only approved sales count. Anything a user reported that's still waiting
-    // on a moderator must not move a published price in the meantime.
-    where: { soldAt: { gte: day, lt: dayEnd }, status: "APPROVED" },
+    where: { soldAt: { gte: day, lt: dayEnd } },
     select: { figureId: true, condition: true, amountUsd: true },
   });
 
@@ -153,7 +151,6 @@ export async function recomputeFigureStatsFor(figureId: string): Promise<boolean
       figureId,
       condition: "NEW_SEALED",
       soldAt: { gte: d90 },
-      status: "APPROVED",
     },
     select: { amountUsd: true, soldAt: true },
   });

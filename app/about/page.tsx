@@ -41,8 +41,9 @@ export default async function AboutPage() {
             obtain. eBay restricts access to sold-price data, and our application is pending.
           </li>
           <li>
-            <strong>Community reports</strong> — collectors telling us what they actually paid.
-            Screened before they count; see below.
+            <strong>Nothing else.</strong> Prices are not crowd-sourced. Anyone can tell us a
+            page is wrong, and a person checks it — but no visitor can write a number straight
+            into the index.
           </li>
         </List>
         {totals.sales === 0 && (
@@ -72,16 +73,20 @@ export default async function AboutPage() {
         </p>
       </Section>
 
-      <Section title="Community reports">
+      <Section title="Corrections">
         <p>
-          Anyone signed in can report a sale. Since those reports feed a public price index,
-          they're checked before they count: rate limited per person, validated, and compared
-          against what's already known about that figure in that condition. Anything unusual
-          waits for a moderator and doesn't affect prices in the meantime.
+          Every price here comes from a marketplace API, never from a visitor. That is a
+          deliberate limit: a price index anyone can write to is a price index anyone can move,
+          and screening that reliably is harder than it first looks.
         </p>
         <p>
-          The thresholds lean toward holding things back. A delayed report costs someone a little
-          patience; a wrong one corrupts a number people use to decide what to pay.
+          What you can do is tell us when something is wrong — a figure filed under the wrong
+          character, a variant treated as one product, a price that can't be right, or a figure
+          missing entirely. That goes through the{" "}
+          <a href="/feedback" className="text-accent hover:underline">
+            feedback form
+          </a>
+          , and a person reads it. Nothing sent that way changes the site by itself.
         </p>
       </Section>
 
