@@ -189,7 +189,11 @@ async function searchDanbooru(
     }
 
     const confirmed = pickConfirmedTag(withWorks, nameMatches, seriesMatches);
-    if (confirmed) return confirmed;
+    // The guess that matched, not the first one tried. "Muelsyse: Elite 2"
+    // offers both itself and "Muelsyse"; only the second is her name, and
+    // storing the first would put an Arknights promotion tier in the
+    // catalogue as though it were part of who she is.
+    if (confirmed) return { tag: confirmed, guess };
   }
   return null;
 }
@@ -331,17 +335,19 @@ async function main() {
       // series name, not AniList's, and is the only source that covers the
       // games and VTuber agencies AniList omits. Ninomae Ina'nis lives here.
       if (!cast) {
-        const tag = await searchDanbooru(pending.candidates, seriesRow);
-        if (tag) {
+        const found = await searchDanbooru(pending.candidates, seriesRow);
+        if (found) {
           resolved.push({
             figureId: pending.id,
             figureName: pending.name,
             seriesName: seriesRow.name,
-            characterName: pending.candidates[0],
+            characterName: found.guess,
             via: "danbooru",
             nameJa: null,
+            // Danbooru's own spelling as an alias — it is the name people
+            // search by, and its casing ("Mcfly") is worse than the box's.
             aliases:
-              tag.name.toLowerCase() === pending.candidates[0].toLowerCase() ? [] : [tag.name],
+              found.tag.name.toLowerCase() === found.guess.toLowerCase() ? [] : [found.tag.name],
             anilistId: null,
           });
           danbooruHits += 1;
@@ -406,19 +412,17 @@ async function main() {
       }
 
       if (!remote) {
-        const tag = await searchDanbooru(pending.candidates, seriesRow);
-        if (tag) {
+        const found = await searchDanbooru(pending.candidates, seriesRow);
+        if (found) {
           resolved.push({
             figureId: pending.id,
             figureName: pending.name,
             seriesName: seriesRow.name,
-            // Our own guess is the better name: it comes off the box, properly
-            // cased, and is usually fuller than a lowercase tag. The tag joins
-            // the aliases, where it is worth having — people do search "kazusa".
-            characterName: pending.candidates[0],
+            characterName: found.guess,
             via: "danbooru",
             nameJa: null,
-            aliases: tag.name.toLowerCase() === pending.candidates[0].toLowerCase() ? [] : [tag.name],
+            aliases:
+              found.tag.name.toLowerCase() === found.guess.toLowerCase() ? [] : [found.tag.name],
             anilistId: null,
           });
           danbooruHits += 1;
