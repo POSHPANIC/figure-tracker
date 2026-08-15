@@ -12,7 +12,7 @@ export default function PrivacyPage() {
     <ProsePage
       title="Privacy"
       intro="What's stored, why, and for how long. Written to be read, not to be survived."
-      updated="2026-08-14"
+      updated="2026-08-15"
     >
       <Section>
         <Callout>
@@ -111,14 +111,12 @@ export default function PrivacyPage() {
             <strong>Discord</strong> — only if you sign in with it, and only what you approve.
           </li>
         </List>
-        <p>
-          One thing worth knowing that most sites don't mention:{" "}
-          <strong>listing photos are loaded directly from eBay</strong> rather than copied here.
-          That means your browser contacts eBay when you view a figure page, and eBay can see
-          your IP address as a result — the same as if you'd visited a listing. We do this
-          because copying their images would be a licensing problem, but it's your information
-          and you should know.
-        </p>
+        <Callout>
+          <strong>No third party is contacted by your browser while you read this site.</strong>{" "}
+          Every page loads entirely from us. There are no embedded images, fonts, scripts or
+          widgets from anywhere else, so nobody except the companies above learns that you were
+          here or what you looked at.
+        </Callout>
       </Section>
 
       <Section title="How long things are kept">

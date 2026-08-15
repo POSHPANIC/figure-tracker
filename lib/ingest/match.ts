@@ -121,15 +121,36 @@ const CATEGORY_LINE: Partial<Record<string, string>> = {
  * plenty of merchandise with the same words on it — the search that found
  * "Nendoroid Marin Kitagawa" also returned a t-shirt.
  *
- * Only unambiguous items belong here. "Towel" is absent on purpose: figures
- * genuinely ship as "Bath Towel ver.", so it's a variant word, not merchandise.
+ * Every word here must mean "this listing IS that thing". Several obvious
+ * candidates are deliberately absent because sellers use them other ways:
+ *
+ *   manga, anime   — genre keywords. "Nezuko Kamado 1/8 Figure Anime Manga
+ *                    Japan" is a figure; treating "manga" as a product type
+ *                    rejected real matches outright.
+ *   sleeve         — describes clothing on the figure as often as a card sleeve.
+ *   plaque, base   — parts of a figure.
+ *   acrylic        — a material, and display cases.
+ *   charm, sticker,
+ *   postcard, cd   — usually pack-in bonuses rather than the product.
+ *   towel          — figures genuinely ship as "Bath Towel ver.".
+ *
+ * The bonus-item problem is handled separately: see BONUS_PREFIXES.
  */
 const NON_FIGURE_MARKERS = new Set([
-  "shirt", "tshirt", "tee", "keychain", "keyring", "poster", "standee",
-  "badge", "mousepad", "sticker", "stickers", "postcard", "tapestry",
-  "wallscroll", "doujinshi", "manga", "artbook", "dvd", "cd", "soundtrack",
-  "dakimakura", "pillowcase", "mug", "tumbler", "coaster", "tote", "charm",
-  "acrylic", "sleeve", "sleeves", "plaque", "banner", "calendar",
+  "shirt", "tshirt", "tee", "hoodie", "keychain", "keyring", "poster",
+  "standee", "badge", "mousepad", "tapestry", "wallscroll", "doujinshi",
+  "artbook", "soundtrack", "dakimakura", "pillowcase", "mug", "tumbler",
+  "coaster", "tote", "calendar", "lanyard",
+]);
+
+/**
+ * Words that turn a following noun into a pack-in rather than the product.
+ *
+ * "Nendoroid Marin Kitagawa with Poster" is a figure; "Marin Kitagawa Poster"
+ * is a poster. Without this the first is thrown away along with the second.
+ */
+const BONUS_PREFIXES = new Set([
+  "with", "includes", "including", "inc", "plus", "bonus", "free", "and", "w",
 ]);
 
 /**
@@ -181,6 +202,24 @@ export function normalize(text: string): string {
     .replace(/[^\p{L}\p{N}\s/.-]/gu, " ")
     .replace(/\s+/g, " ")
     .trim();
+}
+
+/**
+ * Whether the title is selling merchandise rather than a figure.
+ *
+ * A marker only counts when it isn't introduced as a pack-in — "Figure with
+ * Poster" keeps its figure, "Poster" does not. Exported for testing, since
+ * being wrong here silently discards real listings and nothing reports it.
+ */
+export function namesSomethingOtherThanAFigure(normalizedTitle: string): boolean {
+  const words = normalizedTitle.split(/[\s/.-]+/).filter(Boolean);
+
+  return words.some((word, i) => {
+    if (!NON_FIGURE_MARKERS.has(word)) return false;
+    // Look back two words: "with poster", "comes with poster".
+    const before = [words[i - 1], words[i - 2]].filter(Boolean) as string[];
+    return !before.some((w) => BONUS_PREFIXES.has(w));
+  });
 }
 
 /** Fold a word onto its canonical form, if it has one. */
@@ -287,11 +326,11 @@ export function scoreMatch(title: string, figure: MatchCandidate): number {
   }
 
   // --- Gate 2: it has to be a figure, and one of them. ---
+  const normalizedTitle = normalize(title);
+  if (namesSomethingOtherThanAFigure(normalizedTitle)) return 0;
   for (const token of titleTokens) {
-    if (NON_FIGURE_MARKERS.has(token)) return 0;
     if (MULTIPACK_MARKERS.has(token)) return 0;
   }
-  const normalizedTitle = normalize(title);
   if (MULTIPACK_PATTERN.test(normalizedTitle)) return 0;
   if (NON_FIGURE_PHRASES.some((phrase) => normalizedTitle.includes(phrase))) return 0;
 

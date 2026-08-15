@@ -7,7 +7,6 @@ import { FigureActions } from "@/components/figure-actions";
 import { FigureImagesAdmin } from "@/components/figure-images-admin";
 import { ReportSale } from "@/components/report-sale";
 import { FigureThumb } from "@/components/figure-thumb";
-import { ListingThumb } from "@/components/listing-thumb";
 import { PriceChart } from "@/components/price-chart";
 import { getFigureBySlug, getFigureStats, getPriceHistory } from "@/lib/queries";
 import { getFigureUserState } from "@/lib/user-queries";
@@ -268,7 +267,6 @@ export default async function FigurePage({ params, searchParams }: PageProps<"/f
               <ul className="divide-y divide-border">
                 {figure.listings.map((l) => (
                   <li key={l.id} className="flex items-center gap-3 py-2.5">
-                    <ListingThumb url={l.imageUrl} title={l.title} className="size-12" />
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-sm">{l.title}</span>
                       <span className="block text-xs text-muted">

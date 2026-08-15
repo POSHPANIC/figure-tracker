@@ -227,13 +227,47 @@ describe("things that aren't the figure at all", () => {
   });
 
   it("rejects other merchandise types", () => {
-    for (const item of ["Acrylic Standee", "Keychain", "Poster", "Tapestry", "Mousepad"]) {
+    for (const item of ["Standee", "Keychain", "Poster", "Tapestry", "Mousepad"]) {
       assert.equal(
         scoreMatch(`My Dress-Up Darling Marin Kitagawa ${item}`, marinNendo),
         0,
         `${item} is not a figure`,
       );
     }
+  });
+
+  it("does not treat genre keywords as product types", () => {
+    // Real listings, rejected outright before this. Sellers pad titles with
+    // "Anime Manga Japan" as search bait; it says nothing about the product.
+    const titles = [
+      "Manga Anime Model Nezuko Kamado 1 8 Scale Figure ANIPLEX",
+      "Demon Slayer Nezuko Kamado 1/8 Scale ABS PVC Figure Aniplex Anime Manga Japan",
+    ];
+    const nezuko: MatchCandidate = {
+      id: "nezuko-scale",
+      name: "Nezuko Kamado 1/8 Scale Figure",
+      nameJa: null,
+      scale: "1/8",
+      category: "SCALE",
+      manufacturerName: "Aniplex",
+      seriesName: "Demon Slayer",
+      characterNames: ["Nezuko Kamado"],
+    };
+    for (const title of titles) {
+      assert.ok(scoreMatch(title, nezuko) >= MATCH_ACCEPT_THRESHOLD, title);
+    }
+  });
+
+  it("keeps a figure that merely ships with merchandise", () => {
+    // "Figure with Poster" is a figure. "Poster" is not.
+    assert.ok(
+      scoreMatch("Nendoroid Marin Kitagawa with Poster", marinNendo) >= MATCH_ACCEPT_THRESHOLD,
+    );
+    assert.ok(
+      scoreMatch("Nendoroid Marin Kitagawa includes Keychain", marinNendo) >=
+        MATCH_ACCEPT_THRESHOLD,
+    );
+    assert.equal(scoreMatch("My Dress-Up Darling Marin Kitagawa Keychain", marinNendo), 0);
   });
 
   it("rejects blind-box multi-packs", () => {
