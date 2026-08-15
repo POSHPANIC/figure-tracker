@@ -1,5 +1,4 @@
 import type { FigureCategory } from "../generated/prisma/enums";
-import { namesSomethingOtherThanAFigure, normalize } from "./match";
 
 /**
  * Parsing Good Smile Company's product archive at goodsmile.info.
@@ -132,6 +131,12 @@ const ACCESSORY_NAME_PATTERNS = [
   /\bbackdrop\b/i,
   /\bwig\b/i,
   /\bstand\s+set\b/i,
+  /\bbadge\b/i,
+  /\bkey\s?(ring|chain)\b/i,
+  // "figma Styles" is Good Smile's clothing line for figures, not a figure
+  // line. Its products are garments and are named like one — "figma Styles
+  // Hoodie Outfit" — so they need naming rather than inferring.
+  /^figma\s+styles\b/i,
 ];
 
 /**
@@ -150,6 +155,23 @@ const ACCESSORY_NAME_PATTERNS = [
  */
 const TEXTILE_SPEC =
   /\b(cotton|polyester|nylon|rayon|fabric|felt|wool|silk|cloth material)\b/i;
+
+/**
+ * Words that say the spec is describing a figure, whatever else it mentions.
+ *
+ * The textile test alone was too blunt across the whole archive. Half the
+ * Nendoroid Doll range reads "Painted ABS&PVC non-scale articulated figure with
+ * stand included" and then lists the fabrics its clothes are made from — those
+ * are figures, and a hundred-odd were being discarded on the strength of the
+ * word "cotton".
+ *
+ * Only ever used to rescue something the textile test caught, never as a
+ * requirement of its own: plenty of genuine entries from the archive's early
+ * years have a spec reading "Complete", or nothing at all, and demanding this
+ * of everything would throw them away.
+ */
+const FIGURE_MATERIAL_SPEC =
+  /\b(figure|complete product|plastic|pvc|abs|polystone|resin|vinyl|alloy|die-?cast)\b/i;
 
 // ---------------------------------------------------------------------------
 // Listing pages
@@ -375,7 +397,6 @@ export type RejectReason =
   | "non-figure category"
   | "unknown category"
   | "accessory name"
-  | "not a figure by name"
   | "outfit, not a figure"
   | "no spec table"
   | "no name";
@@ -409,18 +430,22 @@ export function classify(item: GscListItem, product: GscProduct | null): Classif
     return { ok: false, reason: "accessory name", detail: String(accessory) };
   }
 
-  // The same test the listing matcher applies, so the catalogue can't contain
-  // something the matcher would refuse to match.
-  if (namesSomethingOtherThanAFigure(normalize(item.name))) {
-    return { ok: false, reason: "not a figure by name", detail: item.name };
-  }
+  // The listing matcher's merchandise test used to run here too. It is the
+  // wrong tool for a catalogue name and was costing real products: it reads
+  // "hoodie" and "shirt" as evidence of merchandise, which holds for a
+  // marketplace title but not for a product name where the character is
+  // *wearing* the thing. "Nendoroid Saitama: OPPAI Hoodie Ver." and fifteen
+  // others were being refused for describing an outfit.
+  //
+  // The archive gives better signals anyway — its own category taxonomy, and a
+  // spec that says what the thing is made of — and both run above.
 
   if (!product) {
     return { ok: false, reason: "no spec table", detail: item.path };
   }
 
   const spec = product["Specifications"];
-  if (spec && TEXTILE_SPEC.test(spec)) {
+  if (spec && TEXTILE_SPEC.test(spec) && !FIGURE_MATERIAL_SPEC.test(spec)) {
     return { ok: false, reason: "outfit, not a figure", detail: spec.slice(0, 60) };
   }
 

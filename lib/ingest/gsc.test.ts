@@ -296,6 +296,54 @@ describe("classify — only figures get through", () => {
     assert.equal(result.ok === false && result.reason, "accessory name");
   });
 
+  it("keeps a figure whose name mentions the outfit it wears", () => {
+    // Real products. The listing matcher reads "hoodie" as merchandise, which
+    // is right for an eBay title and wrong for a product name.
+    for (const name of [
+      "Nendoroid Saitama: OPPAI Hoodie Ver.",
+      "Elis Open-Shirt Ver.",
+      "Mikoto Misaka: Hoodie☆Look Gekota ver.",
+    ]) {
+      const result = classify(tile({ name }), SPECS);
+      assert.ok(result.ok, `${name} should be a figure`);
+    }
+  });
+
+  it("still rejects the clothing line itself", () => {
+    const result = classify(tile({ classes: ["figma"], name: "figma Styles Hoodie Outfit" }), SPECS);
+    assert.equal(result.ok, false);
+    assert.equal(result.ok === false && result.reason, "accessory name");
+  });
+
+  it("rejects a badge collection filed under a figure category", () => {
+    const result = classify(
+      tile({ classes: ["capsuletoy"], name: "Touhou Lost Word Capsule SD Badge Collection Vol 9" }),
+      SPECS,
+    );
+    assert.equal(result.ok, false);
+    assert.equal(result.ok === false && result.reason, "accessory name");
+  });
+
+  it("keeps a doll figure whose clothes are fabric", () => {
+    // "Painted ABS&PVC ... figure" first, fabrics later. A hundred of these
+    // were being discarded on the word "cotton".
+    const result = classify(tile({ classes: ["nendoroiddoll"], name: "Nendoroid Doll Snow Miku" }), {
+      ...SPECS,
+      Specifications:
+        "Painted ABS&PVC non-scale articulated figure with stand included. Outfit: Cotton, Polyester.",
+    });
+    assert.ok(result.ok);
+  });
+
+  it("still rejects a spec that is only fabric", () => {
+    const result = classify(tile({ classes: ["nendoroiddoll"], name: "Nendoroid Doll: Kigurumi Pajamas" }), {
+      ...SPECS,
+      Specifications: "Materials: Cotton, Polyester",
+    });
+    assert.equal(result.ok, false);
+    assert.equal(result.ok === false && result.reason, "outfit, not a figure");
+  });
+
   it("rejects a category it has never seen rather than guessing", () => {
     const result = classify(tile({ classes: ["someNewLine2027"] }), SPECS);
     assert.equal(result.ok, false);
