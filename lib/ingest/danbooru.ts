@@ -42,13 +42,24 @@ async function throttle(): Promise<void> {
 }
 
 export function danbooruConfigured(): boolean {
-  return Boolean(process.env.DANBOORU_LOGIN && process.env.DANBOORU_API_KEY);
+  return Boolean(env("DANBOORU_LOGIN") && env("DANBOORU_API_KEY"));
+}
+
+/**
+ * Read a variable, tolerating quotes around the value.
+ *
+ * dotenv strips matched quotes already, but a stray one on a pasted key is
+ * otherwise invisible: it produces a 401 that reads exactly like a wrong key,
+ * and the difference cost an evening to find once.
+ */
+function env(name: string): string {
+  return (process.env[name] ?? "").trim().replace(/^["']|["']$/g, "");
 }
 
 function authHeaders(): Record<string, string> {
-  const login = process.env.DANBOORU_LOGIN ?? "";
-  const key = process.env.DANBOORU_API_KEY ?? "";
-  const userId = process.env.DANBOORU_USER_ID?.trim();
+  const login = env("DANBOORU_LOGIN");
+  const key = env("DANBOORU_API_KEY");
+  const userId = env("DANBOORU_USER_ID");
 
   return {
     // Basic auth rather than query parameters, so the key never appears in a
@@ -146,6 +157,14 @@ export function pickConfirmedTag(
 // Requests
 // ---------------------------------------------------------------------------
 
+/** Say it once. A failing key fails on every figure, and 30 identical lines bury the report. */
+const warned = new Set<string>();
+function warnOnce(message: string): void {
+  if (warned.has(message)) return;
+  warned.add(message);
+  console.warn(message);
+}
+
 async function get<T>(path: string): Promise<T | null> {
   if (!danbooruConfigured()) return null;
   await throttle();
@@ -161,8 +180,20 @@ async function get<T>(path: string): Promise<T | null> {
     return null;
   }
 
-  if (res.status === 401 || res.status === 403) {
-    console.warn("[danbooru] credentials rejected — check DANBOORU_LOGIN and DANBOORU_API_KEY");
+  // 401 and 403 mean different things here and conflating them sends you
+  // looking in the wrong place. 401 is "these credentials are malformed or
+  // wrong". 403 is Danbooru's User::PrivilegeError: the key was read and
+  // refused, which on a new account usually means the email is unconfirmed
+  // rather than anything being mistyped.
+  if (res.status === 401) {
+    warnOnce("[danbooru] 401 — login or key not accepted. Check for a typo or a stray quote.");
+    return null;
+  }
+  if (res.status === 403) {
+    warnOnce(
+      "[danbooru] 403 — key read but refused. Confirm the account's email address, " +
+        "then regenerate the key at danbooru.donmai.us/profile.",
+    );
     return null;
   }
   if (res.status === 429) {
