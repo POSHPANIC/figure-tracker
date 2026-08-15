@@ -67,6 +67,7 @@ removes it and leaves the catalogue intact.
 | `npm run set-role -- you@example.com ADMIN` | Make someone a moderator or admin |
 | `npm run import:gsc` | Read the Good Smile archive. Dry run unless given `--write` |
 | `npm run derive:characters` | Work out who imported figures depict. Dry run unless given `--yes` |
+| `npm run dedupe:series` | Collapse duplicate series rows. Dry run unless given `--yes` |
 | `npm run rematch` | Re-run matching over stored listings. Dry run unless given `--yes` |
 | `npm run reindex` | Rebuild the search index |
 | `npm run suggest:figures` | Propose catalogue additions from unmatched listings |
@@ -74,12 +75,34 @@ removes it and leaves the catalogue intact.
 ### Growing the catalogue
 
 ```bash
-npm run import:gsc -- --pages 2-4          # look first
+npm run dedupe:series                       # do this BEFORE a big import
+npm run dedupe:series -- --yes
+npm run import:gsc -- --pages 2-4           # look first
 npm run import:gsc -- --pages 2-4 --write
-npm run derive:characters                  # look first
+npm run derive:characters                   # look first
 npm run derive:characters -- --yes
 npm run reindex
 ```
+
+De-duplicate first. Good Smile file products under their own series names, so
+importing splits franchises across rows — "SPY×FAMILY" beside "Spy x Family",
+"Character Vocal Series 01: Hatsune Miku" beside "Hatsune Miku". Search then
+finds half a character's figures and browse filters list the same show twice.
+The work is the same whenever you do it; doing it first means reviewing dozens
+of cases instead of hundreds.
+
+`dedupe:series` merges only on conclusive evidence — the same name once styling
+is ignored, a name listed among the other's AniList synonyms, or the same
+AniList entry. Where one name merely *contains* the other it prints a suggestion
+and the command to act on it, because that pattern is right often enough to show
+and wrong often enough that acting on it would eventually fold Fate/stay night
+into Fate/Grand Order:
+
+```bash
+npm run dedupe:series -- --merge "Character Vocal Series 01: Hatsune Miku" --into "Hatsune Miku" --yes
+```
+
+A merged-away name is kept as a synonym, so the row stays findable under both.
 
 Both steps are dry-run by default and both print why they refused things. The
 refusals are the interesting part — a category nobody has ruled on, or a name
