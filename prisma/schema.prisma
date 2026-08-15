@@ -28,6 +28,7 @@ enum FigureCategory {
   SCALE // 1/7, 1/8, 1/4 etc. static scale figures
   NENDOROID
   FIGMA
+  HELLO_GOOD_SMILE // "HELLO! GOOD SMILE" — small deformed prepainted figures
   PRIZE // arcade / crane game prizes
   TRADING // blind box, gashapon
   GARAGE_KIT

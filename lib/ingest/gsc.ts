@@ -66,6 +66,9 @@ const FIGURE_CLASSES: Record<string, FigureCategory> = {
   nendoroidpetit: "NENDOROID",
   nendoroiddoll: "NENDOROID",
   figma: "FIGMA",
+  // "HELLO! GOOD SMILE" — small deformed prepainted figures. Its own line, the
+  // way Nendoroid and figma are, rather than swept into OTHER.
+  hello: "HELLO_GOOD_SMILE",
   scale: "SCALE",
   "scale1-3": "SCALE",
   "scale1-4": "SCALE",
