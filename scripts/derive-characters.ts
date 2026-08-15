@@ -26,7 +26,13 @@
 import "dotenv/config";
 import { prisma } from "../lib/prisma";
 import { characterCandidates, sameCharacter } from "../lib/ingest/character-guess";
-import { findSeriesCandidates, pickBestSeries, type AniListSeries } from "../lib/ingest/anilist";
+import {
+  findSeriesCandidates,
+  loadMoreCharacters,
+  pickBestSeries,
+  type AniListCharacter,
+  type AniListSeries,
+} from "../lib/ingest/anilist";
 import { rebuildSearchTextFor } from "../lib/ingest/search-index";
 import { slugify } from "../lib/utils";
 
@@ -119,6 +125,8 @@ async function main() {
 
   const resolved: Resolution[] = [];
   const unresolved: Unresolved[] = [];
+  /** How many were only found by paging past AniList's first 25. */
+  let deepCastHits = 0;
 
   // --- Pass 1: guess, and group the work by series ------------------------
   type Pending = { id: string; name: string; candidates: string[] };
@@ -203,12 +211,30 @@ async function main() {
         continue;
       }
 
-      const remote = cast.characters.find((c) =>
+      const matches = (c: AniListCharacter) =>
         pending.candidates.some(
           (guess) =>
             sameCharacter(c.name, guess) || c.alternatives.some((a) => sameCharacter(a, guess)),
-        ),
-      );
+        );
+
+      let remote = cast.characters.find(matches);
+
+      // Not in the first page of the cast. AniList caps a nested character
+      // connection at 25 however many you ask for, and the ordering is by role
+      // then popularity — so a figure of someone further down the bill lands
+      // here. Page through the rest before giving up, once per series: the
+      // extra characters are kept on `cast` so the next figure from the same
+      // show pays nothing.
+      if (!remote && cast.moreCharacters) {
+        const extra = await loadMoreCharacters(cast.id, (found) => found.some(matches));
+        if (extra.length > 0) {
+          cast.characters.push(...extra);
+          cast.moreCharacters = false;
+          remote = extra.find(matches);
+          if (remote) deepCastHits += 1;
+        }
+      }
+
       if (!remote) {
         unresolved.push({
           figureName: pending.name,
@@ -239,6 +265,9 @@ async function main() {
 
   console.log(`${"=".repeat(62)}`);
   console.log(`resolved   : ${resolved.length}  (${viaCatalogue} from the catalogue, ${viaAniList} from AniList)`);
+  if (deepCastHits > 0) {
+    console.log(`             ${deepCastHits} of those needed more than AniList's first 25 cast members`);
+  }
   console.log(`unresolved : ${unresolved.length}`);
 
   if (resolved.length > 0) {

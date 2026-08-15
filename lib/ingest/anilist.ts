@@ -30,6 +30,31 @@ const DELAY_MS = 2_500;
  *
  * The caller picks; see pickBestSeries.
  */
+/**
+ * AniList's ceiling on a nested character connection.
+ *
+ * Asking for more is silently capped rather than refused — request 100 and the
+ * response still carries 25, with pageInfo.perPage reporting 25. This was worth
+ * measuring: the query here asked for 50 for months and had been receiving 25
+ * the whole time, so "the top 50 of the cast" was never true. Getting past it
+ * means paging, not a bigger number.
+ */
+export const CAST_PAGE_SIZE = 25;
+
+/** One page of a single series' cast, for reaching past the first 25. */
+const CHARACTERS_QUERY = `
+query ($id: Int, $page: Int) {
+  Media(id: $id) {
+    characters(sort: [ROLE, FAVOURITES_DESC], perPage: ${CAST_PAGE_SIZE}, page: $page) {
+      pageInfo { hasNextPage }
+      edges {
+        role
+        node { id name { full native alternative } }
+      }
+    }
+  }
+}`;
+
 const SERIES_QUERY = `
 query ($search: String, $perPage: Int) {
   Page(page: 1, perPage: $perPage) {
@@ -38,7 +63,8 @@ query ($search: String, $perPage: Int) {
       popularity
       title { romaji english native }
       synonyms
-      characters(sort: [ROLE, FAVOURITES_DESC], perPage: 50) {
+      characters(sort: [ROLE, FAVOURITES_DESC], perPage: ${CAST_PAGE_SIZE}) {
+        pageInfo { hasNextPage }
         edges {
           role
           node { id name { full native alternative } }
@@ -68,6 +94,8 @@ export type AniListSeries = {
   /** AniList's popularity score. The main entry usually dwarfs its spin-offs. */
   popularity: number;
   characters: AniListCharacter[];
+  /** True when the cast runs past what has been loaded so far. */
+  moreCharacters: boolean;
 };
 
 let lastCallAt = 0;
@@ -153,28 +181,11 @@ type RawMedia = {
   popularity?: number | null;
   synonyms?: (string | null)[];
   title?: Record<string, string | null>;
-  characters?: { edges?: RawEdge[] };
+  characters?: { pageInfo?: { hasNextPage?: boolean }; edges?: RawEdge[] };
 };
 
 function parseMedia(media: RawMedia): AniListSeries {
-  const characters: AniListCharacter[] = (media.characters?.edges ?? [])
-    .map((edge) => {
-      const node = edge.node;
-      if (!node?.id || !node.name?.full) return null;
-
-      const alternatives = (node.name.alternative ?? [])
-        .filter((a): a is string => Boolean(a))
-        .flatMap(expandAlternative);
-
-      return {
-        id: node.id,
-        name: node.name.full,
-        native: node.name.native ?? null,
-        alternatives,
-        role: (edge.role as AniListCharacter["role"]) ?? "BACKGROUND",
-      };
-    })
-    .filter((c): c is AniListCharacter => c !== null);
+  const characters = parseCharacterEdges(media.characters?.edges ?? []);
 
   return {
     id: media.id,
@@ -184,7 +195,89 @@ function parseMedia(media: RawMedia): AniListSeries {
     synonyms: (media.synonyms ?? []).filter((s): s is string => Boolean(s)),
     popularity: media.popularity ?? 0,
     characters,
+    moreCharacters: Boolean(media.characters?.pageInfo?.hasNextPage),
   };
+}
+
+/** Shared by the search query and the per-series pagination query. */
+function parseCharacterEdges(edges: RawEdge[]): AniListCharacter[] {
+  return edges
+    .map((edge) => {
+      const node = edge.node;
+      if (!node?.id || !node.name?.full) return null;
+      const alternatives = (node.name.alternative ?? [])
+        .filter((a): a is string => Boolean(a))
+        .flatMap(expandAlternative);
+      return {
+        id: node.id,
+        name: node.name.full,
+        native: node.name.native ?? null,
+        alternatives,
+        role: (edge.role as AniListCharacter["role"]) ?? "BACKGROUND",
+      };
+    })
+    .filter((c): c is AniListCharacter => c !== null);
+}
+
+/**
+ * Load more of a series' cast, one page at a time, stopping as soon as
+ * `found` is satisfied.
+ *
+ * Worth doing lazily and per series rather than up front. Most figures depict
+ * someone in the first 25 — that ordering is by role then popularity, and
+ * headline characters get the figures. It is the long tail that needs this:
+ * Blue Archive and Fate have hundreds of characters, and the one on the box
+ * may be well down the list.
+ *
+ * `maxPages` bounds the damage. Each page is a throttled request, so an
+ * unbounded walk through a 500-strong cast would cost minutes per series for a
+ * character that may not be there at all.
+ */
+export async function loadMoreCharacters(
+  mediaId: number,
+  found: (characters: AniListCharacter[]) => boolean,
+  maxPages = 7,
+): Promise<AniListCharacter[]> {
+  const collected: AniListCharacter[] = [];
+
+  for (let page = 2; page <= maxPages + 1; page++) {
+    await throttle();
+
+    let res: Response;
+    try {
+      res = await fetch(ENDPOINT, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify({ query: CHARACTERS_QUERY, variables: { id: mediaId, page } }),
+        signal: AbortSignal.timeout(20_000),
+      });
+    } catch (err) {
+      console.warn(`[anilist] cast page ${page} for media ${mediaId} failed:`, err);
+      return collected;
+    }
+
+    if (res.status === 429) {
+      const retryAfter = Number(res.headers.get("retry-after") ?? 60);
+      console.warn(`[anilist] rate limited, waiting ${retryAfter}s`);
+      await new Promise((r) => setTimeout(r, retryAfter * 1000));
+      page -= 1;
+      continue;
+    }
+    if (!res.ok) return collected;
+
+    const body = (await res.json()) as {
+      data?: { Media?: { characters?: { pageInfo?: { hasNextPage?: boolean }; edges?: RawEdge[] } } };
+      errors?: { message?: string }[];
+    };
+    const connection = body.data?.Media?.characters;
+    if (body.errors?.length || !connection) return collected;
+
+    collected.push(...parseCharacterEdges(connection.edges ?? []));
+    if (found(collected)) return collected;
+    if (!connection.pageInfo?.hasNextPage) return collected;
+  }
+
+  return collected;
 }
 
 /**

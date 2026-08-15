@@ -78,6 +78,7 @@ describe("pickBestSeries", () => {
       alternatives: [],
       role: "MAIN" as const,
     })),
+    moreCharacters: false,
   });
 
   it("prefers the candidate containing our known characters", () => {
