@@ -201,6 +201,63 @@ async function searchDanbooru(
 /** One lookup per distinct name, however many figures ask for it. */
 const danbooruCache = new Map<string, Awaited<ReturnType<typeof findCharacterTags>>>();
 
+/**
+ * Attach one confirmed character, creating the row if it is new.
+ *
+ * Returns whether a Character row was created, or null if the series has gone.
+ *
+ * Split out so it can be called per figure. Over a run this size — several
+ * thousand figures, every lookup throttled — collecting everything in memory
+ * and writing at the end means one dropped database connection throws away
+ * hours of API calls.
+ */
+async function attach(r: Resolution): Promise<boolean | null> {
+  const series = await prisma.series.findFirst({
+    where: { name: r.seriesName },
+    select: { id: true },
+  });
+  if (!series) return null;
+
+  const existing = await prisma.character.findUnique({
+    where: { name_seriesId: { name: r.characterName, seriesId: series.id } },
+    select: { id: true },
+  });
+
+  let characterId = existing?.id;
+  let created = false;
+  if (!characterId) {
+    // Character slugs are globally unique, and two series can share a name —
+    // there is more than one Saber, and more than one Rin.
+    const base = slugify(`${r.characterName}-${r.seriesName}`);
+    const taken = await prisma.character.findUnique({
+      where: { slug: base },
+      select: { id: true },
+    });
+    const row = await prisma.character.create({
+      data: {
+        name: r.characterName,
+        slug: taken ? `${base}-${series.id.slice(-6)}` : base,
+        seriesId: series.id,
+        nameJa: r.nameJa,
+        aliases: r.aliases.filter((a) => a.toLowerCase() !== r.characterName.toLowerCase()),
+        anilistId: r.anilistId,
+      },
+      select: { id: true },
+    });
+    characterId = row.id;
+    created = true;
+  }
+
+  await prisma.figure.update({
+    where: { id: r.figureId },
+    data: { characters: { connect: { id: characterId } } },
+  });
+  return created;
+}
+
+/** Figures written during the run, so the closing pass doesn't redo them. */
+const applied = new Set<string>();
+
 async function main() {
   const figures = await prisma.figure.findMany({
     where: { characters: { none: {} } },
@@ -243,6 +300,32 @@ async function main() {
 
   const resolved: Resolution[] = [];
   const unresolved: Unresolved[] = [];
+
+  /**
+   * Record a resolution, and write it immediately when applying.
+   *
+   * Writing here rather than in a batch at the end is what makes a long run
+   * survivable. Several thousand figures at a throttled lookup apiece is hours
+   * of work, and this database drops its connection regularly; holding it all
+   * in memory would mean one drop discards the lot. Written as they come, a
+   * restart simply resumes — figures that already have a character are never
+   * looked at again.
+   */
+  const record = async (r: Resolution) => {
+    resolved.push(r);
+    if (!APPLY) return;
+    try {
+      const created = await attach(r);
+      if (created !== null) {
+        applied.add(r.figureId);
+        if (created) createdSoFar += 1;
+      }
+    } catch (err) {
+      const detail = err instanceof Error ? err.message.split("\n")[0] : String(err);
+      console.warn(`  ! could not save ${r.figureName}: ${detail}`);
+    }
+  };
+  let createdSoFar = 0;
   /** How many were only found by paging past AniList's first 25. */
   let deepCastHits = 0;
   /** How many needed the by-name search rather than the series' cast. */
@@ -305,7 +388,7 @@ async function main() {
         ),
       );
       if (local) {
-        resolved.push({
+        await record({
           figureId: pending.id,
           figureName: pending.name,
           seriesName: seriesRow.name,
@@ -337,7 +420,7 @@ async function main() {
       if (!cast) {
         const found = await searchDanbooru(pending.candidates, seriesRow);
         if (found) {
-          resolved.push({
+          await record({
             figureId: pending.id,
             figureName: pending.name,
             seriesName: seriesRow.name,
@@ -396,7 +479,7 @@ async function main() {
       if (!remote) {
         const found = await searchByName(pending.candidates, seriesRow);
         if (found) {
-          resolved.push({
+          await record({
             figureId: pending.id,
             figureName: pending.name,
             seriesName: seriesRow.name,
@@ -414,7 +497,7 @@ async function main() {
       if (!remote) {
         const found = await searchDanbooru(pending.candidates, seriesRow);
         if (found) {
-          resolved.push({
+          await record({
             figureId: pending.id,
             figureName: pending.name,
             seriesName: seriesRow.name,
@@ -438,7 +521,7 @@ async function main() {
         continue;
       }
 
-      resolved.push({
+      await record({
         figureId: pending.id,
         figureName: pending.name,
         seriesName: seriesRow.name,
@@ -507,45 +590,16 @@ async function main() {
   const touched = new Set<string>();
 
   for (const r of resolved) {
-    const series = await prisma.series.findFirst({
-      where: { name: r.seriesName },
-      select: { id: true },
-    });
-    if (!series) continue;
-
-    let character = await prisma.character.findUnique({
-      where: { name_seriesId: { name: r.characterName, seriesId: series.id } },
-      select: { id: true },
-    });
-
-    if (!character) {
-      // Character slugs are globally unique, and two series can share a name —
-      // there is more than one Saber, and more than one Rin.
-      const base = slugify(`${r.characterName}-${r.seriesName}`);
-      const taken = await prisma.character.findUnique({
-        where: { slug: base },
-        select: { id: true },
-      });
-      character = await prisma.character.create({
-        data: {
-          name: r.characterName,
-          slug: taken ? `${base}-${series.id.slice(-6)}` : base,
-          seriesId: series.id,
-          nameJa: r.nameJa,
-          aliases: r.aliases.filter((a) => a.toLowerCase() !== r.characterName.toLowerCase()),
-          anilistId: r.anilistId,
-        },
-        select: { id: true },
-      });
-      createdCharacters += 1;
+    if (applied.has(r.figureId)) {
+      touched.add(r.figureId);
+      continue;
     }
-
-    await prisma.figure.update({
-      where: { id: r.figureId },
-      data: { characters: { connect: { id: character.id } } },
-    });
+    const created = await attach(r);
+    if (created === null) continue;
+    if (created) createdCharacters += 1;
     touched.add(r.figureId);
   }
+  createdCharacters += createdSoFar;
 
   // The link is only reachable through the denormalized search column, so not
   // rebuilding it would store data nothing can find.
