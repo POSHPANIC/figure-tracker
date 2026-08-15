@@ -3,6 +3,7 @@
  *
  *   npm run dedupe:series                       # dry run
  *   npm run dedupe:series -- --yes              # apply the conclusive ones
+ *   npm run dedupe:series -- --yes --apply-suggested   # …and the suggestions
  *   npm run dedupe:series -- --resolve          # ask AniList about unenriched rows first
  *   npm run dedupe:series -- --merge "Character Vocal Series 01: Hatsune Miku" --into "Hatsune Miku"
  *
@@ -20,7 +21,8 @@
  * contains the other are printed and left alone: that pattern is right often
  * enough to be worth showing and wrong often enough that acting on it would
  * eventually fold Fate/stay night into Fate/Grand Order. Those go through
- * --merge/--into, one at a time, by a person who knows the answer.
+ * --merge/--into one at a time, or --apply-suggested in bulk once somebody has
+ * read the dry run and decided the whole batch is right.
  */
 import "dotenv/config";
 import { prisma } from "../lib/prisma";
@@ -35,6 +37,20 @@ import { sameCharacter } from "../lib/ingest/character-guess";
 import { rebuildSearchTextFor } from "../lib/ingest/search-index";
 
 const APPLY = process.argv.includes("--yes");
+
+/**
+ * Also merge the containment suggestions.
+ *
+ * Off by default because "one name contains the other" is a judgement, not a
+ * fact: it is right for "Jujutsu Kaisen 0" against "Jujutsu Kaisen" and wrong
+ * for Fate/stay night against Fate/Grand Order. Whoever passes this has read
+ * the dry run and decided that, for a catalogue of products rather than a
+ * catalogue of shows, a franchise's seasons and films belong together.
+ *
+ * It applies exactly the groups the dry run printed — no wider rule — so what
+ * you saw is what happens.
+ */
+const APPLY_SUGGESTED = process.argv.includes("--apply-suggested");
 const RESOLVE = process.argv.includes("--resolve");
 
 function arg(name: string): string | null {
@@ -243,10 +259,20 @@ async function main() {
     return;
   }
 
+  // Exactly the groups printed above — the suggestions are taken as shown, not
+  // recomputed under a wider rule, so what was reviewed is what happens.
+  const groups = [...planned];
+  if (APPLY_SUGGESTED) {
+    for (const g of suggested) {
+      const canonical = pickCanonical(g.members);
+      groups.push({ canonical, others: g.members.filter((m) => m.id !== canonical.id) });
+    }
+  }
+
   let figures = 0;
   let characters = 0;
   let reindexed = 0;
-  for (const { canonical, others } of planned) {
+  for (const { canonical, others } of groups) {
     for (const other of others) {
       const moved = await merge(other, canonical);
       figures += moved.figures;
@@ -255,9 +281,9 @@ async function main() {
     reindexed += await reindexSeries(canonical.id);
   }
 
-  console.log(`\nMerged ${planned.length} group(s): moved ${figures} figure(s), merged ${characters} character(s).`);
+  console.log(`\nMerged ${groups.length} group(s): moved ${figures} figure(s), merged ${characters} character(s).`);
   console.log(`Reindexed ${reindexed} figure(s).`);
-  if (suggested.length > 0) {
+  if (!APPLY_SUGGESTED && suggested.length > 0) {
     console.log(`${suggested.length} suggestion(s) left for you to judge.`);
   }
 
