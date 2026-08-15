@@ -222,6 +222,25 @@ export function namesSomethingOtherThanAFigure(normalizedTitle: string): boolean
   });
 }
 
+/**
+ * Whether a title is selling something other than one single figure —
+ * merchandise, an accessory pack, or a multi-pack.
+ *
+ * Shared so the catalogue-suggestion tool applies the same standard as
+ * matching. Otherwise it happily proposes "Nendoroid Surprise BOX Set of 6"
+ * as a product.
+ */
+export function isNotASingleFigure(title: string): boolean {
+  const normalized = normalize(title);
+  if (namesSomethingOtherThanAFigure(normalized)) return true;
+  if (MULTIPACK_PATTERN.test(normalized)) return true;
+  if (NON_FIGURE_PHRASES.some((phrase) => normalized.includes(phrase))) return true;
+  for (const token of tokenize(title)) {
+    if (MULTIPACK_MARKERS.has(token)) return true;
+  }
+  return false;
+}
+
 /** Fold a word onto its canonical form, if it has one. */
 function canonical(token: string): string {
   return SYNONYMS[token] ?? token;
