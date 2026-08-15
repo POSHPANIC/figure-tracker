@@ -73,13 +73,32 @@ function NavLink({ href, children }: { href: string; children: React.ReactNode }
 export function SiteFooter() {
   return (
     <footer className="mt-16 border-t border-border">
-      <div className="mx-auto flex max-w-7xl flex-col gap-2 px-4 py-8 text-xs text-muted sm:flex-row sm:items-center sm:justify-between">
-        <p>
-          {SITE_NAME} — price data aggregated from public marketplace listings and community
-          reports. Values are estimates, not appraisals.
-        </p>
-        <p>Not affiliated with any manufacturer or retailer.</p>
+      <div className="mx-auto max-w-7xl px-4 py-8">
+        {/* The User-Agent our ingestion sends to retailers points people at this
+            footer for contact, so these links have to actually be here. */}
+        <nav className="flex flex-wrap gap-x-5 gap-y-2 text-xs">
+          <FooterLink href="/about">About</FooterLink>
+          <FooterLink href="/contact">Contact</FooterLink>
+          <FooterLink href="/privacy">Privacy</FooterLink>
+          <FooterLink href="/figures">Browse figures</FooterLink>
+        </nav>
+
+        <div className="mt-4 flex flex-col gap-2 text-xs text-muted sm:flex-row sm:items-center sm:justify-between">
+          <p className="max-w-2xl">
+            {SITE_NAME} — price data aggregated from public marketplace listings and community
+            reports. Values are estimates, not appraisals.
+          </p>
+          <p className="shrink-0">Not affiliated with any manufacturer or retailer.</p>
+        </div>
       </div>
     </footer>
+  );
+}
+
+function FooterLink({ href, children }: { href: string; children: React.ReactNode }) {
+  return (
+    <Link href={href} className="text-muted transition hover:text-foreground">
+      {children}
+    </Link>
   );
 }

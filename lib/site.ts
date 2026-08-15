@@ -9,6 +9,19 @@
 
 export const SITE_NAME = "FigureIndex";
 
+/** Canonical public URL, no trailing slash. Used in copy and metadata. */
+export const SITE_URL = "https://figureindex.com";
+
+/**
+ * Public contact address.
+ *
+ * Not decorative: the User-Agent sent to retailers during ingestion points at
+ * the site footer, so there has to be a way through from there. It's also the
+ * route for corrections and takedown requests, which a site republishing
+ * marketplace data needs to offer.
+ */
+export const CONTACT_EMAIL = "hello@figureindex.com";
+
 export const SITE_TAGLINE = "anime figure price guide";
 
 export const SITE_DESCRIPTION =
