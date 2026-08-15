@@ -60,15 +60,29 @@ type SeedFigure = {
   status?: ReleaseStatus;
   scale?: string;
   heightMm?: number;
-  releaseYear: number;
-  releaseMonth: number;
-  msrpJpy: number;
+
+  /**
+   * Release date and MSRP are optional on purpose.
+   *
+   * Some figures were added from evidence in marketplace listings, where the
+   * product is certain but its original retail price and release month are not.
+   * Leaving them out shows "—" on the site; inventing them would be the
+   * synthetic-price mistake wearing a different hat.
+   */
+  releaseYear?: number;
+  releaseMonth?: number;
+  msrpJpy?: number;
+
+  /** JAN/EAN barcode, when known. The most reliable way to identify a figure. */
+  jan?: string;
+
+  // --- Only used by --demo-prices. Absent for anything added since. ---
   /** Roughly where the secondary market sits today, in USD. */
-  marketUsd: number;
+  marketUsd?: number;
   /** Long-run drift per year as a fraction. 0.4 = a grail climbing ~40%/yr. */
-  drift: number;
+  drift?: number;
   /** Day-to-day noise. Prize figures are quiet; grails are volatile. */
-  volatility: number;
+  volatility?: number;
 };
 
 const FIGURES: SeedFigure[] = [
@@ -410,6 +424,89 @@ const FIGURES: SeedFigure[] = [
     drift: 0.38,
     volatility: 0.027,
   },
+  // --- Added from evidence in real listings, then verified against the
+  // manufacturers' own product pages. MSRP and release month are present only
+  // where a primary source confirmed them. ---
+  {
+    // Nendoroid #2433. The figure that kept being mistaken for the 1/7 scale.
+    name: "Nendoroid Marin Kitagawa: Swimsuit Ver.",
+    series: "My Dress-Up Darling",
+    character: "Marin Kitagawa",
+    manufacturer: "Good Smile Company",
+    category: "NENDOROID",
+    heightMm: 100,
+  },
+  {
+    name: "Marin Kitagawa 1/7 Race Queen Ver.",
+    series: "My Dress-Up Darling",
+    character: "Marin Kitagawa",
+    manufacturer: "Aniplex",
+    category: "SCALE",
+    scale: "1/7",
+    heightMm: 230,
+    releaseYear: 2026,
+    releaseMonth: 3,
+    msrpJpy: 22000,
+  },
+  {
+    name: "Racing Miku 2014 Ver. 1/8",
+    series: "Hatsune Miku",
+    character: "Hatsune Miku",
+    manufacturer: "Good Smile Company",
+    category: "SCALE",
+    scale: "1/8",
+    heightMm: 250,
+    releaseYear: 2015,
+    releaseMonth: 8,
+  },
+  {
+    // Good Smile designate this 1/1 despite its size; using their figure.
+    name: "Hatsune Miku Symphony: 5th Anniversary Ver. 1/1",
+    series: "Hatsune Miku",
+    character: "Hatsune Miku",
+    manufacturer: "Good Smile Company",
+    category: "SCALE",
+    scale: "1/1",
+    heightMm: 250,
+  },
+  {
+    // Nendoroid #2100. JAN from the manufacturer listing.
+    name: "Nendoroid Hatsune Miku: Beauty Looking Back Ver.",
+    series: "Hatsune Miku",
+    character: "Hatsune Miku",
+    manufacturer: "Good Smile Company",
+    category: "NENDOROID",
+    heightMm: 100,
+    jan: "4580590174153",
+  },
+  {
+    // Nendoroid #2202.
+    name: "Nendoroid Anya Forger: Winter Clothes Ver.",
+    series: "Spy x Family",
+    character: "Anya Forger",
+    manufacturer: "Good Smile Company",
+    category: "NENDOROID",
+    heightMm: 100,
+  },
+  {
+    // Nendoroid #2205.
+    name: "Nendoroid Satoru Gojo: Tokyo Jujutsu High School Ver.",
+    series: "Jujutsu Kaisen",
+    character: "Gojo Satoru",
+    manufacturer: "Good Smile Company",
+    category: "NENDOROID",
+    heightMm: 100,
+  },
+  {
+    // Released 2018, reissued 2021 and 2024 at different prices. MSRP omitted
+    // because the listings don't say which printing they are.
+    name: "Saber/Altria Pendragon (Alter) Casual Ver. 1/7",
+    series: "Fate/Grand Order",
+    character: "Altria Pendragon",
+    manufacturer: "Kotobukiya",
+    category: "SCALE",
+    scale: "1/7",
+  },
   {
     name: "Ruby Hoshino 1/7 Scale Figure",
     series: "Oshi no Ko",
@@ -514,7 +611,11 @@ async function main() {
     });
 
     const slug = slugify(`${f.name}-${f.manufacturer}`);
-    const releaseDate = new Date(Date.UTC(f.releaseYear, f.releaseMonth - 1, 15));
+    // Day 15 is a placeholder within a known month; only the month is claimed.
+    const releaseDate =
+      f.releaseYear && f.releaseMonth
+        ? new Date(Date.UTC(f.releaseYear, f.releaseMonth - 1, 15))
+        : null;
 
     const figure = await prisma.figure.upsert({
       where: { slug },
@@ -527,8 +628,9 @@ async function main() {
         scale: f.scale ?? null,
         heightMm: f.heightMm ?? null,
         releaseDate,
-        msrpAmount: f.msrpJpy,
-        msrpCurrency: "JPY",
+        // Both or neither — an amount without its currency is meaningless.
+        msrpAmount: f.msrpJpy ?? null,
+        msrpCurrency: f.msrpJpy ? "JPY" : null,
         manufacturerId,
         seriesId,
         characters: { connect: { id: character.id } },
@@ -536,7 +638,20 @@ async function main() {
       },
     });
 
-    if (!DEMO_PRICES) {
+    // A barcode identifies a product exactly, where a title match only guesses.
+    // Worth storing wherever it's known, ready for matching to use.
+    if (f.jan) {
+      await prisma.figureIdentifier.upsert({
+        where: { kind_value: { kind: "JAN", value: f.jan } },
+        update: { figureId: figure.id },
+        create: { figureId: figure.id, kind: "JAN", value: f.jan },
+      });
+    }
+
+    // Synthetic history needs parameters that only the original demo entries
+    // carry. Figures added from real evidence have none, and must not be given
+    // invented ones.
+    if (!DEMO_PRICES || f.marketUsd === undefined) {
       console.log(`  ${figure.name}`);
       continue;
     }
@@ -546,15 +661,15 @@ async function main() {
     // so the newest point is exactly `marketUsd`, then let drift + noise
     // generate the past.
     const rng = makeRng(0x5eed + figureIndex * 7919);
-    const dailyDrift = f.drift / 365;
+    const dailyDrift = (f.drift ?? 0) / 365;
 
     const seriesByDay: number[] = new Array(HISTORY_DAYS);
-    let value = f.marketUsd;
+    let value = f.marketUsd!;
     for (let i = 0; i < HISTORY_DAYS; i++) {
       seriesByDay[HISTORY_DAYS - 1 - i] = value;
-      const shock = (rng() - 0.5) * 2 * f.volatility;
+      const shock = (rng() - 0.5) * 2 * (f.volatility ?? 0);
       value = value / (1 + dailyDrift + shock);
-      value = Math.max(value, f.msrpJpy * JPY_TO_USD * 0.5);
+      value = Math.max(value, (f.msrpJpy ?? 0) * JPY_TO_USD * 0.5);
     }
 
     const snapshotRows: {
@@ -637,7 +752,7 @@ async function main() {
     await prisma.listing.createMany({
       data: Array.from({ length: listingCount }, (_, k) => {
         const markup = 1.05 + rng() * 0.35;
-        const price = Math.round(f.marketUsd * markup * 100) / 100;
+        const price = Math.round(f.marketUsd! * markup * 100) / 100;
         return {
           sourceId: ebay.id,
           figureId: figure.id,
