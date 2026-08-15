@@ -131,7 +131,9 @@ async function searchByName(
 
     const distinct = new Map(plausible.map((c) => [c.id, c]));
     if (distinct.size === 1) return [...distinct.values()][0];
-    if (distinct.size > 1) return null; // Ambiguous — say nothing.
+    // Ambiguous. Retire this guess and try the next one rather than giving up
+    // on the figure — "Saber" is ambiguous inside Fate where "Saber Alter" is
+    // not, and the candidates are ordered roughly vaguest-first.
   }
   return null;
 }
@@ -187,7 +189,12 @@ async function main() {
   const bySeriesId = new Map<string, { series: SeriesRow; figures: Pending[] }>();
 
   for (const figure of figures) {
-    const candidates = characterCandidates(figure.name);
+    const candidates = characterCandidates(
+      figure.name,
+      figure.series
+        ? [figure.series.name, ...(figure.series.synonyms ?? []), figure.series.titleJa ?? ""]
+        : [],
+    );
     if (candidates.length === 0) {
       unresolved.push({
         figureName: figure.name,

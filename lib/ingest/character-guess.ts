@@ -157,6 +157,44 @@ export function stripQualifiers(name: string): string {
   return out;
 }
 
+function escapeRegex(text: string): string {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/**
+ * Remove the series' own name from a product name.
+ *
+ * Good Smile sometimes lead with the franchise: "KONO SUBARASHII SEKAI NI
+ * SYUKUFUKU WO! Megumin: Light Novel Cosplay On The Beach Ver." is a figure of
+ * Megumin, but every word before her name belongs to the show. Left in, the
+ * guess is the entire title and matches nobody.
+ *
+ * Words are rejoined with a small run of punctuation rather than matched
+ * literally, so a series written "Re:ZERO" in one place and "Re ZERO" in
+ * another is still recognised.
+ *
+ * The result is offered *alongside* the unstripped name, never instead of it,
+ * because sometimes the series name is the character: "Soft Vinyl Figure
+ * Nuko-sama-chan" is from the series "Nuko-sama-chan", and stripping it leaves
+ * "Soft Vinyl Figure".
+ */
+export function stripSeriesName(name: string, series: string): string {
+  const words = series.split(/[^\p{L}\p{N}]+/u).filter(Boolean);
+  if (words.length === 0) return name;
+  // A single short word is too likely to be part of somebody's name.
+  if (words.length === 1 && words[0].length < 6) return name;
+
+  const pattern = new RegExp(
+    words.map(escapeRegex).join("[^\\p{L}\\p{N}]{0,3}"),
+    "giu",
+  );
+  return name
+    .replace(pattern, " ")
+    .replace(/\s+/g, " ")
+    .replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu, "")
+    .trim();
+}
+
 /**
  * Candidate character names for a figure, best guess first.
  *
@@ -167,13 +205,22 @@ export function stripQualifiers(name: string): string {
  *
  * Empty when the name doesn't describe a single character at all.
  */
-export function characterCandidates(figureName: string): string[] {
+export function characterCandidates(figureName: string, seriesNames: string[] = []): string[] {
   if (NOT_A_SINGLE_CHARACTER.some((p) => p.test(figureName))) return [];
 
   const base = stripQualifiers(stripProductLine(figureName));
   if (!base) return [];
 
   const candidates = [base];
+
+  // The same name again with the franchise removed. Appended rather than
+  // substituted: stripping is usually the better guess and occasionally
+  // deletes the character, so both get their turn in front of AniList.
+  for (const series of seriesNames) {
+    if (!series) continue;
+    const stripped = stripQualifiers(stripProductLine(stripSeriesName(base, series)));
+    if (stripped && stripped !== base) candidates.push(stripped);
+  }
 
   // Everything before a colon or dash — the usual "Character: variant" shape.
   const beforeSeparator = base.split(/\s*[:\-–—]\s*/)[0]?.trim();
@@ -190,6 +237,14 @@ export function characterCandidates(figureName: string): string[] {
       const trimmed = stripQualifiers(part.trim());
       if (trimmed) candidates.push(trimmed);
     }
+  }
+
+  // Series-stripped names get the same treatment as the base, since the
+  // variant suffix usually survives the strip: "Megumin: Light Novel Cosplay
+  // On The Beach Ver." still needs cutting at the colon.
+  for (const candidate of [...candidates]) {
+    const head = candidate.split(/\s*[:\-–—]\s*/)[0]?.trim();
+    if (head && head !== candidate) candidates.push(head);
   }
 
   const seen = new Set<string>();

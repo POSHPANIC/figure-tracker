@@ -144,6 +144,32 @@ describe("characterCandidates", () => {
     assert.deepEqual(characterCandidates("ACT MODE Mio & Type15 Ver2"), []);
   });
 
+  it("offers the name with its own series stripped out", () => {
+    // Good Smile lead with the franchise on some products.
+    const got = characterCandidates(
+      "KONO SUBARASHII SEKAI NI SYUKUFUKU WO! Megumin: Light Novel Cosplay On The Beach Ver.",
+      ["KONO SUBARASHII SEKAI NI SYUKUFUKU WO!"],
+    );
+    assert.ok(got.includes("Megumin"), `got ${JSON.stringify(got)}`);
+  });
+
+  it("keeps the unstripped name too, in case the series is the character", () => {
+    const got = characterCandidates("Soft Vinyl Figure Nuko-sama-chan", ["Nuko-sama-chan"]);
+    assert.ok(
+      got.some((c) => c.includes("Nuko-sama-chan")),
+      `got ${JSON.stringify(got)}`,
+    );
+  });
+
+  it("strips a series written with different punctuation", () => {
+    const got = characterCandidates("Re ZERO Rem: Wedding Ver.", ["Re:ZERO"]);
+    assert.ok(got.includes("Rem"), `got ${JSON.stringify(got)}`);
+  });
+
+  it("behaves as before when no series is given", () => {
+    assert.deepEqual(characterCandidates("Nendoroid Mia Luna Tearmoon"), ["Mia Luna Tearmoon"]);
+  });
+
   it("never returns duplicates", () => {
     const got = characterCandidates("Nendoroid Ruri Hoshino");
     assert.equal(new Set(got.map((c) => c.toLowerCase())).size, got.length);
