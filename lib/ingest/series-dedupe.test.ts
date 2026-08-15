@@ -8,6 +8,7 @@ import {
   pickCanonical,
   seriesKeys,
   titlesMatchSeries,
+  worksNameThisSeries,
   type SeriesLike,
 } from "./series-dedupe";
 
@@ -162,6 +163,36 @@ describe("titlesMatchSeries", () => {
 
   it("rejects an empty media list", () => {
     assert.equal(titlesMatchSeries([], mha), false);
+  });
+});
+
+describe("worksNameThisSeries", () => {
+  it("accepts an outside source's shorter name for the same franchise", () => {
+    // Danbooru files Ninomae Ina'nis under "hololive"; Good Smile say
+    // "hololive production".
+    const ours = series({ id: "1", name: "hololive production" });
+    assert.equal(worksNameThisSeries(["Hololive", "Hololive English"], ours), true);
+  });
+
+  it("accepts an exact match", () => {
+    const ours = series({ id: "1", name: "Blue Archive" });
+    assert.equal(worksNameThisSeries(["Blue Archive"], ours), true);
+  });
+
+  it("refuses the Juri trap", () => {
+    // Searching "juri" on Danbooru returns the Blue Archive student first.
+    // Our figure is Street Fighter's Juri, and these must not be conflated.
+    const ours = series({ id: "1", name: "STREET FIGHTER 6" });
+    assert.equal(worksNameThisSeries(["Blue Archive"], ours), false);
+  });
+
+  it("still refuses a franchise-wide short word", () => {
+    const ours = series({ id: "1", name: "Fate/Grand Order" });
+    assert.equal(worksNameThisSeries(["Fate"], ours), false);
+  });
+
+  it("refuses when the source names nothing", () => {
+    assert.equal(worksNameThisSeries([], series({ id: "1", name: "Blue Archive" })), false);
   });
 });
 

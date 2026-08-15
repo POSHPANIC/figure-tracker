@@ -38,7 +38,13 @@ import {
   type AniListCharacter,
   type AniListSeries,
 } from "../lib/ingest/anilist";
-import { titlesMatchSeries } from "../lib/ingest/series-dedupe";
+import { titlesMatchSeries, worksNameThisSeries } from "../lib/ingest/series-dedupe";
+import {
+  copyrightsFor,
+  danbooruConfigured,
+  findCharacterTags,
+  pickConfirmedTag,
+} from "../lib/ingest/danbooru";
 import { rebuildSearchTextFor } from "../lib/ingest/search-index";
 import { slugify } from "../lib/utils";
 
@@ -55,7 +61,7 @@ type Resolution = {
   figureName: string;
   seriesName: string;
   characterName: string;
-  via: "catalogue" | "anilist" | "anilist search";
+  via: "catalogue" | "anilist" | "anilist search" | "danbooru";
   nameJa: string | null;
   aliases: string[];
   anilistId: number | null;
@@ -141,6 +147,56 @@ async function searchByName(
 /** One lookup per distinct name, however many figures ask for it. */
 const nameSearchCache = new Map<string, Awaited<ReturnType<typeof findCharacters>>>();
 
+
+/**
+ * The last resort: Danbooru's character tags.
+ *
+ * AniList indexes anime and manga. A large part of the figure market is
+ * neither — Blue Archive is a game, hololive is a talent agency — and those
+ * figures reach here having failed every earlier step. Danbooru tags cover
+ * them because that is what its taggers actually tag.
+ *
+ * The confirmation is the same shape as before and just as necessary. A search
+ * for "juri" returns "juri_(blue_archive)" ahead of anything from Street
+ * Fighter, so taking the first hit would file a Street Fighter figure under a
+ * Blue Archive student. The work has to agree, either from the tag's own
+ * bracketed qualifier or from the copyrights Danbooru relates it to, and where
+ * two different characters both qualify we say nothing.
+ */
+async function searchDanbooru(
+  candidates: string[],
+  series: { name: string; titleJa: string | null; synonyms: string[]; anilistId: number | null },
+) {
+  for (const guess of candidates) {
+    const key = guess.toLowerCase();
+    const tags = danbooruCache.get(key) ?? (await findCharacterTags(guess));
+    danbooruCache.set(key, tags);
+    if (tags.length === 0) continue;
+
+    const nameMatches = (tagName: string) =>
+      sameCharacterWithinSeries(guess, tagName) || sameCharacterWithinSeries(tagName, guess);
+    const seriesMatches = (works: string[]) =>
+      worksNameThisSeries(works, { id: "", ...series });
+
+    // Work out each plausible tag's works. The bracketed qualifier is free;
+    // only spend a request on related copyrights when it doesn't settle it.
+    const withWorks = [];
+    for (const tag of tags.filter((t) => nameMatches(t.name))) {
+      const works = seriesMatches(tag.qualifiers)
+        ? tag.qualifiers
+        : await copyrightsFor(tag.raw);
+      withWorks.push({ tag, works });
+    }
+
+    const confirmed = pickConfirmedTag(withWorks, nameMatches, seriesMatches);
+    if (confirmed) return confirmed;
+  }
+  return null;
+}
+
+/** One lookup per distinct name, however many figures ask for it. */
+const danbooruCache = new Map<string, Awaited<ReturnType<typeof findCharacterTags>>>();
+
 async function main() {
   const figures = await prisma.figure.findMany({
     where: { characters: { none: {} } },
@@ -161,7 +217,12 @@ async function main() {
     await prisma.$disconnect();
     return;
   }
-  console.log(`${APPLY ? "APPLYING" : "DRY RUN"}\n`);
+  console.log(APPLY ? "APPLYING" : "DRY RUN");
+  console.log(
+    danbooruConfigured()
+      ? "Danbooru fallback: on\n"
+      : "Danbooru fallback: off — set DANBOORU_LOGIN and DANBOORU_API_KEY to enable\n",
+  );
 
   // Characters we already hold, grouped by series — checked before spending an
   // AniList call, and a match here is the most trustworthy kind.
@@ -182,6 +243,8 @@ async function main() {
   let deepCastHits = 0;
   /** How many needed the by-name search rather than the series' cast. */
   let nameSearchHits = 0;
+  /** How many only Danbooru's tags could account for. */
+  let danbooruHits = 0;
 
   // --- Pass 1: guess, and group the work by series ------------------------
   type Pending = { id: string; name: string; candidates: string[] };
@@ -263,7 +326,28 @@ async function main() {
     const cast = await resolveSeries(seriesRow.name, expected);
 
     for (const pending of stillUnknown) {
+      // AniList has never heard of this series. That rules out its cast and
+      // its character search, but not Danbooru — which compares against *our*
+      // series name, not AniList's, and is the only source that covers the
+      // games and VTuber agencies AniList omits. Ninomae Ina'nis lives here.
       if (!cast) {
+        const tag = await searchDanbooru(pending.candidates, seriesRow);
+        if (tag) {
+          resolved.push({
+            figureId: pending.id,
+            figureName: pending.name,
+            seriesName: seriesRow.name,
+            characterName: pending.candidates[0],
+            via: "danbooru",
+            nameJa: null,
+            aliases:
+              tag.name.toLowerCase() === pending.candidates[0].toLowerCase() ? [] : [tag.name],
+            anilistId: null,
+          });
+          danbooruHits += 1;
+          continue;
+        }
+
         unresolved.push({
           figureName: pending.name,
           seriesName: seriesRow.name,
@@ -322,6 +406,25 @@ async function main() {
       }
 
       if (!remote) {
+        const tag = await searchDanbooru(pending.candidates, seriesRow);
+        if (tag) {
+          resolved.push({
+            figureId: pending.id,
+            figureName: pending.name,
+            seriesName: seriesRow.name,
+            // Our own guess is the better name: it comes off the box, properly
+            // cased, and is usually fuller than a lowercase tag. The tag joins
+            // the aliases, where it is worth having — people do search "kazusa".
+            characterName: pending.candidates[0],
+            via: "danbooru",
+            nameJa: null,
+            aliases: tag.name.toLowerCase() === pending.candidates[0].toLowerCase() ? [] : [tag.name],
+            anilistId: null,
+          });
+          danbooruHits += 1;
+          continue;
+        }
+
         unresolved.push({
           figureName: pending.name,
           seriesName: seriesRow.name,
@@ -356,6 +459,9 @@ async function main() {
   }
   if (nameSearchHits > 0) {
     console.log(`             ${nameSearchHits} were absent from the cast and found by name search`);
+  }
+  if (danbooruHits > 0) {
+    console.log(`             ${danbooruHits} were unknown to AniList and confirmed by Danbooru tags`);
   }
   console.log(`unresolved : ${unresolved.length}`);
 

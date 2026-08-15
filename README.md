@@ -108,6 +108,32 @@ Both steps are dry-run by default and both print why they refused things. The
 refusals are the interesting part — a category nobody has ruled on, or a name
 AniList can't confirm, is reported rather than guessed at.
 
+### Where character data comes from
+
+**AniList** first — free, no key, and it carries Japanese names and nicknames
+the matcher uses. It indexes anime and manga, which is the limit: Blue Archive
+is a game and hololive is a talent agency, so a fair slice of the figure market
+is invisible to it.
+
+**Danbooru** second, and only for what AniList missed. Its character tags name
+the work they belong to — `kazusa_(blue_archive)` — which is exactly the
+relation needed, and covers games and VTubers. Set `DANBOORU_LOGIN` and
+`DANBOORU_API_KEY` to enable it; leave them unset and the step is skipped with
+a note. Access is the sanctioned kind: their robots.txt disallows `.json` to
+crawlers while their API documentation permits programmatic use with an
+account, a key and an identifying User-Agent, so this authenticates and stays
+under their one-request-per-second guidance.
+
+Worth knowing before you enable it: Danbooru is an adult image board. Only tag
+names are read — a character and their series — and nothing from it reaches a
+visitor beyond a character name the catalogue already shows. That is a
+defensible use of a public API, but it needs an account in your name, so it is
+opt-in rather than assumed.
+
+Neither source can help with characters invented for a figure — Good Smile's
+own "Bara Original Character" and the like. Those have no external record
+anywhere, and never will.
+
 Characters matter more than they look. The matcher's first gate is "the
 character must be named", written as `if (characterTokens.length > 0)`, so a
 figure with no characters doesn't fail that gate — it skips it and matches on

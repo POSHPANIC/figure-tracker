@@ -160,6 +160,31 @@ export function titlesMatchSeries(
 }
 
 /**
+ * Whether a work named by an outside source is the series we hold.
+ *
+ * Looser than `titlesMatchSeries`, and deliberately so. Danbooru names works
+ * the way its taggers do, which is rarely the way Good Smile does: our series
+ * "hololive production" is simply "hololive" over there. Requiring exactness
+ * would throw away most of what the source is good for.
+ *
+ * The looseness is the same containment rule the de-duplication suggestions
+ * use, guards included — at least two words, or one of six characters or more,
+ * and never a title made only of generic words. That is what keeps "hololive"
+ * (eight characters) usable while "Fate" (four) stays refused, which is the
+ * distinction that matters: one is a franchise, the other is half a dozen.
+ */
+export function worksNameThisSeries(workNames: string[], series: SeriesLike): boolean {
+  const keys = seriesKeys(series);
+
+  return workNames.some((work) => {
+    const key = normalizeSeriesName(work);
+    if (!key) return false;
+    if (keys.has(key)) return true;
+    return [...keys].some((ours) => contains(key, ours) || contains(ours, key));
+  });
+}
+
+/**
  * Which row a group should collapse into.
  *
  * Prefers the one already tied to AniList, since that carries the Japanese
