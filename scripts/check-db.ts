@@ -51,6 +51,11 @@ function describe(url: string) {
     user: parsed.username || "(none)",
     hasPassword: parsed.password.length > 0,
     sslmode: parsed.searchParams.get("sslmode") ?? "(unset)",
+    // Neon hands out strings carrying channel_binding=require. libpq enforces
+    // it; drivers that do not implement SCRAM channel binding may instead fail
+    // the handshake, which surfaces as a connection error rather than an
+    // authentication one. Worth naming when a connection dies during startup.
+    channelBinding: parsed.searchParams.get("channel_binding"),
     options,
     // Neon routes by SNI, but connection strings may *also* name the endpoint
     // in `options=endpoint=...`. Removing "-pooler" from the hostname and
@@ -81,6 +86,7 @@ async function main() {
   console.log(`  user      ${info.user}`);
   console.log(`  password  ${info.hasPassword ? "present" : "MISSING"}`);
   console.log(`  sslmode   ${info.sslmode}`);
+  if (info.channelBinding) console.log(`  channel_binding  ${info.channelBinding}`);
   if (info.options) console.log(`  options   ${info.options}`);
   console.log("");
 
@@ -126,6 +132,10 @@ async function main() {
     } else if (/endpoint|SNI|not exist/i.test(message)) {
       console.log("    Neon could not find that endpoint. Check the hostname and any");
       console.log("    options=endpoint=... parameter name the same compute.");
+    } else if (info.channelBinding === "require") {
+      console.log("    The string requires channel binding. Try deleting");
+      console.log("    \"&channel_binding=require\" — sslmode=require still encrypts the");
+      console.log("    connection, and not every driver implements the binding itself.");
     } else {
       console.log("    Neon console → Connect → untick 'Connection pooling' gives the");
       console.log("    exact string migrations need. Copy it whole.");

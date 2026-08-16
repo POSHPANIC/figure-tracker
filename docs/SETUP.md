@@ -223,8 +223,14 @@ That's your `AUTH_SECRET`. Run it again for `CRON_SECRET`.
 Check it before you deploy, rather than finding out from a failed build:
 
 ```powershell
-$env:DIRECT_DATABASE_URL="postgresql://..."; npm run db:check
+$env:DIRECT_DATABASE_URL="postgresql://..."; npm.cmd run db:check
 ```
+
+`npm.cmd`, not `npm`, on Windows: PowerShell's default execution policy refuses
+to run the `npm.ps1` wrapper and fails with "running scripts is disabled on this
+system", which looks like a problem with the command you typed. The `.cmd` entry
+point does the same job and isn't subject to the policy. The same applies to
+`npx.cmd`.
 
 It reports the scheme, host, database and user (never the password), connects,
 and takes the session advisory lock that `prisma migrate deploy` needs. If it
