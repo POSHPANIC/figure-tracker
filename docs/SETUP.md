@@ -219,6 +219,21 @@ That's your `AUTH_SECRET`. Run it again for `CRON_SECRET`.
 | --- | --- |
 | `DATABASE_URL` | your Neon connection string — the **pooled** one |
 | `DIRECT_DATABASE_URL` | the **whole** connection string again, with `-pooler` deleted from the host — not just the hostname |
+
+Check it before you deploy, rather than finding out from a failed build:
+
+```powershell
+$env:DIRECT_DATABASE_URL="postgresql://..."; npm run db:check
+```
+
+It reports the scheme, host, database and user (never the password), connects,
+and takes the session advisory lock that `prisma migrate deploy` needs. If it
+prints two ticks, the deploy will get past the migration step.
+
+The most reliable source for that string is the Neon console — **Connect**, then
+untick **Connection pooling**. Editing the pooled string by hand works, but a
+`-pooler` can also hide in an `options=endpoint=...` parameter, and missing it
+there fails the deploy with `P1001` as if the server were down.
 | `AUTH_SECRET` | the first random string you generated |
 | `CRON_SECRET` | the second random string |
 | `EBAY_CLIENT_ID` | from step 1 |

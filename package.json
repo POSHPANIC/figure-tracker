@@ -12,6 +12,7 @@
     "db:dev": "prisma dev --name figuretracker",
     "db:migrate": "prisma migrate dev",
     "db:deploy": "prisma migrate deploy",
+    "db:check": "tsx scripts/check-db.ts",
     "db:seed": "tsx prisma/seed.ts",
     "db:studio": "prisma studio",
     "ingest": "tsx scripts/ingest.ts",
