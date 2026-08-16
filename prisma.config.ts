@@ -3,6 +3,39 @@
 import "dotenv/config";
 import { defineConfig } from "prisma/config";
 
+/**
+ * Which connection the Prisma CLI should use.
+ *
+ * Checks the shape of DIRECT_DATABASE_URL before handing it over, because
+ * Prisma's own complaint about a bad one is "P1013: The scheme is not
+ * recognized in database URL", printed next to an empty datasource line. That
+ * is technically accurate and tells you nothing about which variable is wrong
+ * or what it should look like — and it costs a full deploy to find out.
+ */
+function migrationUrl(): string | undefined {
+  const direct = process.env["DIRECT_DATABASE_URL"]?.trim();
+  if (!direct) return process.env["DATABASE_URL"];
+
+  if (!/^postgres(ql)?:\/\//.test(direct)) {
+    throw new Error(
+      `DIRECT_DATABASE_URL is set but is not a connection string — it starts with ` +
+        `"${direct.slice(0, 24)}…".
+
+` +
+        `It needs the whole URL, not just the host. Take DATABASE_URL and delete ` +
+        `"-pooler" from the hostname:
+
+` +
+        `  postgresql://user:password@ep-xxx.region.aws.neon.tech/neondb?sslmode=require
+
+` +
+        `Migrations need the direct endpoint because a connection pooler cannot ` +
+        `hold the session-level advisory lock they take.`,
+    );
+  }
+  return direct;
+}
+
 export default defineConfig({
   schema: "prisma/schema.prisma",
   migrations: {
@@ -24,7 +57,7 @@ export default defineConfig({
      * from the environment in lib/prisma.ts and keeps using the pooled
      * endpoint, which is the right one for serverless request traffic.
      */
-    url: process.env["DIRECT_DATABASE_URL"] ?? process.env["DATABASE_URL"],
+    url: migrationUrl(),
     shadowDatabaseUrl: process.env["SHADOW_DATABASE_URL"],
   },
 });
