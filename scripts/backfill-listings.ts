@@ -1,6 +1,4 @@
 import "dotenv/config";
-import { prisma } from "../lib/prisma";
-import { runIngestion } from "../lib/ingest/run";
 
 /**
  * Fill in current eBay listings across the catalogue.
@@ -15,9 +13,13 @@ import { runIngestion } from "../lib/ingest/run";
  * is marked polled as it completes, so a run that stops early simply resumes
  * where it left off. Nothing is done twice.
  *
- *   npm run backfill:listings                        # 2000 figures
- *   npm run backfill:listings -- --total 500
- *   npm run backfill:listings -- --total 2000 --batch 250
+ *   npm run backfill:listings -- --production
+ *   npm run backfill:listings -- --production --total 500
+ *   npm run backfill:listings -- --total 200          # local dev database
+ *
+ * Both databases hold the same 7,068 figures, so a backfill aimed at the wrong
+ * one looks completely successful and changes nothing on the live site. Hence
+ * the explicit flag, and hence printing the host before touching anything.
  *
  * Browse API allows 5,000 calls/day by default and this spends about one per
  * figure, so 2,000 is a comfortable day's work with room to spare.
@@ -29,6 +31,7 @@ function flag(name: string, fallback: number): number {
   return Number.isFinite(value) && value > 0 ? value : fallback;
 }
 
+const PRODUCTION = process.argv.includes("--production");
 const TOTAL = flag("total", 2000);
 // Each batch reloads the match candidates — every figure and character in the
 // catalogue — so small batches waste real time. Large ones lose progress
@@ -41,6 +44,26 @@ function hhmmss(ms: number): string {
 }
 
 async function main() {
+  if (PRODUCTION) {
+    const url = process.env["DIRECT_DATABASE_URL"]?.trim();
+    if (!url) {
+      console.error("\n  --production needs DIRECT_DATABASE_URL in .env.");
+      console.error("  npm run db:check verifies it.\n");
+      process.exit(1);
+    }
+    process.env["DATABASE_URL"] = url;
+  }
+
+  // Imported only now, because the client reads DATABASE_URL when it loads and
+  // a static import would bind to the local database before the line above
+  // could redirect it.
+  const { prisma } = await import("../lib/prisma");
+  const { runIngestion } = await import("../lib/ingest/run");
+
+  const host = new URL(process.env["DATABASE_URL"] ?? "postgres://unset").hostname;
+  console.log("");
+  console.log(`  Writing to ${host}${PRODUCTION ? "  (production)" : "  (local — pass --production for the live site)"}`);
+
   const startedAll = Date.now();
   const before = await prisma.listing.findMany({
     distinct: ["figureId"],
@@ -92,11 +115,11 @@ async function main() {
   console.log(`  Done in ${hhmmss(Date.now() - startedAll)}.`);
   console.log(`  Figures with listings: ${before.length} -> ${after.length}`);
   console.log("");
+
+  await prisma.$disconnect();
 }
 
-main()
-  .catch((err) => {
-    console.error(err);
-    process.exit(1);
-  })
-  .finally(() => prisma.$disconnect());
+main().catch((err) => {
+  console.error(err);
+  process.exit(1);
+});
