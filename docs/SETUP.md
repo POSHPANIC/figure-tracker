@@ -335,6 +335,56 @@ curl -H "Authorization: Bearer YOUR_CRON_SECRET" https://your-site.vercel.app/ap
 
 ---
 
+## Email
+
+Two independent systems that are easy to confuse, because a failure in either
+looks like "the email never arrived".
+
+**Outbound** — sign-in links, sent through Resend from the address in
+`EMAIL_FROM` (`hello@figureindex.com`).
+
+**Inbound** — mail *to* that address, handled by Cloudflare Email Routing, which
+forwards it to a personal inbox. Nothing in this repo touches inbound; it is
+entirely DNS and Cloudflare configuration.
+
+### The DNS records, and what each one is for
+
+| Record | Value | Why |
+| --- | --- | --- |
+| `figureindex.com` MX | `route1/2/3.mx.cloudflare.net` | Cloudflare receives mail for the domain |
+| `figureindex.com` TXT | `v=spf1 include:_spf.mx.cloudflare.net ~all` | SPF for the domain itself |
+| `send.figureindex.com` TXT | `v=spf1 include:amazonses.com ~all` | Resend's return path — this is what SPF aligns against when the app sends |
+| `resend._domainkey` TXT | (key from Resend) | DKIM, signed as `figureindex.com`, which is what lets the From address be `@figureindex.com` rather than `@send.figureindex.com` |
+| `_dmarc` TXT | `v=DMARC1; p=none;` | Required in practice by Gmail. Without it, a new domain's mail is filed as spam |
+
+`p=none` monitors without affecting delivery, which is the right starting
+policy — a stricter one silently discards mail while you are still finding out
+what sends from the domain.
+
+### When mail does not arrive
+
+Establish which direction is broken first; they share no machinery.
+
+Outbound:
+
+```powershell
+npm.cmd run email:test -- you@example.com
+```
+
+That sends one message through the same sender and key as sign-in links and
+prints what Resend said. A refusal is a configuration problem and names itself;
+an acceptance means sending works and the message is somewhere between Resend
+and the inbox — check spam, then Resend's dashboard, which shows whether it was
+delivered or bounced.
+
+Inbound is Cloudflare → the domain → **Email** → **Email Routing**:
+
+1. The destination address must show **Verified**. Cloudflare emails a
+   confirmation link when you add it, and until that is clicked it drops
+   forwarded mail silently — no bounce, no error, nothing to find.
+2. There must be an enabled rule for `hello@` pointing at that destination.
+   Without one the address does not exist as far as Cloudflare is concerned.
+
 ## Optional: sign in with Google or Discord
 
 Without these, the only way to sign in on the live site is… nothing. **Set up at
