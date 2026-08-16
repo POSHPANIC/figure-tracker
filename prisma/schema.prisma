@@ -148,6 +148,20 @@ model Figure {
   salesVolume90d   Int       @default(0)
   lastAggregatedAt DateTime?
 
+  // --- Demand signals, for deciding where to spend the polling budget ------
+  //
+  // The catalogue is far larger than the marketplace quota. eBay allows a few
+  // thousand searches a day against seven thousand figures, so polling every
+  // figure equally means every figure's prices are equally stale. These say
+  // which ones anybody actually cares about.
+  /// Times this figure's page has been opened. Crawlers are not counted.
+  viewCount    Int       @default(0)
+  lastViewedAt DateTime?
+  /// When a marketplace was last searched for this figure. Distinct from
+  /// lastAggregatedAt, which only moves for figures that have sales — using
+  /// that to rotate polling meant figures with no sales never rotated at all.
+  lastPolledAt DateTime?
+
   /// Everything this figure can be found by, in one lowercase blob: its own
   /// names, its manufacturer, its series under every title, and every character
   /// with their Japanese name and nicknames.
@@ -176,6 +190,8 @@ model Figure {
   // Prefix searches use this. A substring match ("%marin%") can't, and wants a
   // pg_trgm GIN index instead — worth adding when the catalogue outgrows a scan.
   @@index([searchText])
+  // The polling queue reads by staleness.
+  @@index([lastPolledAt])
 }
 
 /// A catalog image for a figure — the product photo, not a marketplace listing's.

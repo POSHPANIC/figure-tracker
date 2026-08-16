@@ -1,8 +1,10 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { after } from "next/server";
 import type { Metadata } from "next";
 import { ExternalLink, Flag } from "lucide-react";
 import { currentUser } from "@/auth";
+import { recordFigureView } from "@/lib/views";
 import { FigureActions } from "@/components/figure-actions";
 import { FigureImagesAdmin } from "@/components/figure-images-admin";
 import { FigureThumb } from "@/components/figure-thumb";
@@ -45,6 +47,11 @@ export default async function FigurePage({ params, searchParams }: PageProps<"/f
 
   const figure = await getFigureBySlug(slug);
   if (!figure) notFound();
+
+  // Which figures people actually open decides where the marketplace polling
+  // budget goes — see lib/ingest/poll-priority.ts. Deferred with after() so a
+  // page never waits on a counter.
+  after(() => recordFigureView(figure.id));
 
   const requested = Array.isArray(sp.condition) ? sp.condition[0] : sp.condition;
   const condition: ItemCondition = CHARTABLE_CONDITIONS.includes(requested as ItemCondition)
@@ -259,8 +266,14 @@ export default async function FigurePage({ params, searchParams }: PageProps<"/f
             </div>
 
             {figure.listings.length === 0 ? (
+              // "None found" and "not looked yet" are different facts, and a
+              // catalogue this much larger than its marketplace quota will
+              // always have figures in the second state. Saying so beats an
+              // empty panel that implies we checked.
               <p className="py-6 text-center text-sm text-muted">
-                No active listings tracked right now.
+                {figure.lastPolledAt
+                  ? "No active listings tracked right now."
+                  : "Not checked for prices yet — this figure is queued."}
               </p>
             ) : (
               <ul className="divide-y divide-border">

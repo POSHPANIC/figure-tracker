@@ -4,6 +4,7 @@ import { isEbayConfigured, searchActiveListings, searchSoldItems, type EbayItem 
 import { isAmiAmiEnabled, searchAmiAmi } from "./amiami";
 import { bestMatch, normalizeCondition, type MatchCandidate } from "./match";
 import { loadCandidates } from "./candidates";
+import { selectByPriority } from "./poll-priority";
 import { expireStaleListings } from "./aggregate";
 
 /**
@@ -48,6 +49,20 @@ type FigureRow = {
   manufacturerName: string | null;
 };
 
+/**
+ * Choose which figures to spend this run's marketplace calls on.
+ *
+ * This used to take the least-recently-aggregated figures, which stopped
+ * working the moment the catalogue outgrew the quota. `lastAggregatedAt` only
+ * moves for figures that *have* sales, so with seven thousand figures and
+ * almost no sale data it was null nearly everywhere — the ordering was
+ * arbitrary among thousands of ties, and the same figures could be picked
+ * every run while others were never picked at all.
+ *
+ * Now it ranks on demand and staleness together; see poll-priority.ts. The
+ * whole catalogue is read to do it, which is one query returning small rows
+ * and cheap next to the API calls it is deciding.
+ */
 async function selectFigures(options: IngestOptions): Promise<FigureRow[]> {
   const cutoff = options.minAgeHours
     ? new Date(Date.now() - options.minAgeHours * 3600_000)
@@ -55,18 +70,37 @@ async function selectFigures(options: IngestOptions): Promise<FigureRow[]> {
 
   const rows = await prisma.figure.findMany({
     where: cutoff
-      ? { OR: [{ lastAggregatedAt: null }, { lastAggregatedAt: { lt: cutoff } }] }
+      ? { OR: [{ lastPolledAt: null }, { lastPolledAt: { lt: cutoff } }] }
       : undefined,
-    // Least-recently-touched first, so a capped run eventually covers everything.
-    orderBy: [{ lastAggregatedAt: { sort: "asc", nulls: "first" } }],
-    take: options.figureLimit ?? 200,
-    select: { id: true, name: true, manufacturer: { select: { name: true } } },
+    select: {
+      id: true,
+      name: true,
+      viewCount: true,
+      releaseDate: true,
+      lastPolledAt: true,
+      manufacturer: { select: { name: true } },
+      _count: { select: { collectionItems: true, wishlistItems: true } },
+    },
   });
 
-  return rows.map((r) => ({
+  const ranked = selectByPriority(
+    rows.map((r) => ({
+      id: r.id,
+      name: r.name,
+      manufacturerName: r.manufacturer?.name ?? null,
+      collectionCount: r._count.collectionItems,
+      wishlistCount: r._count.wishlistItems,
+      viewCount: r.viewCount,
+      releaseDate: r.releaseDate,
+      lastPolledAt: r.lastPolledAt,
+    })),
+    options.figureLimit ?? 200,
+  );
+
+  return ranked.map((r) => ({
     id: r.id,
     name: r.name,
-    manufacturerName: r.manufacturer?.name ?? null,
+    manufacturerName: r.manufacturerName,
   }));
 }
 
@@ -174,7 +208,21 @@ async function ingestEbay(
       if (matched) summary.itemsUpserted += 1;
       else summary.unmatched += 1;
     }
+
+    // Record the attempt, not the outcome. A search that found nothing still
+    // used a call and still answers "what do we know about this figure right
+    // now" — leaving it unrecorded would put the figure straight back at the
+    // front of the queue and spend the same call again next run.
+    await markPolled(figure.id);
   }
+}
+
+/** Note that a marketplace was searched for this figure. */
+async function markPolled(figureId: string): Promise<void> {
+  await prisma.figure.update({
+    where: { id: figureId },
+    data: { lastPolledAt: new Date() },
+  });
 }
 
 async function upsertEbayListing(
@@ -277,6 +325,7 @@ async function ingestAmiAmi(
   for (const figure of figures) {
     const items = await searchAmiAmi(buildQuery(figure), 20);
     summary.itemsSeen += items.length;
+    await markPolled(figure.id);
 
     for (const item of items) {
       const match = bestMatch(item.title, candidates);
