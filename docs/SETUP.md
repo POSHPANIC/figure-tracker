@@ -238,6 +238,15 @@ In PowerShell:
 
 ```powershell
 $env:DATABASE_URL="paste-your-neon-connection-string-here"; npm run db:deploy
+
+> **Vercel now runs this for you.** The `vercel-build` script applies pending
+> migrations before building, so a deploy can't ship code that expects columns
+> the database hasn't got. That failure mode is not theoretical: shipping the
+> demand-signal columns without migrating first took every figure page to a 500
+> while browse and search carried on working, because those use explicit field
+> lists and the figure page selects the whole row.
+>
+> You still need the command above when changing the schema without deploying.
 ```
 
 Then load the starter catalog:
