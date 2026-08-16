@@ -35,10 +35,8 @@ developer portal and eBay approves case by case. Until you're approved,
 `searchSoldItems()` in `lib/ingest/ebay.ts` returns an empty array and logs a
 note; nothing breaks.
 
-Until then, your options for real sold data are:
-
-- Apply for Marketplace Insights (worth doing early — approval takes time).
-- Wait for Marketplace Insights. There is currently no second path.
+Until then there is no second path: apply for Marketplace Insights, and apply
+early, because approval takes time.
 
 Community sale reporting was built and then removed. It worked, but it made the
 published price index writable by the public, and screening that reliably is a
@@ -47,8 +45,43 @@ the same check that rejects a genuine bargain. Visitors can now report a
 *problem* through `/feedback`, which a person reads — nothing they send changes
 a published number.
 
-Rate limits on the free tier are roughly 5,000 Browse calls/day, which is why
-`runIngestion` processes a capped number of figures per run, oldest first.
+Rate limits on the free tier are roughly 5,000 Browse calls/day. Which figures
+get those calls is decided by `lib/ingest/poll-priority.ts` — demand multiplied
+by how long a figure has waited — because the catalogue is far larger than the
+allowance and a plain rotation would leave everything equally out of date.
+
+Higher limits exist. eBay run a free **Application Growth Check**, but approval
+needs a usage history showing you have actually hit the limit, plus evidence the
+app earns through eBay Partner Network or sends buyers and sellers to eBay.
+There is no point applying while using 4% of the current allowance.
+
+### How far back the data goes
+
+**90 days, and it starts the day you are approved.** Marketplace Insights
+returns the trailing 90 days of completed sales. There is no parameter for
+older data and no endpoint that has it.
+
+That has a consequence worth being clear about: a figure released in 2015 has a
+decade of price history that this project will never show. Our history begins at
+approval and grows forward. `PriceSnapshot` keeps daily aggregates
+indefinitely — min, median, average, maximum, sample size — so the curve does
+accumulate; `purgeExpiredSales` drops the individual `Sale` rows behind it at 90
+days, which is what we told eBay we would do.
+
+Routes to back-history, and why none are taken:
+
+| Source | Has history | Why not |
+| --- | --- | --- |
+| **Terapeak** | ~3 years of sold data | A Seller Hub interface, not an API. Programmatic access was folded into Marketplace Insights — back to 90 days. |
+| **MyFigureCollection** | Years of user-reported sales | Their terms forbid scraping. Same reason it isn't a catalogue source. |
+| **Japanese auction archives** (aucfan and similar) | Years of Yahoo Auctions results | Paid, and the terms need reading before anything is written against them. This is the only route that would genuinely work. |
+| **User-reported sales** | Whatever people remember | Built once and deliberately removed — see below. Reinstating it for history would reintroduce exactly the problem it was removed for. |
+
+If back-history ever becomes worth paying for, the auction archives are the
+serious option. Until then the honest position is that the clock started when it
+started, and that MSRP plus a current price already answers the question
+collectors ask most — what did this cost new, and what is it worth now — without
+needing a curve between the two.
 
 ## AmiAmi
 
