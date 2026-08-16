@@ -208,6 +208,30 @@ export async function recomputeFigureStatsFor(figureId: string): Promise<boolean
  * Mark listings we haven't seen in a while as inactive. Sources rarely tell us
  * when something sells or is delisted, so absence is the signal.
  */
+/**
+ * Delete individual sale records once they age out of the source window.
+ *
+ * eBay's Marketplace Insights returns the last 90 days of completed sales, and
+ * our application to them states that we keep individual records only for that
+ * window. This is what makes the statement true rather than aspirational — a
+ * retention promise nothing enforces is a compliance problem waiting for the
+ * day somebody checks.
+ *
+ * The daily summaries in PriceSnapshot are untouched and are what long-term
+ * price history is built from: min, median, average, maximum and sample size
+ * per figure, per condition, per day. That split is deliberate. Aggregates say
+ * what a figure was worth without retaining anybody's individual transaction.
+ *
+ * Must run *after* aggregation, never before — summarising yesterday and then
+ * deleting the day it summarised is the right order, and the reverse quietly
+ * loses data.
+ */
+export async function purgeExpiredSales(olderThanDays = 90): Promise<number> {
+  const cutoff = new Date(Date.now() - olderThanDays * 86400_000);
+  const result = await prisma.sale.deleteMany({ where: { soldAt: { lt: cutoff } } });
+  return result.count;
+}
+
 export async function expireStaleListings(olderThanDays = 3): Promise<number> {
   const cutoff = new Date(Date.now() - olderThanDays * 86400_000);
   const result = await prisma.listing.updateMany({
