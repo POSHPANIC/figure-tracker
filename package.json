@@ -13,6 +13,7 @@
     "db:deploy": "prisma migrate deploy",
     "db:check": "tsx scripts/check-db.ts",
     "hooks:install": "tsx scripts/install-hooks.ts",
+    "email:test": "tsx scripts/test-email.ts",
     "db:seed": "tsx prisma/seed.ts",
     "db:studio": "prisma studio",
     "ingest": "tsx scripts/ingest.ts",
