@@ -46,14 +46,23 @@ if [ $? -eq 0 ]; then
   exit 0
 fi
 
-# migrate status exits non-zero both for pending migrations and for a database
-# it cannot reach. Only the first is a reason to block a push — an unreachable
-# database says nothing about whether this code is safe to deploy.
+# migrate status exits non-zero for pending migrations and for every way of
+# failing to ask. Only the first is a reason to block a push: a database this
+# machine cannot reach, or cannot log in to, says nothing about whether the
+# code being pushed is safe to deploy.
+#
+# Blocking on those would also be self-defeating. A guard that stops a push
+# over a stale local credential teaches you to type --no-verify without
+# reading, and then it is not guarding anything.
 case "$status" in
-  *P1001*|*P1002*|*P1013*|*"Can't reach"*)
+  *P1000*|*P1001*|*P1002*|*P1013*|*"Can't reach"*|*"uthentication failed"*)
     echo ""
-    echo "  pre-push: could not reach the database, so migrations went unchecked."
-    echo "  Pushing anyway. Run 'npm run db:check' if this persists."
+    echo "  pre-push: could not check production migrations, so they went"
+    echo "  unchecked. Pushing anyway — this says nothing about your code."
+    echo ""
+    echo "$status" | grep -v '^npm notice' | grep -i "error\|P10" | sed 's/^/    /'
+    echo ""
+    echo "    npm run db:check    diagnose DIRECT_DATABASE_URL in .env"
     echo ""
     exit 0
     ;;
