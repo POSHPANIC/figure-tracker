@@ -217,7 +217,8 @@ That's your `AUTH_SECRET`. Run it again for `CRON_SECRET`.
 
 | Name | Value |
 | --- | --- |
-| `DATABASE_URL` | your Neon connection string |
+| `DATABASE_URL` | your Neon connection string — the **pooled** one |
+| `DIRECT_DATABASE_URL` | the same string with `-pooler` removed from the host |
 | `AUTH_SECRET` | the first random string you generated |
 | `CRON_SECRET` | the second random string |
 | `EBAY_CLIENT_ID` | from step 1 |

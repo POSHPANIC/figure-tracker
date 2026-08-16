@@ -10,7 +10,21 @@ export default defineConfig({
     seed: "tsx prisma/seed.ts",
   },
   datasource: {
-    url: process.env["DATABASE_URL"],
+    /**
+     * Migrations run on the direct connection, not the pooled one.
+     *
+     * Prisma Migrate takes a session-level advisory lock so two deploys can't
+     * migrate at once. A connection pooler doesn't hold a session — each
+     * statement may land on a different backend — so `pg_advisory_lock` never
+     * resolves and the CLI dies with P1002 after ten seconds. That is exactly
+     * how the first build-time migration failed against Neon's `-pooler`
+     * endpoint.
+     *
+     * Only the CLI reads this file. The application takes DATABASE_URL straight
+     * from the environment in lib/prisma.ts and keeps using the pooled
+     * endpoint, which is the right one for serverless request traffic.
+     */
+    url: process.env["DIRECT_DATABASE_URL"] ?? process.env["DATABASE_URL"],
     shadowDatabaseUrl: process.env["SHADOW_DATABASE_URL"],
   },
 });
