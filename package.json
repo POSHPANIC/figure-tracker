@@ -17,6 +17,7 @@
     "db:seed": "tsx prisma/seed.ts",
     "db:studio": "prisma studio",
     "ingest": "tsx scripts/ingest.ts",
+    "backfill:listings": "tsx scripts/backfill-listings.ts",
     "set-role": "tsx scripts/set-role.ts",
     "verify:characters": "tsx scripts/verify-characters.ts",
     "purge:demo": "tsx scripts/purge-demo-data.ts",

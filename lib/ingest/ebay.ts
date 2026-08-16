@@ -178,11 +178,25 @@ export async function searchActiveListings(
  * eBay answers 403 and we return [] — the caller treats that as "no sold data
  * available", not as a failure.
  */
+/**
+ * Set once eBay has told us we do not have Marketplace Insights access.
+ *
+ * A 403 is a fact about the application, not about the figure being searched,
+ * so asking again for the next figure cannot produce a different answer. Across
+ * a full-catalogue run that is thousands of pointless requests — and thousands
+ * of unauthorised calls against the exact API whose access is under review,
+ * which is not how you want to appear in a reviewer's logs.
+ *
+ * Reset per process, so granting access needs no code change: the next run
+ * asks once again and, if it now works, keeps working.
+ */
+let insightsDenied = false;
+
 export async function searchSoldItems(
   query: string,
   options: SearchOptions = {},
 ): Promise<EbayItem[]> {
-  if (!isEbayConfigured()) return [];
+  if (!isEbayConfigured() || insightsDenied) return [];
 
   const params = new URLSearchParams({
     q: query,
@@ -199,9 +213,11 @@ export async function searchSoldItems(
   }
 
   if (res.status === 403 || res.status === 401) {
+    insightsDenied = true;
     console.info(
-      "[ebay] Marketplace Insights access not granted — skipping sold data. " +
-        "Apply at https://developer.ebay.com if you want real sold prices.",
+      "[ebay] Marketplace Insights access not granted — skipping sold data for " +
+        "the rest of this run. Apply at https://developer.ebay.com if you want " +
+        "real sold prices.",
     );
     return [];
   }
