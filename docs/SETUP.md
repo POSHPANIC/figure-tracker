@@ -267,7 +267,7 @@ the deploy goes live.
 To make the wrong order hard to reach, install the pre-push hook once:
 
 ```powershell
-sh scripts/hooks/install.sh
+npm.cmd run hooks:install
 ```
 
 It checks production before each push and blocks one that would ship code ahead
