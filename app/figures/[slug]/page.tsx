@@ -5,10 +5,12 @@ import type { Metadata } from "next";
 import { ExternalLink, Flag } from "lucide-react";
 import { currentUser } from "@/auth";
 import { recordFigureView } from "@/lib/views";
+import { EbayMark } from "@/components/ebay-mark";
 import { FigureActions } from "@/components/figure-actions";
 import { FigureImagesAdmin } from "@/components/figure-images-admin";
 import { FigureThumb } from "@/components/figure-thumb";
 import { PriceChart } from "@/components/price-chart";
+import { ebaySearchUrl } from "@/lib/ebay-search";
 import { getFigureBySlug, getFigureStats, getPriceHistory } from "@/lib/queries";
 import { getFigureUserState } from "@/lib/user-queries";
 import { formatCurrency, formatPercent, formatUsd, trendOf } from "@/lib/money";
@@ -253,10 +255,17 @@ export default async function FigurePage({ params, searchParams }: PageProps<"/f
           </section>
 
           <section className="rounded-xl border border-border bg-surface p-4">
-            <div className="mb-3 flex items-baseline justify-between">
-              <h2 className="text-sm font-semibold tracking-tight">Live listings</h2>
+            <div className="mb-3 flex items-baseline justify-between gap-3">
+              <h2 className="flex items-baseline gap-1.5 text-sm font-semibold tracking-tight">
+                Live listings
+                {figure.listings.some((l) => l.source.key === "ebay") && (
+                  <span className="text-muted">
+                    on <EbayMark className="text-[0.95em]" />
+                  </span>
+                )}
+              </h2>
               {stats.lowestAsk && (
-                <p className="text-xs text-muted">
+                <p className="shrink-0 text-xs text-muted">
                   Lowest ask{" "}
                   <span className="tabular font-medium text-foreground">
                     {formatMoney(stats.lowestAsk.amountUsd, money)}
@@ -270,52 +279,107 @@ export default async function FigurePage({ params, searchParams }: PageProps<"/f
               // catalogue this much larger than its marketplace quota will
               // always have figures in the second state. Saying so beats an
               // empty panel that implies we checked.
-              <p className="py-6 text-center text-sm text-muted">
-                {figure.lastPolledAt
-                  ? "No active listings tracked right now."
-                  : "Not checked for prices yet — this figure is queued."}
-              </p>
+              <div className="py-6 text-center">
+                <p className="text-sm text-muted">
+                  {figure.lastPolledAt
+                    ? "No active listings tracked right now."
+                    : "Not checked for prices yet — this figure is queued."}
+                </p>
+                {/* Nothing tracked is not the same as nothing for sale — most
+                    often it means we have not spent a call on this figure yet.
+                    Sending people to eBay's own search costs us nothing and is
+                    more use than a dead end. */}
+                <a
+                  href={ebaySearchUrl(figure)}
+                  target="_blank"
+                  rel="noopener noreferrer nofollow"
+                  className="mt-3 inline-flex items-baseline gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs font-medium transition hover:border-accent/60"
+                >
+                  Search <EbayMark /> for this figure
+                </a>
+              </div>
             ) : (
-              <ul className="divide-y divide-border">
-                {figure.listings.map((l) => (
-                  <li key={l.id} className="flex items-center gap-3 py-2.5">
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate text-sm">{l.title}</span>
-                      <span className="block text-xs text-muted">
-                        {l.source.name} · {CONDITION_LABELS[l.condition]}
-                        {l.shippingUsd
-                          ? ` · +${formatMoney(l.shippingUsd, money)} shipping`
-                          : ""}
-                      </span>
-                    </span>
-                    <span className="tabular shrink-0 text-sm font-medium">
-                      {formatMoney(l.amountUsd, money, {
-                        // The seller's own price, when it's already in the
-                        // currency being shown — no round trip through USD.
-                        original: { amount: l.amount, currency: l.currency },
-                      })}
-                    </span>
+              <>
+                <ul className="divide-y divide-border">
+                  {figure.listings.map((l) => {
+                    const isEbay = l.source.key === "ebay";
+                    return (
+                      <li key={l.id} className="flex items-center gap-3 py-2.5">
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-sm">{l.title}</span>
+                          <span className="flex items-baseline gap-1 text-xs text-muted">
+                            {isEbay ? <EbayMark /> : l.source.name} ·{" "}
+                            {CONDITION_LABELS[l.condition]}
+                            {l.shippingUsd
+                              ? ` · +${formatMoney(l.shippingUsd, money)} shipping`
+                              : ""}
+                          </span>
+                        </span>
+                        <span className="tabular shrink-0 text-sm font-medium">
+                          {formatMoney(l.amountUsd, money, {
+                            // The seller's own price, when it's already in the
+                            // currency being shown — no round trip through USD.
+                            original: { amount: l.amount, currency: l.currency },
+                          })}
+                        </span>
+                        <a
+                          // eBay rows open a search for this figure rather than
+                          // this listing. Matching a seller's title to a
+                          // catalogue entry is a guess, and a wrong guess sends
+                          // someone to the wrong figure with nothing to tell
+                          // them so. A search puts them on eBay's results for
+                          // what they were looking at: right match, it is the
+                          // top result anyway; wrong match, they are still in
+                          // the right place.
+                          href={isEbay ? ebaySearchUrl(figure) : l.url}
+                          target="_blank"
+                          rel="noopener noreferrer nofollow"
+                          className="shrink-0 rounded-md border border-border p-1.5 text-muted transition hover:border-accent/60 hover:text-foreground"
+                          aria-label={
+                            isEbay
+                              ? `Search eBay for ${figure.name}`
+                              : `Open listing on ${l.source.name}`
+                          }
+                        >
+                          <ExternalLink className="size-3.5" />
+                        </a>
+                      </li>
+                    );
+                  })}
+                </ul>
+
+                {figure.listings.some((l) => l.source.key === "ebay") && (
+                  <p className="mt-3 border-t border-border pt-3 text-xs text-muted">
+                    Listings are matched to this figure automatically and can
+                    include similar releases.{" "}
                     <a
-                      href={l.url}
+                      href={ebaySearchUrl(figure)}
                       target="_blank"
                       rel="noopener noreferrer nofollow"
-                      className="shrink-0 rounded-md border border-border p-1.5 text-muted transition hover:border-accent/60 hover:text-foreground"
-                      aria-label={`Open listing on ${l.source.name}`}
+                      className="font-medium text-foreground underline underline-offset-2 hover:text-accent"
                     >
-                      <ExternalLink className="size-3.5" />
-                    </a>
-                  </li>
-                ))}
-              </ul>
+                      Search eBay for this figure
+                    </a>{" "}
+                    to see everything.
+                  </p>
+                )}
+              </>
             )}
           </section>
 
           <section className="rounded-xl border border-border bg-surface p-4">
             <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
               <div>
-                <h2 className="text-sm font-semibold tracking-tight">Recent sales</h2>
+                <h2 className="flex items-baseline gap-1.5 text-sm font-semibold tracking-tight">
+                  Recent sales
+                  {figure.sales.some((s) => s.source.key === "ebay") && (
+                    <span className="text-muted">
+                      on <EbayMark className="text-[0.95em]" />
+                    </span>
+                  )}
+                </h2>
                 <p className="mt-0.5 text-xs text-muted">
-                  Completed transactions — the basis for this figure's market value.
+                  Completed transactions — the basis for this figure’s market value.
                 </p>
               </div>
               <Link
