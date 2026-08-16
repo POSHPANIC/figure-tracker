@@ -246,6 +246,37 @@ there fails the deploy with `P1001` as if the server were down.
 | `EBAY_CLIENT_SECRET` | from step 1 |
 | `EBAY_ENV` | `PRODUCTION` |
 
+### Deploying a schema change
+
+Migrations are **not** run by the Vercel build. Build machines cannot reliably
+reach Neon — the attempt failed three deploys running with three different error
+codes — and a build that migrates would also let a preview deploy migrate the
+production database. Migrations run from your machine, where the connection
+works, before the code that needs them ships:
+
+```powershell
+npm.cmd run db:check      # confirm the connection can migrate
+npm.cmd run db:deploy     # apply pending migrations to production
+git push                  # then deploy the code
+```
+
+That order matters. Code deployed before its migration is the failure that took
+the site down once already: every page touching the new column throws the moment
+the deploy goes live.
+
+To make the wrong order hard to reach, install the pre-push hook once:
+
+```powershell
+sh scripts/hooks/install.sh
+```
+
+It checks production before each push and blocks one that would ship code ahead
+of its schema. It needs `DIRECT_DATABASE_URL` in your local `.env` — without it
+the only database it could check is your dev one, so it skips rather than report
+something reassuring about the wrong server. If the database is unreachable it
+also lets the push through, since that says nothing about whether the code is
+safe. Bypass any single push with `git push --no-verify`.
+
 Leave `SHADOW_DATABASE_URL` out — it's only needed for creating migrations
 locally.
 

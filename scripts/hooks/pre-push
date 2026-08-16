@@ -1,0 +1,82 @@
+#!/bin/sh
+#
+# Refuse to push code whose migrations have not been applied to production.
+#
+# Pushing to main deploys. If a commit needs a column that production does not
+# have yet, every page touching it starts throwing the moment the deploy goes
+# live — which is exactly how this repo took its last outage.
+#
+# Running migrations inside the Vercel build was the first attempt at a fix,
+# and it was a poor one: the build machine cannot reliably reach Neon, so
+# migrations turned every deploy into a coin flip, and preview deploys would
+# have migrated the production database. Checking here instead is both safer
+# and more honest — it happens on a machine with a working database
+# connection, before anything ships.
+#
+# Install: sh scripts/hooks/install.sh
+# Bypass:  git push --no-verify
+
+if ! git diff --quiet HEAD --stat -- prisma/migrations 2>/dev/null; then
+  echo "pre-push: uncommitted changes under prisma/migrations." >&2
+fi
+
+if [ -z "$(ls -A prisma/migrations 2>/dev/null)" ]; then
+  exit 0
+fi
+
+# prisma.config.ts prefers DIRECT_DATABASE_URL and falls back to DATABASE_URL,
+# which locally is the dev database. Checking that would report a reassuring
+# "up to date" about entirely the wrong server, so say nothing rather than
+# something false.
+if ! grep -q '^DIRECT_DATABASE_URL=' .env 2>/dev/null; then
+  echo ""
+  echo "  pre-push: skipping the migration check."
+  echo ""
+  echo "  DIRECT_DATABASE_URL is not in .env, so the only database this could"
+  echo "  check is your local dev one — and production is the one that matters."
+  echo "  Add it (npm run db:check verifies it) to turn this check on."
+  echo ""
+  exit 0
+fi
+
+echo "pre-push: checking production migrations..."
+
+status=$(npx prisma migrate status 2>&1)
+if [ $? -eq 0 ]; then
+  exit 0
+fi
+
+# migrate status exits non-zero both for pending migrations and for a database
+# it cannot reach. Only the first is a reason to block a push — an unreachable
+# database says nothing about whether this code is safe to deploy.
+case "$status" in
+  *P1001*|*P1002*|*P1013*|*"Can't reach"*)
+    echo ""
+    echo "  pre-push: could not reach the database, so migrations went unchecked."
+    echo "  Pushing anyway. Run 'npm run db:check' if this persists."
+    echo ""
+    exit 0
+    ;;
+esac
+
+echo ""
+echo "$status" | grep -v '^npm notice' | sed 's/^/  /'
+echo ""
+
+# Say which of the two it is. "migrate status failed" covers both, and a
+# headline that names the wrong cause is worse than one that names none —
+# that is the entire reason this check exists.
+case "$status" in
+  *"not yet been applied"*|*"not found in the database"*)
+    echo "  Push blocked: production is missing migrations this code may need."
+    echo ""
+    echo "    npm run db:deploy      apply them, then push again"
+    ;;
+  *)
+    echo "  Push blocked: could not confirm production is migrated."
+    echo "  The reason is above — it is not a pending migration."
+    ;;
+esac
+echo "    git push --no-verify   push regardless"
+echo ""
+exit 1
