@@ -41,6 +41,15 @@ import type { ItemCondition } from "../generated/prisma/enums";
  */
 export const MATCH_ACCEPT_THRESHOLD = 0.55;
 
+/**
+ * Tolerance for calling two scores equal.
+ *
+ * Scores are sums of floating-point weights, so two candidates that ought to
+ * tie can land a bit apart in the last places. Comparing exactly would let that
+ * decide which figure a listing belongs to.
+ */
+const SCORE_EPSILON = 1e-9;
+
 /** Words that appear in nearly every listing and carry no matching signal. */
 const STOPWORDS = new Set([
   "figure", "figures", "anime", "authentic", "genuine", "new", "sealed", "used",
@@ -474,19 +483,41 @@ export function bestMatch(title: string, candidates: MatchCandidate[]): MatchRes
   let best: MatchResult = null;
   let bestSpecificity = -1;
 
+  // How many candidates are tied at the top. More than one and there is no
+  // answer to give.
+  let tied = 0;
+
   for (const c of candidates) {
     const score = scoreMatch(title, c);
     if (score < MATCH_ACCEPT_THRESHOLD) continue;
 
     const specificity = matchedNameTokens(title, c);
-    const better =
-      !best || score > best.score || (score === best.score && specificity > bestSpecificity);
-    if (better) {
+    const sameScore = best !== null && Math.abs(score - best.score) <= SCORE_EPSILON;
+
+    if (best === null || score > best.score + SCORE_EPSILON) {
       best = { figureId: c.id, score };
       bestSpecificity = specificity;
+      tied = 1;
+    } else if (sameScore && specificity > bestSpecificity) {
+      best = { figureId: c.id, score };
+      bestSpecificity = specificity;
+      tied = 1;
+    } else if (sameScore && specificity === bestSpecificity) {
+      tied += 1;
     }
   }
-  return best;
+
+  // A tie is not a near miss to be settled by whichever row the database
+  // handed over first. The catalogue has 89 names shared by two or more
+  // figures — four separate products called "Megumi Kato" — and against those
+  // a listing scores identically every time. Picking one is inventing a fact,
+  // and it is unstable: re-running moved 210 listings between equal candidates
+  // without improving a single score.
+  //
+  // Unmatched is the honest answer, and a visible one. The figure page says
+  // nothing is tracked and offers an eBay search, which beats a confident
+  // wrong price.
+  return tied > 1 ? null : best;
 }
 
 /** Map a marketplace's free-text condition onto our enum. */

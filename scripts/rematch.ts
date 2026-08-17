@@ -8,8 +8,15 @@
  *
  * Uses no API quota — it only re-reads titles we already have.
  *
- *   npm run rematch          # report what would change
- *   npm run rematch -- --yes # apply
+ *   npm run rematch                        # report what would change
+ *   npm run rematch -- --yes               # apply everything
+ *   npm run rematch -- --yes --no-moves    # apply only unmatches and new matches
+ *
+ * --no-moves exists because the two kinds of change carry very different risk.
+ * Dropping a listing that no longer matches only ever removes a claim. Moving
+ * one from figure A to figure B asserts a new one, and when the two scored
+ * equally that assertion is arbitrary — so it can be applied separately, or
+ * not at all.
  */
 import "dotenv/config";
 import { prisma } from "../lib/prisma";
@@ -18,6 +25,7 @@ import { bestMatch } from "../lib/ingest/match";
 import { recomputeFigureStatsFor } from "../lib/ingest/aggregate";
 
 const APPLY = process.argv.includes("--yes");
+const SKIP_MOVES = process.argv.includes("--no-moves");
 
 async function main() {
   const candidates = await loadCandidates(true);
@@ -29,6 +37,7 @@ async function main() {
   const lost: { title: string; from: string }[] = [];
   const moved: { title: string; from: string; to: string }[] = [];
   const touched = new Set<string>();
+  let skippedMoves = 0;
 
   for (const l of listings) {
     const match = bestMatch(l.title, candidates);
@@ -38,9 +47,16 @@ async function main() {
     const nameOf = (id: string | null) =>
       candidates.find((c) => c.id === id)?.name ?? "(unknown)";
 
+    const isMove = Boolean(l.figureId && next);
+
     if (!l.figureId && next) gained.push({ title: l.title, to: nameOf(next) });
     else if (l.figureId && !next) lost.push({ title: l.title, from: nameOf(l.figureId) });
     else moved.push({ title: l.title, from: nameOf(l.figureId), to: nameOf(next) });
+
+    if (isMove && SKIP_MOVES) {
+      skippedMoves += 1;
+      continue;
+    }
 
     if (l.figureId) touched.add(l.figureId);
     if (next) touched.add(next);
@@ -56,7 +72,7 @@ async function main() {
   console.log(`listings examined : ${listings.length}`);
   console.log(`newly matched     : ${gained.length}`);
   console.log(`no longer matched : ${lost.length}`);
-  console.log(`moved figure      : ${moved.length}`);
+  console.log(`moved figure      : ${moved.length}${SKIP_MOVES ? " (left alone)" : ""}`);
 
   const show = (label: string, rows: { title: string }[]) => {
     if (rows.length === 0) return;
@@ -75,6 +91,9 @@ async function main() {
   } else {
     for (const id of touched) await recomputeFigureStatsFor(id);
     console.log(`\nApplied. Refreshed stats for ${touched.size} figure(s).`);
+    if (skippedMoves) {
+      console.log(`Left ${skippedMoves} move(s) alone, as asked.`);
+    }
   }
 
   await prisma.$disconnect();

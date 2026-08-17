@@ -244,6 +244,32 @@ describe("bestMatch", () => {
   it("returns null for an empty title", () => {
     assert.equal(bestMatch("", ALL), null);
   });
+
+  it("refuses to choose between two figures with the same name", () => {
+    // The catalogue really is like this: 89 names are shared by two or more
+    // figures, four of them called "Megumi Kato". A listing scores identically
+    // against each, so whichever the database returned first used to win —
+    // which meant re-running matching moved 210 listings without improving a
+    // single score. Unmatched is the only honest answer here.
+    const a = { ...marinNendo, id: "marin-nendo-a" };
+    const b = { ...marinNendo, id: "marin-nendo-b" };
+    assert.equal(bestMatch("Nendoroid Marin Kitagawa Good Smile Company", [a, b]), null);
+  });
+
+  it("is not swayed by the order the tied candidates arrive in", () => {
+    const a = { ...marinNendo, id: "marin-nendo-a" };
+    const b = { ...marinNendo, id: "marin-nendo-b" };
+    const title = "Nendoroid Marin Kitagawa Good Smile Company";
+    assert.equal(bestMatch(title, [a, b]), bestMatch(title, [b, a]));
+  });
+
+  it("still answers when one of several candidates is genuinely better", () => {
+    // A tie is ambiguity; a clear winner among near-misses is not. Rejecting
+    // both would throw away the matches this exists to find.
+    const vague = { ...marinNendo, id: "marin-vague", name: "Marin Kitagawa" };
+    const result = bestMatch("Good Smile Nendoroid Marin Kitagawa figure", [vague, marinNendo]);
+    assert.equal(result?.figureId, "marin-nendo");
+  });
 });
 
 describe("descriptorTokens", () => {
