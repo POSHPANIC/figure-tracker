@@ -1,0 +1,68 @@
+name: Daily listing refresh
+
+# Refresh eBay listings across the catalogue, once a day.
+#
+# This does not run on Vercel because it cannot: a sweep of the catalogue is
+# about ninety minutes and a serverless function is capped at minutes. The
+# site's own cron still runs a small batch at 04:00 UTC; this is the bulk pass
+# an hour later, once that has had its turn and the daily quota has reset.
+#
+# Listings genuinely go stale — they sell, expire, get relisted — so a figure
+# page showing last week's prices is showing the wrong thing. That is the
+# reason this exists; the call volume follows from it.
+
+on:
+  schedule:
+    # 05:00 UTC daily. After the Vercel cron at 04:00, and early enough that a
+    # ninety-minute run finishes well inside the same quota day.
+    - cron: "0 5 * * *"
+  workflow_dispatch:
+    inputs:
+      total:
+        description: "How many figures to poll"
+        required: false
+        default: "4800"
+
+concurrency:
+  # Never two sweeps at once. They would spend double the quota and race each
+  # other for the same figures, and the second would add nothing the first
+  # had not already done.
+  group: daily-listings
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    # The measured run is ~90 minutes at 4,800 figures. This is a backstop
+    # against a hang, not a target — a job killed here has still marked every
+    # figure it finished, so the next run carries on from there.
+    timeout-minutes: 150
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Generate Prisma client
+        run: npx prisma generate
+
+      - name: Refresh listings
+        env:
+          # The direct Neon endpoint, not the pooled one — same reason
+          # migrations need it, and this run holds long connections.
+          DIRECT_DATABASE_URL: ${{ secrets.DIRECT_DATABASE_URL }}
+          DATABASE_URL: ${{ secrets.DIRECT_DATABASE_URL }}
+          EBAY_CLIENT_ID: ${{ secrets.EBAY_CLIENT_ID }}
+          EBAY_CLIENT_SECRET: ${{ secrets.EBAY_CLIENT_SECRET }}
+          EBAY_ENV: ${{ secrets.EBAY_ENV }}
+        run: |
+          npm run backfill:listings -- \
+            --production \
+            --total "${{ github.event.inputs.total || '4800' }}" \
+            --batch 500

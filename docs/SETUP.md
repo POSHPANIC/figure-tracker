@@ -336,6 +336,58 @@ curl -H "Authorization: Bearer YOUR_CRON_SECRET" https://your-site.vercel.app/ap
 
 ---
 
+## Daily listing refresh
+
+Listings go stale — they sell, expire, and get relisted — so a figure page
+left alone shows last week's prices. Two jobs keep them current:
+
+| Job | Where | Size |
+| --- | --- | --- |
+| 04:00 UTC | Vercel cron | 40 figures |
+| 05:00 UTC | GitHub Actions | 4,800 figures |
+
+The bulk pass does not run on Vercel because it cannot. A sweep of the
+catalogue is about ninety minutes, and a serverless function is capped at
+minutes — the cron was previously asked for 100 figures against a 60-second
+limit and was killed every night having recorded nothing at all. Keep the two
+in step: raising the cron's `limit` in `vercel.json` means raising
+`maxDuration` in the route with it, because a run that does not finish fails
+silently.
+
+### Turning the workflow on
+
+`.github/workflows/daily-listings.yml` needs four secrets. Add them at
+**Settings → Secrets and variables → Actions → New repository secret**:
+
+| Secret | Value |
+| --- | --- |
+| `DIRECT_DATABASE_URL` | the non-pooled Neon string — the one `npm run db:check` verifies |
+| `EBAY_CLIENT_ID` | from your production keyset |
+| `EBAY_CLIENT_SECRET` | from the same keyset |
+| `EBAY_ENV` | `production` |
+
+Then run it once by hand — **Actions → Daily listing refresh → Run workflow** —
+rather than waiting overnight to find out a secret was pasted wrong.
+
+### Cost
+
+The repository is private, so Actions bills against 2,000 free minutes a
+month. A 4,800-figure run is roughly 90 minutes, so a daily sweep is about
+2,700 minutes — a few dollars a month over the free allowance. Passing a
+smaller `total` when running it by hand, or editing the schedule to every
+other day, brings it under.
+
+### Quota
+
+eBay allows 5,000 Browse calls a day and resets at UTC midnight. A figure
+costs one call, so 4,800 plus the site's own 40 leaves headroom without
+running the allowance to zero. Check what has been spent today with:
+
+```sql
+SELECT count(*) FROM "Figure"
+WHERE "lastPolledAt" >= date_trunc('day', now() AT TIME ZONE 'UTC');
+```
+
 ## Email
 
 Two independent systems that are easy to confuse, because a failure in either
