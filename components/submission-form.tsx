@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { Bug, CheckCircle2, ImagePlus, Loader2, MessageSquare, PackagePlus } from "lucide-react";
 import { createSubmission } from "@/lib/actions/submissions";
-import { EDITABLE_FIELDS } from "@/lib/figure-fields";
+import { EDITABLE_FIELDS, FIELD_LABELS } from "@/lib/figure-fields";
 import { cn } from "@/lib/utils";
 
 type Kind = "FEEDBACK" | "BUG" | "FIGURE" | "EDIT";
@@ -72,6 +72,8 @@ export function SubmissionForm({
     /** What the page says now, so the fields start as an edit, not a blank. */
     current: Record<string, string>;
     hasImage: boolean;
+    /** Fields checked against the manufacturer, by key, with the note. */
+    confirmed: Record<string, string>;
   } | null;
   signedIn: boolean;
 }) {
@@ -162,7 +164,7 @@ export function SubmissionForm({
             <legend className="mb-1 text-xs uppercase tracking-wide text-muted">
               Change anything that&apos;s wrong
             </legend>
-            {EDITABLE_FIELDS.map((f) => (
+            {EDITABLE_FIELDS.filter((f) => !(f.key in figure.confirmed)).map((f) => (
               <label key={f.key} className="block">
                 <span className="mb-1 block text-xs text-muted">{f.label}</span>
                 <input
@@ -175,6 +177,22 @@ export function SubmissionForm({
               </label>
             ))}
           </fieldset>
+
+          {Object.keys(figure.confirmed).length > 0 && (
+            // Named rather than silently absent. A field that vanishes looks
+            // like a bug, and someone who has spotted a genuine error needs to
+            // know where to take it.
+            <p className="text-xs text-muted">
+              Checked against the manufacturer and not open to suggestions:{" "}
+              <span className="text-foreground">
+                {Object.keys(figure.confirmed)
+                  .map((k) => FIELD_LABELS[k] ?? k)
+                  .join(", ")}
+              </span>
+              . If one of those is genuinely wrong, say so below and we&apos;ll
+              look again.
+            </p>
+          )}
 
           {figure.hasImage ? (
             <p className="text-xs text-muted">

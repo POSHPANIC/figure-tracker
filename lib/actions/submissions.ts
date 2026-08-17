@@ -173,6 +173,7 @@ export async function createSubmission(formData: FormData): Promise<SubmissionRe
         series: { select: { name: true } },
         characters: { select: { name: true } },
         _count: { select: { images: true } },
+        fieldLocks: { select: { field: true } },
       },
     });
     if (!figure) {
@@ -188,8 +189,12 @@ export async function createSubmission(formData: FormData): Promise<SubmissionRe
     if (figure._count.images > 0) imageUrl = null;
 
     const current = currentFieldValues(figure);
+    // Confirmed fields are dropped here, not just hidden on the form. The
+    // form is a courtesy; this is the rule.
+    const confirmed = new Set(figure.fieldLocks.map((l) => l.field));
     const changed: Record<string, string> = {};
     for (const key of EDITABLE_FIELD_KEYS) {
+      if (confirmed.has(key)) continue;
       const value = (input as Record<string, unknown>)[key];
       if (typeof value !== "string") continue;
       const next = value.trim();
@@ -269,5 +274,82 @@ export async function reviewSubmission(formData: FormData): Promise<ActionResult
   });
 
   revalidatePath("/moderation");
+  return { ok: true };
+}
+
+// --- Confirmed fields ------------------------------------------------------
+
+const lockSchema = z.object({
+  figureId: z.string().min(1),
+  field: z.enum(EDITABLE_FIELD_KEYS as unknown as [string, ...string[]]),
+  note: z.string().trim().max(300).optional(),
+});
+
+/**
+ * Mark a field as checked and correct, closing it to further suggestions.
+ *
+ * The same handful of fields attract the same correction over and over —
+ * usually where a retailer and the box disagree and the box is right. Without
+ * somewhere to record that we looked, every moderator repeats the check and the
+ * queue keeps filling with a claim that has already been settled.
+ *
+ * This says nothing about the value being unchangeable. It says a person
+ * verified it against the manufacturer, and it can be unlocked by anyone who
+ * finds otherwise — the row keeps who confirmed it and when, which is exactly
+ * what you want when someone insists it is wrong.
+ */
+export async function lockFigureField(formData: FormData): Promise<ActionResult> {
+  let moderator;
+  try {
+    moderator = await requireModerator();
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : "Not permitted." };
+  }
+
+  const parsed = lockSchema.safeParse(Object.fromEntries(formData.entries()));
+  if (!parsed.success) return { ok: false, error: "Invalid request." };
+  const { figureId, field, note } = parsed.data;
+
+  const figure = await prisma.figure.findUnique({
+    where: { id: figureId },
+    select: { slug: true },
+  });
+  if (!figure) return { ok: false, error: "Figure not found." };
+
+  // Confirming twice is not an error — a second moderator reaching the same
+  // conclusion should not see a failure. Their note replaces the old one.
+  await prisma.figureFieldLock.upsert({
+    where: { figureId_field: { figureId, field } },
+    create: { figureId, field, note: note || null, lockedById: moderator.id },
+    update: { note: note || null, lockedById: moderator.id },
+  });
+
+  revalidatePath("/moderation");
+  revalidatePath(`/figures/${figure.slug}`);
+  return { ok: true };
+}
+
+/** Reopen a field to suggestions. A delete, so nothing lingers half-locked. */
+export async function unlockFigureField(formData: FormData): Promise<ActionResult> {
+  try {
+    await requireModerator();
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : "Not permitted." };
+  }
+
+  const parsed = lockSchema.safeParse(Object.fromEntries(formData.entries()));
+  if (!parsed.success) return { ok: false, error: "Invalid request." };
+  const { figureId, field } = parsed.data;
+
+  const figure = await prisma.figure.findUnique({
+    where: { id: figureId },
+    select: { slug: true },
+  });
+  if (!figure) return { ok: false, error: "Figure not found." };
+
+  await prisma.figureFieldLock.deleteMany({ where: { figureId, field } });
+
+  revalidatePath("/moderation");
+  revalidatePath(`/figures/${figure.slug}`);
   return { ok: true };
 }

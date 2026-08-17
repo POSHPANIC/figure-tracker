@@ -135,6 +135,7 @@ model Figure {
   images      FigureImage[]
   identifiers FigureIdentifier[]
   submissions Submission[]
+  fieldLocks  FigureFieldLock[]
   listings    Listing[]
   sales       Sale[]
   snapshots   PriceSnapshot[]
@@ -226,6 +227,36 @@ model FigureImage {
 
 /// External IDs we can match marketplace listings against.
 /// `kind` is e.g. "MFC", "AMIAMI_CODE", "JAN", "GSC_PRODUCT", "EBAY_EPID".
+/// A figure attribute checked against the manufacturer and confirmed correct,
+/// which closes it to further suggestions.
+///
+/// The catalogue attracts repeat corrections to the same handful of fields,
+/// usually where the box and a retailer disagree and the box is right. Without
+/// somewhere to record "we looked, this is right", every moderator re-does that
+/// check from scratch and the queue fills with the same claim.
+///
+/// A row per confirmed field rather than a list on the figure: it records who
+/// confirmed it and when, which is what you want when someone later insists the
+/// value is wrong — and unlocking is a delete rather than a rewrite.
+model FigureFieldLock {
+  id       String @id @default(cuid())
+  figureId String
+  figure   Figure @relation(fields: [figureId], references: [id], onDelete: Cascade)
+
+  /// One of the editable field keys — see lib/figure-fields.ts.
+  field String
+
+  /// What was checked, in the moderator's words. "Box states 230mm."
+  note String?
+
+  lockedById String?
+  lockedBy   User?    @relation("FieldLocks", fields: [lockedById], references: [id], onDelete: SetNull)
+  createdAt  DateTime @default(now())
+
+  @@unique([figureId, field])
+  @@index([figureId])
+}
+
 model FigureIdentifier {
   id       String @id @default(cuid())
   figureId String
@@ -556,8 +587,9 @@ model User {
   wishlistItems      WishlistItem[]
   priceAlerts        PriceAlert[]
   addedImages        FigureImage[]
-  submissions        Submission[]     @relation("SubmissionsSent")
-  handledSubmissions Submission[]     @relation("SubmissionsHandled")
+  submissions        Submission[]      @relation("SubmissionsSent")
+  handledSubmissions Submission[]      @relation("SubmissionsHandled")
+  fieldLocks         FigureFieldLock[] @relation("FieldLocks")
 }
 
 model Account {

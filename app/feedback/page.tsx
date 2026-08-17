@@ -51,6 +51,7 @@ export default async function FeedbackPage({ searchParams }: PageProps<"/feedbac
           series: { select: { name: true } },
           characters: { select: { name: true } },
           _count: { select: { images: true } },
+          fieldLocks: { select: { field: true, note: true } },
         },
       })
     : null;
@@ -64,6 +65,7 @@ export default async function FeedbackPage({ searchParams }: PageProps<"/feedbac
         name: row.name,
         current: currentFieldValues(row),
         hasImage: row._count.images > 0,
+        confirmed: Object.fromEntries(row.fieldLocks.map((l) => [l.field, l.note ?? ""])),
       }
     : null;
 

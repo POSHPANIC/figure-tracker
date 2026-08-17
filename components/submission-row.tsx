@@ -2,8 +2,22 @@
 
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
-import { Bug, Check, ExternalLink, MessageSquare, PackagePlus, PencilLine, X } from "lucide-react";
-import { reviewSubmission } from "@/lib/actions/submissions";
+import {
+  Bug,
+  Check,
+  ExternalLink,
+  Lock,
+  LockOpen,
+  MessageSquare,
+  PackagePlus,
+  PencilLine,
+  X,
+} from "lucide-react";
+import {
+  lockFigureField,
+  reviewSubmission,
+  unlockFigureField,
+} from "@/lib/actions/submissions";
 import type { SubmissionKind } from "@/lib/generated/prisma/enums";
 import { FIELD_LABELS } from "@/lib/figure-fields";
 import { cn } from "@/lib/utils";
@@ -19,7 +33,7 @@ export type QueuedSubmission = {
   referenceUrl: string | null;
   imageUrl: string | null;
   proposedFields: unknown;
-  figure: { slug: string; name: string } | null;
+  figure: { id: string; slug: string; name: string; fieldLocks: { field: string }[] } | null;
   contactEmail: string | null;
   createdAt: Date;
   user: { id: string; username: string | null; name: string | null; email: string | null } | null;
@@ -165,9 +179,18 @@ export function SubmissionRow({ submission }: { submission: QueuedSubmission }) 
             <Detail label="Proposed">
               <ul className="space-y-0.5">
                 {Object.entries(submission.proposedFields).map(([key, value]) => (
-                  <li key={key}>
-                    <span className="text-muted">{FIELD_LABELS[key] ?? key}: </span>
-                    <span className="font-medium">{String(value)}</span>
+                  <li key={key} className="flex items-center gap-2">
+                    <span className="min-w-0 flex-1">
+                      <span className="text-muted">{FIELD_LABELS[key] ?? key}: </span>
+                      <span className="font-medium">{String(value)}</span>
+                    </span>
+                    {submission.figure && (
+                      <FieldLockButton
+                        figureId={submission.figure.id}
+                        field={key}
+                        locked={submission.figure.fieldLocks.some((l) => l.field === key)}
+                      />
+                    )}
                   </li>
                 ))}
               </ul>
@@ -258,5 +281,68 @@ function Detail({ label, children }: { label: string; children: React.ReactNode 
       <dt className="text-xs uppercase tracking-wide text-muted sm:pt-0.5">{label}</dt>
       <dd className="mb-1 sm:mb-0">{children}</dd>
     </>
+  );
+}
+
+/**
+ * Confirm a field as checked, or reopen it.
+ *
+ * Sits beside the proposed value because that is the moment the check happens:
+ * a moderator looking up the box to judge one suggestion has already done the
+ * work that settles every future one. Anywhere else and it becomes a separate
+ * chore nobody does.
+ *
+ * Locking says a person verified the value, not that it is beyond question —
+ * hence the same button reopens it.
+ */
+function FieldLockButton({
+  figureId,
+  field,
+  locked,
+}: {
+  figureId: string;
+  field: string;
+  locked: boolean;
+}) {
+  const router = useRouter();
+  const [pending, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+
+  function toggle() {
+    setError(null);
+    const formData = new FormData();
+    formData.set("figureId", figureId);
+    formData.set("field", field);
+    startTransition(async () => {
+      const result = await (locked ? unlockFigureField : lockFigureField)(formData);
+      if (result.ok) router.refresh();
+      else setError(result.error);
+    });
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={toggle}
+      disabled={pending}
+      title={
+        error ??
+        (locked
+          ? "Confirmed — reopen this field to suggestions"
+          : "Confirm this value and close the field to suggestions")
+      }
+      aria-pressed={locked}
+      className={cn(
+        "flex shrink-0 items-center gap-1 rounded-md border px-1.5 py-1 text-[10px] font-medium transition disabled:opacity-50",
+        error
+          ? "border-down/40 text-down"
+          : locked
+            ? "border-up/40 bg-up/10 text-up"
+            : "border-border text-muted hover:border-accent/60 hover:text-foreground",
+      )}
+    >
+      {locked ? <Lock className="size-3" /> : <LockOpen className="size-3" />}
+      {locked ? "Confirmed" : "Confirm"}
+    </button>
   );
 }
