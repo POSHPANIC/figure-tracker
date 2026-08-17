@@ -12,7 +12,7 @@ trouble, so read it before flipping anything on in production.
 | **AmiAmi** | Retail + preorder prices, MSRP, JPY | **Blocked by Cloudflare** — affiliate route only | — |
 | **Community reports** | User-submitted sale prices | **Removed** — see below | — |
 | **MyFigureCollection** | Best catalog data anywhere | Not implemented | **Their ToS forbids scraping** |
-| **Mandarake / Mercari / Yahoo Auctions** | Deep Japanese secondary market | Not implemented | Needs proxies; ToS varies |
+| **Mandarake / Suruga-ya / Yahoo Auctions** | Deep Japanese secondary market | Ruled out — see below | Blocked or disallowed, and asking prices rather than sales |
 
 ## eBay
 
@@ -123,6 +123,51 @@ Worth asking for explicitly:
 
 Same conversation as the press-image request in docs/PRESS_IMAGES.md, and worth
 combining: you're asking to send buyers to their store.
+
+## Japanese secondary market: checked, and closed
+
+Checked properly on 2026-08-17, because with Marketplace Insights pending it is
+the obvious place to look for sold prices. All three doors are shut, and it is
+worth writing down which and how so nobody spends another afternoon on it.
+
+| Site | What happened |
+| --- | --- |
+| **Yahoo! Auctions** | `robots.txt` disallows `/closedsearch/`, `/closedsearch`, and `/jp/closedsearch` — the completed-auction search specifically, which is the only part with sold prices in it |
+| **Suruga-ya** | answers `403` to a scripted request regardless of `robots.txt` |
+| **Mandarake** | serves a JavaScript shell: no items, no form, no item links in the HTML |
+
+Yahoo's is the clearest. Their `robots.txt` permits plenty of the site and then
+names the completed-auction search as off limits, which is a deliberate line
+rather than an oversight.
+
+Suruga-ya and Mandarake are the same situation as AmiAmi above, and get the same
+answer: getting through means impersonating a browser to defeat a measure the
+owner put there on purpose. Don't.
+
+### Even open, they would not be sale data
+
+Worth being clear that this is not only an access problem. A fixed-price used
+item that disappears has *probably* sold at its listed price, but that is an
+inference, and a weaker one the moment stock is pulled, relisted, or reserved.
+It is a different fact from "this sold for this, on this date", which is what a
+price chart claims and what Marketplace Insights actually reports.
+
+If any of these were ever ingested, it belongs in its own source, labelled as
+what it is — "last seen selling at" — and never merged into a figure's market
+value.
+
+### What that leaves
+
+1. **eBay Marketplace Insights.** Real sold prices, officially. Pending.
+2. **Paid auction archives** (aucfan and similar) — see above; still the only
+   route that would genuinely work for Japanese history.
+3. **Community reports.** Real transactions, moderated, and the `user` source
+   already exists for them. Low volume until there are users, but honest.
+
+Until one of those lands, the price charts stay empty and say so. That is not a
+gap to paper over before an application: an empty chart that explains itself is
+the strongest evidence available that this site does not invent numbers, which
+is exactly what a reviewer is deciding before handing over commercial sale data.
 
 ## MyFigureCollection
 
