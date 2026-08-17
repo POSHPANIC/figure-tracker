@@ -34,7 +34,7 @@ import type { ItemCondition } from "../generated/prisma/enums";
 /**
  * Below this, we store the listing but leave figureId null.
  *
- * Lower than it looks: precision now comes from the five gates in scoreMatch,
+ * Lower than it looks: precision now comes from the six gates in scoreMatch,
  * not from this number. A terse but correct title like "Marin Kitagawa Swimsuit
  * Ver. Figure" names no maker, series or scale and so scores only 0.6 — with
  * the gates in place, rejecting that was costing real matches for nothing.
@@ -264,6 +264,22 @@ export function tokenize(text: string): Set<string> {
   );
 }
 
+/**
+ * The release number a title gives for a product line — the 1935 in
+ * "Nendoroid 1935 Marin Kitagawa".
+ *
+ * Only counted when it sits next to the line word. Marketplace titles are full
+ * of unrelated numbers — years, heights, quantities, "100% authentic" — and any
+ * of them read as a release number would be worse than reading none.
+ *
+ * normalize() has already split "Nendoroid1935" into two tokens and stripped
+ * the "#" from "#1935", so both spellings arrive here in the same shape.
+ */
+export function extractLineNumber(text: string): string | null {
+  const m = normalize(text).match(/\b(?:nendoroid|figma)\s+(?:no\.?\s*)?(\d{1,4})\b/);
+  return m ? m[1] : null;
+}
+
 /** Pull "1/7", "1/8" etc. out of a title. */
 function extractScale(text: string): string | null {
   const m = normalize(text).match(/\b1\s*\/\s*(\d{1,2})\b/);
@@ -278,6 +294,12 @@ export type MatchCandidate = {
   /** FigureCategory value — decides which product line the figure belongs to. */
   category: string;
   manufacturerName: string | null;
+  /**
+   * Release number within a product line — the 1935 in "Nendoroid 1935".
+   * Null for scale figures, which have none, and for line entries the archive
+   * never printed one for.
+   */
+  lineNumber?: string | null;
   seriesName: string | null;
   characterNames: string[];
   /**
@@ -333,7 +355,7 @@ function unexplainedVariants(titleTokens: Set<string>, figure: MatchCandidate): 
 /**
  * Score a listing title against one figure, 0..1.
  *
- * Five hard gates run before any scoring. They're questions of identity rather
+ * Six hard gates run before any scoring. They're questions of identity rather
  * than confidence, so no amount of agreement elsewhere should override them —
  * a t-shirt with the right character's name on it is still a t-shirt.
  */
@@ -397,7 +419,20 @@ export function scoreMatch(title: string, figure: MatchCandidate): number {
     if (!titleTokens.has(token)) return 0;
   }
 
-  // --- Gate 5: a stated scale must agree. ---
+  // --- Gate 5: a stated release number must agree. ---
+  // "Nendoroid 1935" and "Nendoroid 2100" are different products even when
+  // every word around them matches, which for two entries of the same
+  // character is exactly the situation.
+  //
+  // Only when both sides carry one. Plenty of catalogue entries have no
+  // recorded number, and rejecting those would throw away the many listings
+  // that do quote one.
+  const titleLineNumber = extractLineNumber(title);
+  if (figure.lineNumber && titleLineNumber && titleLineNumber !== figure.lineNumber) {
+    return 0;
+  }
+
+  // --- Gate 6: a stated scale must agree. ---
   // A 1/7 and a 1/8 of the same character are different products, however
   // alike their names read. This was a -0.3 penalty and that was not enough:
   // "Gojo Satoru 1/7 Scale Figure" kept matching Kotobukiya's 1/8 ARTFX J,
@@ -446,8 +481,14 @@ export function scoreMatch(title: string, figure: MatchCandidate): number {
   });
   if (seriesMatched) score += 0.12;
 
-  // Agreement is worth rewarding; disagreement already returned 0 at gate 5.
+  // Agreement is worth rewarding; disagreement already returned 0 at gate 6.
   if (figure.scale && titleScale === figure.scale) score += 0.13;
+
+  // A matching release number is the strongest signal available, and the only
+  // one that separates two catalogue entries with identical names. Weighted to
+  // settle that outright: where one entry records the number and the other does
+  // not, this is the whole difference between them.
+  if (figure.lineNumber && titleLineNumber === figure.lineNumber) score += 0.2;
 
   // Japanese name appearing verbatim is near-conclusive.
   if (figure.nameJa && normalize(title).includes(normalize(figure.nameJa))) {

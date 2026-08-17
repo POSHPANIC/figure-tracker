@@ -3,6 +3,7 @@ import { describe, it } from "node:test";
 import {
   MATCH_ACCEPT_THRESHOLD,
   bestMatch,
+  extractLineNumber,
   descriptorTokens,
   normalizeCondition,
   scoreMatch,
@@ -516,5 +517,51 @@ describe("normalizeCondition", () => {
     assert.equal(normalizeCondition("Pre-owned"), "USED_COMPLETE");
     assert.equal(normalizeCondition("For parts or not working"), "DAMAGED");
     assert.equal(normalizeCondition(null), "UNKNOWN");
+  });
+});
+
+describe("extractLineNumber", () => {
+  it("reads the number next to the line word", () => {
+    assert.equal(extractLineNumber("Nendoroid 1935 Marin Kitagawa"), "1935");
+    assert.equal(extractLineNumber("figma 390 Jeanne d'Arc Alter"), "390");
+    assert.equal(extractLineNumber("Nendoroid No. 1146 Girls' Frontline"), "1146");
+    assert.equal(extractLineNumber("GSC Nendoroid1902 Anya Forger"), "1902");
+  });
+
+  it("ignores numbers that are not release numbers", () => {
+    // The whole risk of this function: marketplace titles are full of numbers,
+    // and reading the wrong one is worse than reading none.
+    assert.equal(extractLineNumber("Marin Kitagawa 1/7 Scale Figure 210mm 2020"), null);
+    assert.equal(extractLineNumber("Anya Forger figure 100% authentic F/S"), null);
+  });
+
+  it("does not take the first digits of a longer number", () => {
+    // Without a trailing word boundary this returned "1935", which is a real
+    // release number belonging to a different figure.
+    assert.equal(extractLineNumber("Nendoroid 19350 something"), null);
+  });
+});
+
+describe("release numbers in matching", () => {
+  const withNumber: MatchCandidate = { ...marinNendo, id: "marin-1935", lineNumber: "1935" };
+  const withoutNumber: MatchCandidate = { ...marinNendo, id: "marin-unknown", lineNumber: null };
+
+  it("picks the entry whose number the title states", () => {
+    // The case this exists for. Two catalogue entries, the same name, and the
+    // only difference is that one records the number the listing quotes.
+    const result = bestMatch("Nendoroid 1935 Marin Kitagawa Good Smile Company", [
+      withoutNumber,
+      withNumber,
+    ]);
+    assert.equal(result?.figureId, "marin-1935");
+  });
+
+  it("rejects an entry whose number contradicts the title", () => {
+    assert.equal(scoreMatch("Nendoroid 2100 Marin Kitagawa Good Smile", withNumber), 0);
+  });
+
+  it("still matches when the title quotes no number", () => {
+    const score = scoreMatch("Good Smile Company Nendoroid Marin Kitagawa", withNumber);
+    assert.ok(score >= MATCH_ACCEPT_THRESHOLD, `silence is not contradiction, got ${score}`);
   });
 });

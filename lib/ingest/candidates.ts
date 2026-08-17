@@ -24,6 +24,13 @@ export async function loadCandidates(force = false): Promise<MatchCandidate[]> {
       manufacturer: { select: { name: true } },
       series: { select: { name: true, synonyms: true } },
       characters: { select: { name: true, nameJa: true } },
+      // The release number printed on the box — "Nendoroid 1935". The archive
+      // records it separately from the name, and it is the only thing telling
+      // two catalogue entries with the same name apart.
+      identifiers: {
+        where: { kind: { in: ["NENDOROID_NO", "FIGMA_NO"] } },
+        select: { value: true },
+      },
     },
   });
 
@@ -38,6 +45,7 @@ export async function loadCandidates(force = false): Promise<MatchCandidate[]> {
     seriesAliases: f.series?.synonyms ?? [],
     characterNames: f.characters.map((c) => c.name),
     characterNamesJa: f.characters.map((c) => c.nameJa).filter((n): n is string => Boolean(n)),
+    lineNumber: f.identifiers[0]?.value ?? null,
   }));
 
   cache = { at: Date.now(), rows };
