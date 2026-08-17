@@ -199,7 +199,39 @@ const MAKER_ALIASES: Record<string, string[]> = {
   aniplex: ["aniplex+", "aniplexplus"],
 };
 
-export function normalize(text: string): string {
+/**
+ * Remember what a pure string function last returned.
+ *
+ * scoreMatch runs once per listing per candidate — for a full rematch that is
+ * 39,839 listings against 7,068 figures, some 281 million calls — and each one
+ * re-derived everything from the same title: tokenize twice, normalize three
+ * times, plus another normalize inside each of extractScale and
+ * extractLineNumber. Seven passes over one string, repeated seven thousand
+ * times in a row before the title ever changes.
+ *
+ * The working set is tiny and short-lived: one title against every candidate,
+ * plus the names of the candidates themselves. So a plain Map with a wholesale
+ * clear when it fills beats tracking recency for the sake of it.
+ */
+function memoized<T>(compute: (input: string) => T, cap = 8192): (input: string) => T {
+  const cache = new Map<string, T>();
+  return (input: string): T => {
+    const hit = cache.get(input);
+    if (hit !== undefined) return hit;
+    const value = compute(input);
+    if (cache.size >= cap) cache.clear();
+    cache.set(input, value);
+    return value;
+  };
+}
+
+/**
+ * Safe to memoize only because nothing mutates what these return. tokenize's
+ * Set is read with .has and .size, and descriptorTokens builds its own Sets
+ * rather than adding to one it was handed. Returning a shared Set that someone
+ * later mutated would corrupt every match after it.
+ */
+function normalizeImpl(text: string): string {
   return text
     .toLowerCase()
     .normalize("NFKC")
@@ -212,6 +244,8 @@ export function normalize(text: string): string {
     .replace(/\s+/g, " ")
     .trim();
 }
+
+export const normalize = memoized(normalizeImpl);
 
 /**
  * Whether the title is selling merchandise rather than a figure.
@@ -255,7 +289,7 @@ function canonical(token: string): string {
   return SYNONYMS[token] ?? token;
 }
 
-export function tokenize(text: string): Set<string> {
+function tokenizeImpl(text: string): Set<string> {
   return new Set(
     normalize(text)
       .split(/[\s/.-]+/)
@@ -263,6 +297,8 @@ export function tokenize(text: string): Set<string> {
       .map(canonical),
   );
 }
+
+export const tokenize = memoized(tokenizeImpl);
 
 /**
  * The release number a title gives for a product line — the 1935 in
@@ -485,10 +521,22 @@ export function scoreMatch(title: string, figure: MatchCandidate): number {
   if (figure.scale && titleScale === figure.scale) score += 0.13;
 
   // A matching release number is the strongest signal available, and the only
-  // one that separates two catalogue entries with identical names. Weighted to
+  // one separating two catalogue entries with identical names. Weighted to
   // settle that outright: where one entry records the number and the other does
   // not, this is the whole difference between them.
-  if (figure.lineNumber && titleLineNumber === figure.lineNumber) score += 0.2;
+  //
+  // Asked as "does this figure's number appear in the title" rather than
+  // "which number does the title state", because the two questions have very
+  // different answers. Sellers put the number wherever they like — "Nendoroid
+  // 1935 Marin Kitagawa" but equally "Nendoroid Marin Kitagawa 1935" — and
+  // reading it out of an arbitrary position means guessing which of a title's
+  // numbers is the release one. That guess cannot be made safely: the obvious
+  // guard is to skip year-like numbers, and 1935, 1902 and 2353 are all
+  // year-like. Checking for a number we already know needs no guess at all.
+  //
+  // The strict reading above still governs rejection, where a wrong answer
+  // discards a good listing and precision matters more than reach.
+  if (figure.lineNumber && titleTokens.has(figure.lineNumber)) score += 0.2;
 
   // Japanese name appearing verbatim is near-conclusive.
   if (figure.nameJa && normalize(title).includes(normalize(figure.nameJa))) {

@@ -546,6 +546,18 @@ describe("release numbers in matching", () => {
   const withNumber: MatchCandidate = { ...marinNendo, id: "marin-1935", lineNumber: "1935" };
   const withoutNumber: MatchCandidate = { ...marinNendo, id: "marin-unknown", lineNumber: null };
 
+  it("picks the entry whose number appears late in the title", () => {
+    // The shape that made the first attempt worse than useless. Sellers write
+    // the number after the character as often as before it, and reading only
+    // the adjacent position left these tied — so they were discarded as
+    // ambiguous while the number sat in plain sight.
+    const result = bestMatch("Good Smile Company Nendoroid Marin Kitagawa 1935 Figure", [
+      withoutNumber,
+      withNumber,
+    ]);
+    assert.equal(result?.figureId, "marin-1935");
+  });
+
   it("picks the entry whose number the title states", () => {
     // The case this exists for. Two catalogue entries, the same name, and the
     // only difference is that one records the number the listing quotes.
