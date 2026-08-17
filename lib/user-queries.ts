@@ -156,6 +156,7 @@ export async function getSubmissionQueue(take = 50) {
         series: true,
         referenceUrl: true,
         imageUrl: true,
+        proposedFields: true,
         figure: { select: { slug: true, name: true } },
         contactEmail: true,
         createdAt: true,

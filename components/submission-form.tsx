@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { Bug, CheckCircle2, ImagePlus, Loader2, MessageSquare, PackagePlus } from "lucide-react";
 import { createSubmission } from "@/lib/actions/submissions";
+import { EDITABLE_FIELDS } from "@/lib/figure-fields";
 import { cn } from "@/lib/utils";
 
 type Kind = "FEEDBACK" | "BUG" | "FIGURE" | "EDIT";
@@ -65,7 +66,13 @@ export function SubmissionForm({
   initialKind?: Kind;
   initialPageUrl?: string;
   /** Set when arriving from a figure's page, which is the only route to EDIT. */
-  figure?: { id: string; name: string } | null;
+  figure?: {
+    id: string;
+    name: string;
+    /** What the page says now, so the fields start as an edit, not a blank. */
+    current: Record<string, string>;
+    hasImage: boolean;
+  } | null;
   signedIn: boolean;
 }) {
   const [kind, setKind] = useState<Kind>(initialKind);
@@ -143,12 +150,45 @@ export function SubmissionForm({
             <span className="text-muted">About: </span>
             <span className="font-medium">{figure.name}</span>
           </p>
-          <Field
-            label="Link to an image (optional)"
-            hint="A link, not an upload — we need to know where a photo came from before it goes on the page, so send the product page or press release it appears on."
-          >
-            <input type="url" name="imageUrl" placeholder="https://…" className={inputClass} />
-          </Field>
+
+          {/*
+            Prefilled with what the page currently says. Correcting a height
+            then means changing one number rather than retyping eight fields,
+            and an empty box is itself informative — it shows what we are
+            missing. Which of these actually changed is decided on the server,
+            not here.
+          */}
+          <fieldset className="grid gap-3 sm:grid-cols-2">
+            <legend className="mb-1 text-xs uppercase tracking-wide text-muted">
+              Change anything that&apos;s wrong
+            </legend>
+            {EDITABLE_FIELDS.map((f) => (
+              <label key={f.key} className="block">
+                <span className="mb-1 block text-xs text-muted">{f.label}</span>
+                <input
+                  type="text"
+                  name={f.key}
+                  defaultValue={figure.current[f.key] ?? ""}
+                  placeholder={f.placeholder}
+                  className={inputClass}
+                />
+              </label>
+            ))}
+          </fieldset>
+
+          {figure.hasImage ? (
+            <p className="text-xs text-muted">
+              This figure already has a photo, so we&apos;re not taking more. If the
+              one shown is wrong or shouldn&apos;t be there, say so below.
+            </p>
+          ) : (
+            <Field
+              label="Link to an image (optional)"
+              hint="A link, not an upload — we need to know where a photo came from before it goes on the page, so send the product page or press release it appears on."
+            >
+              <input type="url" name="imageUrl" placeholder="https://…" className={inputClass} />
+            </Field>
+          )}
         </div>
       )}
 
@@ -210,11 +250,11 @@ export function SubmissionForm({
         </div>
       )}
 
-      <Field label={kind === "FIGURE" ? "Anything else" : "Details"}>
+      <Field label={kind === "FIGURE" || kind === "EDIT" ? "Anything else" : "Details"}>
         <textarea
           name="details"
-          required
-          minLength={10}
+          required={kind !== "EDIT"}
+          minLength={kind === "EDIT" ? 0 : 10}
           maxLength={4000}
           rows={6}
           placeholder={active.placeholder}

@@ -454,6 +454,15 @@ model Submission {
   figureId String?
   figure   Figure? @relation(fields: [figureId], references: [id], onDelete: SetNull)
 
+  /// Field-by-field corrections to a figure already in the catalogue, as
+  /// { field: proposedValue } holding only what the sender actually changed.
+  ///
+  /// JSON rather than a column each, because these mirror the figure's info
+  /// box and that is not a fixed list — a column per field would mean a
+  /// migration every time the page gains a row, and eight mostly-null columns
+  /// on a table where the vast majority of rows are not corrections at all.
+  proposedFields Json?
+
   /// A link to an image the sender thinks belongs on the figure. A link, never
   /// an upload: catalogue images carry a credit and a licence note because
   /// permission was actually asked for, and accepting arbitrary uploads would

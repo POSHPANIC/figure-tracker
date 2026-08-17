@@ -9,6 +9,11 @@ import { clientIp, LIMITS } from "@/lib/rate-limit";
 import { rateLimit } from "@/lib/rate-limit-store";
 import type { ActionResult } from "./collection";
 import type { SubmissionKind } from "@/lib/generated/prisma/enums";
+import {
+  EDITABLE_FIELD_KEYS,
+  currentFieldValues,
+  type EditableFieldKey,
+} from "@/lib/figure-fields";
 
 /**
  * Feedback, bug reports, and requests to add a figure.
@@ -55,7 +60,6 @@ const submissionSchema = z
     details: z
       .string()
       .trim()
-      .min(10, "Please add a little more detail — a sentence or two is plenty.")
       .max(4000, "That's longer than this form can take. Please email us instead."),
     pageUrl: optionalText(500),
     figureName: optionalText(200),
@@ -64,6 +68,10 @@ const submissionSchema = z
     referenceUrl: optionalUrl,
     figureId: optionalText(40),
     imageUrl: optionalUrl,
+    // Every editable field arrives on every correction, prefilled with what
+    // the page already says. Which of them changed is worked out here rather
+    // than taken on trust — see proposedChanges.
+    ...Object.fromEntries(EDITABLE_FIELD_KEYS.map((k) => [k, optionalText(200)])),
     contactEmail: z
       .string()
       .trim()
@@ -83,6 +91,13 @@ const submissionSchema = z
     message: "Please tell us the figure's name.",
     path: ["figureName"],
   })
+  .refine((v) => v.kind === "EDIT" || v.details.length >= 10, {
+    // A correction can be nothing but a changed field — "230" in the height
+    // box says everything it needs to. Every other kind is only words, so
+    // there has to be enough of them to act on.
+    message: "Please add a little more detail — a sentence or two is plenty.",
+    path: ["details"],
+  })
   .refine((v) => v.kind !== "EDIT" || Boolean(v.figureId), {
     // The form only offers this kind from a figure's own page, so a missing
     // id means the request did not come from there.
@@ -98,7 +113,6 @@ function fieldsFor(kind: SubmissionKind, input: z.infer<typeof submissionSchema>
     manufacturer: kind === "FIGURE" ? (input.manufacturer ?? null) : null,
     series: kind === "FIGURE" ? (input.series ?? null) : null,
     referenceUrl: kind === "FIGURE" ? (input.referenceUrl ?? null) : null,
-    imageUrl: kind === "EDIT" ? (input.imageUrl ?? null) : null,
     figureId: kind === "EDIT" ? (input.figureId ?? null) : null,
   };
 }
@@ -138,18 +152,58 @@ export async function createSubmission(formData: FormData): Promise<SubmissionRe
     }
   }
 
-  // A figure id that does not exist would fail on the foreign key, which
-  // surfaces to the sender as an unexplained error after they have typed out a
-  // correction. Check first and say something useful instead.
+  // Corrections are checked against the figure itself: it has to exist, the
+  // changes have to be real changes, and an image is only wanted where there
+  // isn't one.
+  let proposed: Record<string, string> | null = null;
+  let imageUrl = input.kind === "EDIT" ? (input.imageUrl ?? null) : null;
+
   if (input.kind === "EDIT" && input.figureId) {
     const figure = await prisma.figure.findUnique({
       where: { id: input.figureId },
-      select: { id: true },
+      select: {
+        id: true,
+        name: true,
+        scale: true,
+        heightMm: true,
+        msrpAmount: true,
+        msrpCurrency: true,
+        releaseDate: true,
+        manufacturer: { select: { name: true } },
+        series: { select: { name: true } },
+        characters: { select: { name: true } },
+        _count: { select: { images: true } },
+      },
     });
     if (!figure) {
       return {
         ok: false,
         error: "That figure no longer exists. Try again from its page.",
+      };
+    }
+
+    // The form hides the image field once a figure has one, but the form is
+    // not the guard — a submission can be made without it. Dropped rather
+    // than refused: the rest of what they wrote is still worth having.
+    if (figure._count.images > 0) imageUrl = null;
+
+    const current = currentFieldValues(figure);
+    const changed: Record<string, string> = {};
+    for (const key of EDITABLE_FIELD_KEYS) {
+      const value = (input as Record<string, unknown>)[key];
+      if (typeof value !== "string") continue;
+      const next = value.trim();
+      // Blank means "left alone", not "delete this". Removing a value is a
+      // different request and one worth explaining in words.
+      if (!next || next === current[key as EditableFieldKey].trim()) continue;
+      changed[key] = next;
+    }
+    if (Object.keys(changed).length > 0) proposed = changed;
+
+    if (!proposed && !imageUrl && input.details.trim().length < 10) {
+      return {
+        ok: false,
+        error: "Nothing looks changed. Edit a field, add an image, or describe the problem.",
       };
     }
   }
@@ -160,6 +214,8 @@ export async function createSubmission(formData: FormData): Promise<SubmissionRe
       details: input.details,
       contactEmail: input.contactEmail ?? null,
       userId: user?.id ?? null,
+      imageUrl,
+      proposedFields: proposed ?? undefined,
       ...fieldsFor(input.kind, input),
     },
   });

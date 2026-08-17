@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { currentUser } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { currentFieldValues } from "@/lib/figure-fields";
 import { SubmissionForm } from "@/components/submission-form";
 import { ProsePage, Section } from "@/components/prose";
 import { CONTACT_EMAIL, SITE_NAME } from "@/lib/site";
@@ -35,8 +36,35 @@ export default async function FeedbackPage({ searchParams }: PageProps<"/feedbac
   // up rather than trusting a name in the query string — the id is what the
   // submission is stored against, and it should be one we actually have.
   const slug = Array.isArray(sp.figure) ? sp.figure[0] : sp.figure;
-  const figure = slug
-    ? await prisma.figure.findUnique({ where: { slug }, select: { id: true, name: true } })
+  const row = slug
+    ? await prisma.figure.findUnique({
+        where: { slug },
+        select: {
+          id: true,
+          name: true,
+          scale: true,
+          heightMm: true,
+          msrpAmount: true,
+          msrpCurrency: true,
+          releaseDate: true,
+          manufacturer: { select: { name: true } },
+          series: { select: { name: true } },
+          characters: { select: { name: true } },
+          _count: { select: { images: true } },
+        },
+      })
+    : null;
+
+  // The form is prefilled with what the page currently says, so a correction
+  // means editing one value rather than retyping the lot — and it makes the
+  // gaps visible, which is half of what prompts someone to fill them in.
+  const figure = row
+    ? {
+        id: row.id,
+        name: row.name,
+        current: currentFieldValues(row),
+        hasImage: row._count.images > 0,
+      }
     : null;
 
   return (

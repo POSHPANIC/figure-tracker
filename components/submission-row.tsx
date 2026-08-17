@@ -5,6 +5,7 @@ import { useState, useTransition } from "react";
 import { Bug, Check, ExternalLink, MessageSquare, PackagePlus, PencilLine, X } from "lucide-react";
 import { reviewSubmission } from "@/lib/actions/submissions";
 import type { SubmissionKind } from "@/lib/generated/prisma/enums";
+import { FIELD_LABELS } from "@/lib/figure-fields";
 import { cn } from "@/lib/utils";
 
 export type QueuedSubmission = {
@@ -17,6 +18,7 @@ export type QueuedSubmission = {
   series: string | null;
   referenceUrl: string | null;
   imageUrl: string | null;
+  proposedFields: unknown;
   figure: { slug: string; name: string } | null;
   contactEmail: string | null;
   createdAt: Date;
@@ -45,6 +47,16 @@ const KIND_META: Record<SubmissionKind, { label: string; icon: React.ReactNode; 
     tone: "border-accent/40 bg-accent/10 text-accent",
   },
 };
+
+/** Prisma hands JSON back as unknown, and a moderator's page is no place to trust it. */
+function isFieldMap(value: unknown): value is Record<string, string> {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    !Array.isArray(value) &&
+    Object.values(value).every((v) => typeof v === "string")
+  );
+}
 
 /**
  * One item in the inbox.
@@ -143,6 +155,24 @@ export function SubmissionRow({ submission }: { submission: QueuedSubmission }) 
               <span className="text-muted">no longer in the catalogue</span>
             )}
           </Detail>
+          {/*
+            Shown as a list of proposed values rather than a diff. Storing the
+            old value alongside would let the queue print an arrow, but it
+            would also be a snapshot going stale from the moment it was taken
+            — the figure page is one click away and always right.
+          */}
+          {isFieldMap(submission.proposedFields) && (
+            <Detail label="Proposed">
+              <ul className="space-y-0.5">
+                {Object.entries(submission.proposedFields).map(([key, value]) => (
+                  <li key={key}>
+                    <span className="text-muted">{FIELD_LABELS[key] ?? key}: </span>
+                    <span className="font-medium">{String(value)}</span>
+                  </li>
+                ))}
+              </ul>
+            </Detail>
+          )}
           {submission.imageUrl && (
             <Detail label="Image">
               <a
