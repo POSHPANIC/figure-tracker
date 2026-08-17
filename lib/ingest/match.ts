@@ -34,7 +34,7 @@ import type { ItemCondition } from "../generated/prisma/enums";
 /**
  * Below this, we store the listing but leave figureId null.
  *
- * Lower than it looks: precision now comes from the four gates in scoreMatch,
+ * Lower than it looks: precision now comes from the five gates in scoreMatch,
  * not from this number. A terse but correct title like "Marin Kitagawa Swimsuit
  * Ver. Figure" names no maker, series or scale and so scores only 0.6 — with
  * the gates in place, rejecting that was costing real matches for nothing.
@@ -324,7 +324,7 @@ function unexplainedVariants(titleTokens: Set<string>, figure: MatchCandidate): 
 /**
  * Score a listing title against one figure, 0..1.
  *
- * Four hard gates run before any scoring. They're questions of identity rather
+ * Five hard gates run before any scoring. They're questions of identity rather
  * than confidence, so no amount of agreement elsewhere should override them —
  * a t-shirt with the right character's name on it is still a t-shirt.
  */
@@ -388,6 +388,18 @@ export function scoreMatch(title: string, figure: MatchCandidate): number {
     if (!titleTokens.has(token)) return 0;
   }
 
+  // --- Gate 5: a stated scale must agree. ---
+  // A 1/7 and a 1/8 of the same character are different products, however
+  // alike their names read. This was a -0.3 penalty and that was not enough:
+  // "Gojo Satoru 1/7 Scale Figure" kept matching Kotobukiya's 1/8 ARTFX J,
+  // scoring 0.57 against a 0.55 threshold — everything else about the two
+  // agrees, so the penalty had plenty of score to eat through.
+  //
+  // Only when both sides say so. Most listings state no scale at all, and
+  // silence is not disagreement.
+  const titleScale = extractScale(title);
+  if (figure.scale && titleScale && titleScale !== figure.scale) return 0;
+
   const overlap = [...nameTokensForLine].filter((t) => titleTokens.has(t)).length;
   const nameScore = nameTokensForLine.size ? overlap / nameTokensForLine.size : 0;
 
@@ -425,12 +437,8 @@ export function scoreMatch(title: string, figure: MatchCandidate): number {
   });
   if (seriesMatched) score += 0.12;
 
-  // Scale is a strong disambiguator between a 1/7 scale and a Nendoroid of the
-  // same character — reward agreement, punish an explicit mismatch.
-  const titleScale = extractScale(title);
-  if (figure.scale && titleScale) {
-    score += titleScale === figure.scale ? 0.13 : -0.3;
-  }
+  // Agreement is worth rewarding; disagreement already returned 0 at gate 5.
+  if (figure.scale && titleScale === figure.scale) score += 0.13;
 
   // Japanese name appearing verbatim is near-conclusive.
   if (figure.nameJa && normalize(title).includes(normalize(figure.nameJa))) {

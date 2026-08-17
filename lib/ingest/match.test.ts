@@ -191,10 +191,38 @@ describe("scoreMatch", () => {
     assert.equal(scoreMatch("Good Smile Company Power 1/7 Scale Figure", marinScale), 0);
   });
 
-  it("penalises a scale mismatch", () => {
+  it("rejects a scale mismatch outright", () => {
     const right = scoreMatch("GSC Marin Kitagawa 1/7 Swimsuit Ver.", marinScale);
-    const wrong = scoreMatch("GSC Marin Kitagawa 1/4 Swimsuit Ver.", marinScale);
-    assert.ok(wrong < right, "a 1/4 listing should score below the 1/7 it isn't");
+    assert.ok(right >= MATCH_ACCEPT_THRESHOLD, `the 1/7 should match, got ${right}`);
+    assert.equal(scoreMatch("GSC Marin Kitagawa 1/4 Swimsuit Ver.", marinScale), 0);
+  });
+
+  it("rejects a 1/8 of the same character on a 1/7 figure", () => {
+    // From production: 206 listings sat in the 0.5-0.6 band and this was most
+    // of them. Character, series and product type all agree, so a penalty had
+    // plenty of score to eat through — it landed on 0.57 against a threshold
+    // of 0.55 and was accepted.
+    const gojo: MatchCandidate = {
+      id: "gojo-scale",
+      name: "Gojo Satoru 1/7 Scale Figure",
+      nameJa: null,
+      scale: "1/7",
+      category: "SCALE",
+      manufacturerName: "Good Smile Company",
+      seriesName: "Jujutsu Kaisen",
+      characterNames: ["Satoru Gojo"],
+    };
+    assert.equal(
+      scoreMatch("Jujutsu Kaisen Satoru Gojo - ARTFX J 1/8 Scale Figure Kotobukiya", gojo),
+      0,
+    );
+  });
+
+  it("still matches a title that states no scale at all", () => {
+    // The gate must only fire when both sides say so. Most listings never
+    // mention a scale, and rejecting those would cost far more than it saves.
+    const score = scoreMatch("Marin Kitagawa Swimsuit Ver. Figure", marinScale);
+    assert.ok(score >= MATCH_ACCEPT_THRESHOLD, `silence is not disagreement, got ${score}`);
   });
 });
 
