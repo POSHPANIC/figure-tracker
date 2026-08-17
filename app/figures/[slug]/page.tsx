@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { after } from "next/server";
 import type { Metadata } from "next";
-import { ExternalLink, Flag } from "lucide-react";
+import { ExternalLink, Flag, PencilLine } from "lucide-react";
 import { currentUser } from "@/auth";
 import { recordFigureView } from "@/lib/views";
 import { EbayMark } from "@/components/ebay-mark";
@@ -196,6 +196,21 @@ export default async function FigurePage({ params, searchParams }: PageProps<"/f
               )}
             </Spec>
           </dl>
+
+          {/*
+            Under the spec box on purpose: this is where someone notices the
+            height is wrong or that the page has no photograph, so it is where
+            the offer to tell us belongs. A link rather than a dialog — the
+            form is a real page, works without JavaScript, and can be sent to
+            someone else.
+          */}
+          <Link
+            href={`/feedback?kind=edit&figure=${figure.slug}`}
+            className="mt-3 flex items-center justify-center gap-1.5 rounded-lg border border-border px-3 py-2 text-xs font-medium text-muted transition hover:border-accent/60 hover:text-foreground"
+          >
+            <PencilLine className="size-3.5" />
+            Suggest an edit or add a photo
+          </Link>
         </div>
 
         {/* --- Right column: pricing --- */}

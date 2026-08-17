@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { currentUser } from "@/auth";
+import { prisma } from "@/lib/prisma";
 import { SubmissionForm } from "@/components/submission-form";
 import { ProsePage, Section } from "@/components/prose";
 import { CONTACT_EMAIL, SITE_NAME } from "@/lib/site";
@@ -9,7 +10,7 @@ export const metadata: Metadata = {
   description: `Report a bug, suggest a figure, or tell us what ${SITE_NAME} is getting wrong.`,
 };
 
-type Kind = "FEEDBACK" | "BUG" | "FIGURE";
+type Kind = "FEEDBACK" | "BUG" | "FIGURE" | "EDIT";
 
 /** Accepts ?kind=bug so other pages can link straight to the right form. */
 function parseKind(value: string | string[] | undefined): Kind {
@@ -19,6 +20,8 @@ function parseKind(value: string | string[] | undefined): Kind {
       return "BUG";
     case "FIGURE":
       return "FIGURE";
+    case "EDIT":
+      return "EDIT";
     default:
       return "FEEDBACK";
   }
@@ -28,6 +31,14 @@ export default async function FeedbackPage({ searchParams }: PageProps<"/feedbac
   const [sp, user] = await Promise.all([searchParams, currentUser()]);
   const page = Array.isArray(sp.page) ? sp.page[0] : sp.page;
 
+  // Corrections arrive from a figure's own page, which passes its slug. Look it
+  // up rather than trusting a name in the query string — the id is what the
+  // submission is stored against, and it should be one we actually have.
+  const slug = Array.isArray(sp.figure) ? sp.figure[0] : sp.figure;
+  const figure = slug
+    ? await prisma.figure.findUnique({ where: { slug }, select: { id: true, name: true } })
+    : null;
+
   return (
     <ProsePage
       title="Feedback"
@@ -36,6 +47,7 @@ export default async function FeedbackPage({ searchParams }: PageProps<"/feedbac
       <SubmissionForm
         initialKind={parseKind(sp.kind)}
         initialPageUrl={page}
+        figure={figure}
         signedIn={user !== null}
       />
 

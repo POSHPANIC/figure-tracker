@@ -37,6 +37,8 @@ export default async function ModerationPage() {
               {counts.BUG === 1 ? "bug" : "bugs"},{" "}
               <span className="tabular">{counts.FIGURE}</span> figure{" "}
               {counts.FIGURE === 1 ? "request" : "requests"},{" "}
+              <span className="tabular">{counts.EDIT}</span>{" "}
+              {counts.EDIT === 1 ? "edit" : "edits"},{" "}
               <span className="tabular">{counts.FEEDBACK}</span> feedback. Oldest first.
             </>
           )}
@@ -47,7 +49,7 @@ export default async function ModerationPage() {
         <div className="rounded-xl border border-dashed border-border py-16 text-center">
           <p className="font-medium">Inbox is clear</p>
           <p className="mt-1 text-sm text-muted">
-            Bug reports, figure requests and feedback from the{" "}
+            Bug reports, figure requests, suggested edits and feedback from the{" "}
             <a href="/feedback" className="text-accent hover:underline">
               feedback form
             </a>{" "}

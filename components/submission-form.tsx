@@ -1,11 +1,11 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Bug, CheckCircle2, Loader2, MessageSquare, PackagePlus } from "lucide-react";
+import { Bug, CheckCircle2, ImagePlus, Loader2, MessageSquare, PackagePlus } from "lucide-react";
 import { createSubmission } from "@/lib/actions/submissions";
 import { cn } from "@/lib/utils";
 
-type Kind = "FEEDBACK" | "BUG" | "FIGURE";
+type Kind = "FEEDBACK" | "BUG" | "FIGURE" | "EDIT";
 
 const KINDS: {
   value: Kind;
@@ -31,6 +31,14 @@ const KINDS: {
       "Searching for “Nendoroid Rem” returns nothing, but the figure has its own page. Chrome on Windows.",
   },
   {
+    value: "EDIT",
+    label: "Correction",
+    icon: <ImagePlus className="size-4" />,
+    blurb: "Something wrong on this figure's page, or a photo it should have.",
+    placeholder:
+      "The height is listed as 210mm but the box says 230mm. Photo of the box below.",
+  },
+  {
     value: "FIGURE",
     label: "Missing figure",
     icon: <PackagePlus className="size-4" />,
@@ -51,10 +59,13 @@ const KINDS: {
 export function SubmissionForm({
   initialKind = "FEEDBACK",
   initialPageUrl,
+  figure,
   signedIn,
 }: {
   initialKind?: Kind;
   initialPageUrl?: string;
+  /** Set when arriving from a figure's page, which is the only route to EDIT. */
+  figure?: { id: string; name: string } | null;
   signedIn: boolean;
 }) {
   const [kind, setKind] = useState<Kind>(initialKind);
@@ -62,7 +73,11 @@ export function SubmissionForm({
   const [sent, setSent] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
-  const active = KINDS.find((k) => k.value === kind)!;
+  // A correction has to be about something. Without a figure there is nothing
+  // to correct, so the option is not offered at all rather than offered and
+  // then rejected on submit.
+  const kinds = figure ? KINDS : KINDS.filter((k) => k.value !== "EDIT");
+  const active = kinds.find((k) => k.value === kind) ?? kinds[0]!;
 
   function submit(formData: FormData) {
     setError(null);
@@ -99,8 +114,8 @@ export function SubmissionForm({
         <legend className="mb-2 text-xs uppercase tracking-wide text-muted">
           What is this about?
         </legend>
-        <div className="grid gap-2 sm:grid-cols-3">
-          {KINDS.map((k) => (
+        <div className="grid gap-2 sm:grid-cols-2">
+          {kinds.map((k) => (
             <button
               key={k.value}
               type="button"
@@ -120,6 +135,22 @@ export function SubmissionForm({
         </div>
         <p className="mt-2 text-xs text-muted">{active.blurb}</p>
       </fieldset>
+
+      {kind === "EDIT" && figure && (
+        <div className="space-y-4 rounded-xl border border-border bg-surface-2 p-4">
+          <input type="hidden" name="figureId" value={figure.id} />
+          <p className="text-sm">
+            <span className="text-muted">About: </span>
+            <span className="font-medium">{figure.name}</span>
+          </p>
+          <Field
+            label="Link to an image (optional)"
+            hint="A link, not an upload — we need to know where a photo came from before it goes on the page, so send the product page or press release it appears on."
+          >
+            <input type="url" name="imageUrl" placeholder="https://…" className={inputClass} />
+          </Field>
+        </div>
+      )}
 
       {kind === "BUG" && (
         <Field

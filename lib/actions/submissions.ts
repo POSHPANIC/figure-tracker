@@ -28,7 +28,7 @@ export type SubmissionResult =
   | { ok: true; message: string }
   | { ok: false; error: string };
 
-const KINDS = ["FEEDBACK", "BUG", "FIGURE"] as const;
+const KINDS = ["FEEDBACK", "BUG", "FIGURE", "EDIT"] as const;
 
 /** Trims, and turns "" into undefined so empty inputs don't become empty rows. */
 const optionalText = (max: number) =>
@@ -62,6 +62,8 @@ const submissionSchema = z
     manufacturer: optionalText(120),
     series: optionalText(120),
     referenceUrl: optionalUrl,
+    figureId: optionalText(40),
+    imageUrl: optionalUrl,
     contactEmail: z
       .string()
       .trim()
@@ -80,6 +82,12 @@ const submissionSchema = z
   .refine((v) => v.kind !== "FIGURE" || Boolean(v.figureName), {
     message: "Please tell us the figure's name.",
     path: ["figureName"],
+  })
+  .refine((v) => v.kind !== "EDIT" || Boolean(v.figureId), {
+    // The form only offers this kind from a figure's own page, so a missing
+    // id means the request did not come from there.
+    message: "We could not tell which figure this is about.",
+    path: ["figureId"],
   });
 
 /** Fields that only make sense for one kind are dropped for the others. */
@@ -90,6 +98,8 @@ function fieldsFor(kind: SubmissionKind, input: z.infer<typeof submissionSchema>
     manufacturer: kind === "FIGURE" ? (input.manufacturer ?? null) : null,
     series: kind === "FIGURE" ? (input.series ?? null) : null,
     referenceUrl: kind === "FIGURE" ? (input.referenceUrl ?? null) : null,
+    imageUrl: kind === "EDIT" ? (input.imageUrl ?? null) : null,
+    figureId: kind === "EDIT" ? (input.figureId ?? null) : null,
   };
 }
 
@@ -98,6 +108,8 @@ const THANKS: Record<SubmissionKind, string> = {
   BUG: "Thanks for reporting it. We'll take a look, and fixes usually go out the same week.",
   FIGURE:
     "Thanks. We'll check the product exists and get it into the catalogue — usually within a few days.",
+  EDIT:
+    "Thanks. We'll check this against the manufacturer before changing anything on the page.",
 };
 
 export async function createSubmission(formData: FormData): Promise<SubmissionResult> {
@@ -122,6 +134,22 @@ export async function createSubmission(formData: FormData): Promise<SubmissionRe
       return {
         ok: false,
         error: "That's a lot of submissions at once. Please try again in a minute.",
+      };
+    }
+  }
+
+  // A figure id that does not exist would fail on the foreign key, which
+  // surfaces to the sender as an unexplained error after they have typed out a
+  // correction. Check first and say something useful instead.
+  if (input.kind === "EDIT" && input.figureId) {
+    const figure = await prisma.figure.findUnique({
+      where: { id: input.figureId },
+      select: { id: true },
+    });
+    if (!figure) {
+      return {
+        ok: false,
+        error: "That figure no longer exists. Try again from its page.",
       };
     }
   }

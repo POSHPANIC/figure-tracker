@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
-import { Bug, Check, ExternalLink, MessageSquare, PackagePlus, X } from "lucide-react";
+import { Bug, Check, ExternalLink, MessageSquare, PackagePlus, PencilLine, X } from "lucide-react";
 import { reviewSubmission } from "@/lib/actions/submissions";
 import type { SubmissionKind } from "@/lib/generated/prisma/enums";
 import { cn } from "@/lib/utils";
@@ -16,6 +16,8 @@ export type QueuedSubmission = {
   manufacturer: string | null;
   series: string | null;
   referenceUrl: string | null;
+  imageUrl: string | null;
+  figure: { slug: string; name: string } | null;
   contactEmail: string | null;
   createdAt: Date;
   user: { id: string; username: string | null; name: string | null; email: string | null } | null;
@@ -35,6 +37,11 @@ const KIND_META: Record<SubmissionKind, { label: string; icon: React.ReactNode; 
   FIGURE: {
     label: "Missing figure",
     icon: <PackagePlus className="size-3.5" />,
+    tone: "border-accent/40 bg-accent/10 text-accent",
+  },
+  EDIT: {
+    label: "Suggested edit",
+    icon: <PencilLine className="size-3.5" />,
     tone: "border-accent/40 bg-accent/10 text-accent",
   },
 };
@@ -114,6 +121,45 @@ export function SubmissionRow({ submission }: { submission: QueuedSubmission }) 
               </a>
             )}
           </Detail>
+        </dl>
+      )}
+
+      {submission.kind === "EDIT" && (
+        <dl className="mb-3 space-y-1.5 rounded-lg border border-border bg-surface-2 p-3 text-sm">
+          <Detail label="Figure">
+            {submission.figure ? (
+              <a
+                href={`/figures/${submission.figure.slug}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 text-accent hover:underline"
+              >
+                {submission.figure.name}
+                <ExternalLink className="size-3 shrink-0" />
+              </a>
+            ) : (
+              // The figure was deleted after this was sent; the relation is
+              // SetNull so the suggestion survives it.
+              <span className="text-muted">no longer in the catalogue</span>
+            )}
+          </Detail>
+          {submission.imageUrl && (
+            <Detail label="Image">
+              <a
+                href={submission.imageUrl}
+                target="_blank"
+                rel="noopener noreferrer nofollow"
+                className="inline-flex items-center gap-1 break-all text-accent hover:underline"
+              >
+                {submission.imageUrl}
+                <ExternalLink className="size-3 shrink-0" />
+              </a>
+              <span className="mt-1 block text-xs text-muted">
+                Check the licence before publishing this — catalogue images need a
+                credit and permission on record.
+              </span>
+            </Detail>
+          )}
         </dl>
       )}
 

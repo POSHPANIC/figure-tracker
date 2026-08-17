@@ -155,6 +155,8 @@ export async function getSubmissionQueue(take = 50) {
         manufacturer: true,
         series: true,
         referenceUrl: true,
+        imageUrl: true,
+        figure: { select: { slug: true, name: true } },
         contactEmail: true,
         createdAt: true,
         user: { select: { id: true, username: true, name: true, email: true } },
@@ -177,6 +179,7 @@ export async function getSubmissionQueue(take = 50) {
       FEEDBACK: counts.FEEDBACK ?? 0,
       BUG: counts.BUG ?? 0,
       FIGURE: counts.FIGURE ?? 0,
+      EDIT: counts.EDIT ?? 0,
     },
   };
 }
