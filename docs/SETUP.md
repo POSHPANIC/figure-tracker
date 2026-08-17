@@ -55,7 +55,8 @@ Keep the quotes. **Never commit this file** — it's already gitignored.
 
 ### Test it
 
-Make sure the database is running (`npm run db:dev` in another terminal), then:
+`npm run dev` starts the database for you, but for a one-off script run it on
+its own with `npm run db:dev`. Then:
 
 ```bash
 npm run ingest -- --source ebay --limit 3

@@ -9,25 +9,17 @@ Built with Next.js 16, TypeScript, Tailwind CSS, Prisma 7 and Postgres.
 
 ## Running it on your machine
 
-You need two terminals. The first runs the database, the second runs the site.
-
-**Terminal 1 — start the database:**
-
-```bash
-npm run db:dev
-```
-
-This starts a Postgres server on your own machine and prints two connection
-URLs. Leave it running. If the URLs differ from what's in `.env`, paste the new
-ones in.
-
-**Terminal 2 — start the site:**
+One command, one terminal:
 
 ```bash
 npm run dev
 ```
 
-Open <http://localhost:3000>.
+It starts the local Postgres server if it isn't already running, waits for it,
+then starts the site. Open <http://localhost:3000>. Ctrl-C stops both.
+
+A database that was already running is left alone — started separately, it stays
+yours to stop.
 
 First time only, load the sample catalog:
 
@@ -58,7 +50,7 @@ removes it and leaves the catalogue intact.
 | `npm run dev` | Start the site in development |
 | `npm run build` | Production build (also typechecks) |
 | `npm test` | Run unit tests |
-| `npm run db:dev` | Start the local Postgres server |
+| `npm run db:dev` | Run the local Postgres server on its own |
 | `npm run db:seed` | Load sample figures and price history |
 | `npm run db:studio` | Open a GUI to browse the database |
 | `npm run db:migrate` | Create a migration after editing the schema |
