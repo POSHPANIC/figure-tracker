@@ -134,6 +134,7 @@ model Figure {
 
   images      FigureImage[]
   identifiers FigureIdentifier[]
+  submissions Submission[]
   listings    Listing[]
   sales       Sale[]
   snapshots   PriceSnapshot[]
@@ -412,6 +413,8 @@ enum SubmissionKind {
   BUG
   /// A figure that ought to be in the catalogue and isn't.
   FIGURE
+  /// A correction, or an image, for a figure already in the catalogue.
+  EDIT
 }
 
 enum SubmissionStatus {
@@ -447,6 +450,17 @@ model Submission {
   /// A link backing the request up: a product page, a shop, a listing.
   referenceUrl String?
 
+  /// Edit suggestions: the figure the sender was looking at.
+  figureId String?
+  figure   Figure? @relation(fields: [figureId], references: [id], onDelete: SetNull)
+
+  /// A link to an image the sender thinks belongs on the figure. A link, never
+  /// an upload: catalogue images carry a credit and a licence note because
+  /// permission was actually asked for, and accepting arbitrary uploads would
+  /// put unlicensed photography on a public page under our name. A person
+  /// checks the source before anything is published.
+  imageUrl String?
+
   /// Set when the sender was signed in. Null for anonymous submissions.
   userId       String?
   user         User?   @relation("SubmissionsSent", fields: [userId], references: [id], onDelete: SetNull)
@@ -466,6 +480,8 @@ model Submission {
   @@index([status, createdAt])
   @@index([kind, status])
   @@index([userId, createdAt])
+  // The figure page's own suggestions, newest first.
+  @@index([figureId, createdAt])
 }
 
 /// Fixed-window request counters.

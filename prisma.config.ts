@@ -4,18 +4,46 @@ import "dotenv/config";
 import { defineConfig } from "prisma/config";
 
 /**
+ * Commands that build or rewrite a schema, rather than ship one.
+ *
+ * These belong on a development database. `migrate dev` in particular will
+ * offer to reset when it detects drift, and `db push` rewrites the schema with
+ * no migration at all — neither is something you ever want aimed at the live
+ * site by default.
+ */
+const DEVELOPMENT_COMMANDS = ["dev", "reset", "push", "diff", "seed"];
+
+function isDevelopmentCommand(): boolean {
+  // e.g. ["node", "prisma", "migrate", "dev", "--name", "x"]
+  const args = process.argv.slice(2).filter((a) => !a.startsWith("-"));
+  return args.some((a) => DEVELOPMENT_COMMANDS.includes(a));
+}
+
+/**
  * Which connection the Prisma CLI should use.
  *
- * Checks the shape of DIRECT_DATABASE_URL before handing it over, because
- * Prisma's own complaint about a bad one is "P1013: The scheme is not
- * recognized in database URL", printed next to an empty datasource line. That
- * is technically accurate and tells you nothing about which variable is wrong
- * or what it should look like — and it costs a full deploy to find out.
+ * DIRECT_DATABASE_URL points at production, and migrations need it because a
+ * connection pooler cannot hold the session-level advisory lock Prisma Migrate
+ * takes. But preferring it unconditionally aimed *every* CLI command at the
+ * live database — including `prisma migrate dev`, which is for local work and
+ * offers to reset the database it finds drift on. That happened here: a
+ * migration meant for a local database was applied straight to production. It
+ * was additive so nothing was lost, which was luck rather than design.
+ *
+ * So development commands get DATABASE_URL, which locally is the local server.
+ * Only the commands that deliberately ship a migration — deploy, status — reach
+ * for the direct production connection.
  */
 function migrationUrl(): string | undefined {
-  const direct = process.env["DIRECT_DATABASE_URL"]?.trim();
-  if (!direct) return process.env["DATABASE_URL"];
+  const local = process.env["DATABASE_URL"];
+  if (isDevelopmentCommand()) return local;
 
+  const direct = process.env["DIRECT_DATABASE_URL"]?.trim();
+  if (!direct) return local;
+
+  // Prisma's own complaint about a malformed one is "P1013: The scheme is not
+  // recognized in database URL", printed beside an empty datasource line —
+  // accurate, and no help at all in naming which variable is wrong.
   if (!/^postgres(ql)?:\/\//.test(direct)) {
     throw new Error(
       `DIRECT_DATABASE_URL is set but is not a connection string — it starts with ` +
