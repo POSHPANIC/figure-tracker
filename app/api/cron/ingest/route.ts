@@ -9,9 +9,17 @@ export const maxDuration = 60;
 /**
  * Pull fresh listings and sales from every enabled source.
  *
- * `figureLimit` keeps a single invocation inside the serverless timeout. The
- * runner processes least-recently-updated figures first, so consecutive runs
- * work their way through the whole catalog instead of re-doing the same head.
+ * `figureLimit` has to fit inside maxDuration, and the two were out of step:
+ * the schedule asked for 100 figures against a 60-second budget, so every run
+ * was killed partway and recorded nothing at all — `finishedAt` null, zero
+ * items seen, night after night. A figure costs about a second now that they
+ * are polled four at a time, so 40 leaves real headroom for a slow response
+ * or two.
+ *
+ * Raising this means raising maxDuration with it. A run that does not finish
+ * is worse than a smaller one that does: the figures it managed are marked
+ * polled, so the next run skips past them, and the shortfall is invisible
+ * unless someone goes looking at IngestRun.
  */
 export async function GET(request: Request) {
   if (!isAuthorizedCron(request)) {

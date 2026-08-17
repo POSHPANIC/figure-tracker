@@ -175,6 +175,44 @@ export async function runIngestion(options: IngestOptions = {}): Promise<IngestS
 
 // --- Per-source handlers --------------------------------------------------
 
+/**
+ * How many figures to have in flight at once.
+ *
+ * Almost all of a figure's cost is waiting for eBay to answer, so doing them
+ * one at a time leaves the connection idle roughly 95% of the time: 2.8
+ * seconds each, which is four hours for a day's quota and well beyond any
+ * serverless timeout. The nightly cron was configured for 100 figures and
+ * killed at 60 seconds having managed about twenty, recording nothing.
+ *
+ * Four is deliberately modest. At roughly 1.4 requests a second it is a
+ * fraction of what the Browse API permits, it keeps us well clear of looking
+ * like a scraper while an access request is under review, and it is gentle on
+ * the database connection underneath. The win is already an order of
+ * magnitude; taking it further trades politeness for time we do not need.
+ */
+const FIGURE_CONCURRENCY = 4;
+
+/**
+ * Run a task over every item, keeping `limit` of them in flight.
+ *
+ * Workers share one moving index rather than being handed fixed slices, so a
+ * figure that takes four seconds does not hold up the ones behind it.
+ */
+async function inParallel<T>(
+  items: T[],
+  limit: number,
+  task: (item: T) => Promise<void>,
+): Promise<void> {
+  let next = 0;
+  const workers = Array.from({ length: Math.min(limit, items.length) }, async () => {
+    while (next < items.length) {
+      const item = items[next++];
+      if (item !== undefined) await task(item);
+    }
+  });
+  await Promise.all(workers);
+}
+
 async function ingestEbay(
   sourceId: string,
   figures: FigureRow[],
@@ -186,7 +224,9 @@ async function ingestEbay(
     return;
   }
 
-  for (const figure of figures) {
+  // Counters are incremented from several workers, which is safe because
+  // JavaScript runs them on one thread — no two increments interleave.
+  await inParallel(figures, FIGURE_CONCURRENCY, async (figure) => {
     const query = buildQuery(figure);
 
     const [active, sold] = await Promise.all([
@@ -214,7 +254,7 @@ async function ingestEbay(
     // now" — leaving it unrecorded would put the figure straight back at the
     // front of the queue and spend the same call again next run.
     await markPolled(figure.id);
-  }
+  });
 }
 
 /** Note that a marketplace was searched for this figure. */
