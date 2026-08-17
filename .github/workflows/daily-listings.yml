@@ -60,7 +60,12 @@ jobs:
           DATABASE_URL: ${{ secrets.DIRECT_DATABASE_URL }}
           EBAY_CLIENT_ID: ${{ secrets.EBAY_CLIENT_ID }}
           EBAY_CLIENT_SECRET: ${{ secrets.EBAY_CLIENT_SECRET }}
-          EBAY_ENV: ${{ secrets.EBAY_ENV }}
+          # Not a secret, and holding it as one was actively harmful: GitHub
+          # masks every occurrence of a secret's value in the logs, and this
+          # value is the word "production". The flag came out as "--***" and
+          # the target database as "(***)", which is exactly the detail you
+          # open the log to check.
+          EBAY_ENV: production
         run: |
           npm run backfill:listings -- \
             --production \

@@ -213,7 +213,12 @@ export async function searchSoldItems(
   }
 
   if (res.status === 403 || res.status === 401) {
+    // Four figures are in flight at once, so four of them get this answer
+    // before any has recorded it. Setting the latch first keeps the message
+    // to one line rather than one per worker.
+    const alreadyKnown = insightsDenied;
     insightsDenied = true;
+    if (alreadyKnown) return [];
     console.info(
       "[ebay] Marketplace Insights access not granted — skipping sold data for " +
         "the rest of this run. Apply at https://developer.ebay.com if you want " +

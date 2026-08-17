@@ -364,7 +364,7 @@ silently.
 | `DIRECT_DATABASE_URL` | the non-pooled Neon string — the one `npm run db:check` verifies |
 | `EBAY_CLIENT_ID` | from your production keyset |
 | `EBAY_CLIENT_SECRET` | from the same keyset |
-| `EBAY_ENV` | `production` |
+| — | `EBAY_ENV` is set in the workflow itself. As a secret it would mask the word "production" throughout the logs |
 
 Then run it once by hand — **Actions → Daily listing refresh → Run workflow** —
 rather than waiting overnight to find out a secret was pasted wrong.
@@ -372,10 +372,10 @@ rather than waiting overnight to find out a secret was pasted wrong.
 ### Cost
 
 The repository is private, so Actions bills against 2,000 free minutes a
-month. A 4,800-figure run is roughly 90 minutes, so a daily sweep is about
-2,700 minutes — a few dollars a month over the free allowance. Passing a
-smaller `total` when running it by hand, or editing the schedule to every
-other day, brings it under.
+month. A test run managed 50 figures in 15 seconds — roughly 0.3 seconds
+each, against 1.05 on a home connection, because the runner sits much closer
+to eBay. That puts a 4,800-figure sweep near 25 minutes, so a daily run is
+about 800 minutes a month and stays inside the free allowance.
 
 ### Quota
 
