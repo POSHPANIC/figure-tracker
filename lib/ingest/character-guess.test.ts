@@ -228,6 +228,36 @@ describe("splitCharacterNames", () => {
     ]);
   });
 
+  it("ignores a joining word inside the series title", () => {
+    // Real: the series is "Lord Marksman and Vanadis", so splitting on that
+    // "and" proposed "Lord Marksman" as a character.
+    assert.deepEqual(
+      splitCharacterNames("Lord Marksman and Vanadis: Eleonora Viltaria", [
+        "Lord Marksman and Vanadis",
+      ]),
+      [],
+    );
+  });
+
+  it("ignores a joining mark inside a name", () => {
+    // "La+ Darknesss" is one hololive character. A mark that joins has spaces
+    // around it; this one is welded to the word.
+    assert.deepEqual(splitCharacterNames("figma La+ Darknesss"), []);
+    assert.deepEqual(splitCharacterNames("Fate/EXTRA CCC"), []);
+  });
+
+  it("ignores a bracketed list of options", () => {
+    // Colours and clothing, not casts. Both were being read as several people.
+    assert.deepEqual(
+      splitCharacterNames("Nendoroid Doll Customizable Face Plate 00 (Peach/Cinnamon/Cream/Almond)"),
+      [],
+    );
+    assert.deepEqual(
+      splitCharacterNames("figma Female Body (Alice) with Dress + Apron Outfit"),
+      [],
+    );
+  });
+
   it("returns nothing for an ordinary single name", () => {
     assert.deepEqual(splitCharacterNames("Nendoroid Marin Kitagawa"), []);
     assert.deepEqual(splitCharacterNames("Megumin: Light Novel Ver."), []);

@@ -43,7 +43,7 @@ async function main() {
       name: true,
       slug: true,
       characters: { select: { id: true, name: true } },
-      series: { select: { id: true, franchiseId: true, name: true } },
+      series: { select: { id: true, franchiseId: true, name: true, synonyms: true } },
     },
   });
 
@@ -69,7 +69,10 @@ async function main() {
   const examples: string[] = [];
 
   for (const figure of figures) {
-    const parts = splitCharacterNames(figure.name);
+    const parts = splitCharacterNames(
+      figure.name,
+      figure.series ? [figure.series.name, ...(figure.series.synonyms ?? [])] : [],
+    );
     if (parts.length < 2) continue;
 
     const pool = byFranchise.get(figure.series?.franchiseId ?? "") ?? [];

@@ -218,14 +218,31 @@ export function stripSeriesName(name: string, series: string): string {
  * to *different* characters — two names for one character resolve to the same
  * row and collapse back to a single result.
  */
-export function splitCharacterNames(figureName: string): string[] {
-  const base = stripQualifiers(stripProductLine(figureName));
+export function splitCharacterNames(
+  figureName: string,
+  seriesNames: string[] = [],
+): string[] {
+  // The series title goes first, because plenty of them contain a joining
+  // word: "Lord Marksman and Vanadis: Eleonora Viltaria" is one character,
+  // and splitting on that "and" proposed "Lord Marksman" as a person.
+  let base = stripQualifiers(stripProductLine(figureName));
+  for (const series of seriesNames) {
+    if (!series) continue;
+    const stripped = stripQualifiers(stripSeriesName(base, series));
+    if (stripped) base = stripped;
+  }
   if (!base) return [];
 
   // Everything before a colon, since the variant suffix belongs to the whole
   // group rather than to the last character: "Asuka/Rei/Mari: Newtype Cover
   // ver." must not make "Mari: Newtype Cover ver." a name to look up.
-  const head = base.split(/\s*[:\-–—]\s*/)[0]?.trim() ?? base;
+  const head = (base.split(/\s*[:\-–—]\s*/)[0] ?? base)
+    // Cut at the first bracket too. What follows is options rather than a
+    // cast: "Face Plate 00 (Peach/Cinnamon/Cream/Almond)" is four colours,
+    // and "Female Body (Alice) with Dress + Apron Outfit" is clothing. Both
+    // read as several characters and neither is.
+    .split(/\s*[[(（]/)[0]!
+    .trim();
 
   // "&", "+" and "and" join two characters. A slash usually does not: in Fate
   // it is the class — "Saber/Nero Claudius" is Nero of the Saber class — and
@@ -236,7 +253,10 @@ export function splitCharacterNames(figureName: string): string[] {
   // A slash is only a list at three parts or more, where the class reading
   // runs out: "Asuka/Rei/Mari" is a cast, and nothing is named for one
   // character's class, alias and self at once.
-  const joined = head.split(/\s*(?:&|×|\+|\band\b)\s*/i).map((part) => part.trim());
+  // Whitespace on both sides is required. "La+ Darknesss" is one character
+  // whose name simply contains a plus, and "&" and "×" run into words the
+  // same way. A joining mark that joins is surrounded by spaces.
+  const joined = head.split(/\s+(?:&|×|\+|and)\s+/i).map((part) => part.trim());
   // Scale markers carry a slash, and that slash counts. "Saber/Altria
   // Pendragon 1/7 Alter Ver." splits into three parts, which is the very
   // shape the two-part rule exists to refuse — the scale smuggles a Fate
