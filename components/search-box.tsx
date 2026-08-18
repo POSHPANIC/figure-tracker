@@ -6,18 +6,42 @@ import { Loader2, Search } from "lucide-react";
 import { formatMoney, USD_MONEY, type DisplayMoney } from "@/lib/currency";
 import { cn } from "@/lib/utils";
 
-type Suggestion = {
+type FigureHit = {
   slug: string;
   name: string;
   marketValueUsd: string | null;
   series: { franchise: { name: string } | null } | null;
 };
 
+/** A filter to jump to, rather than a figure to open. */
+type EntityHit = {
+  kind: "franchise" | "character" | "manufacturer";
+  name: string;
+  slug: string;
+  count: number;
+};
+
+const KIND_LABELS: Record<EntityHit["kind"], string> = {
+  character: "Character",
+  franchise: "Franchise",
+  manufacturer: "Manufacturer",
+};
+
+/** One row of the dropdown, whichever sort it is. */
+type Option = { type: "entity"; hit: EntityHit } | { type: "figure"; hit: FigureHit };
+
 /**
  * Header search with typeahead.
  *
+ * Two kinds of result, filters first: typing "Hats" offers Hatsune Miku
+ * herself — all 215 of her figures — above the few of them that rank highest
+ * by sales. "Everything by this character" is most of what a search box is
+ * asked, and the answer used to live only in the browse page's filter panel,
+ * which is a second search box and not an obvious one.
+ *
  * Enter always submits to the full results page — the dropdown is a shortcut,
- * never the only way to get somewhere. Arrow keys move through suggestions.
+ * never the only way to get somewhere. Arrow keys move through every row across
+ * both groups, because they are one list to the person using them.
  */
 export function SearchBox({
   defaultValue = "",
@@ -38,18 +62,31 @@ export function SearchBox({
   const [query, setQuery] = useState(defaultValue);
   // Keyed to the query that produced it, so a stale list is recognisable
   // rather than merely old.
-  const [result, setResult] = useState<{ query: string; items: Suggestion[] } | null>(null);
+  const [result, setResult] = useState<{
+    query: string;
+    figures: FigureHit[];
+    entities: EntityHit[];
+  } | null>(null);
   const [open, setOpen] = useState(false);
   const q = query.trim();
   // Only this query's results count. Anything else is the previous one
   // still on screen, and showing it under a different search is a lie.
-  const items = result?.query === q ? result.items : [];
+  const fresh = result?.query === q ? result : null;
+  const entities = fresh?.entities ?? [];
+  const figures = fresh?.figures ?? [];
   // Derived rather than stored: we are loading exactly when the query is long
   // enough to search and no result has come back for it. One less thing to set,
   // and it cannot fall out of step with the query it describes.
   const loading = q.length >= 2 && result?.query !== q;
   const [highlight, setHighlight] = useState(-1);
   const rootRef = useRef<HTMLDivElement>(null);
+
+  // Flat, and in the order drawn. The keyboard walks this rather than either
+  // group, so a highlight stays one number and cannot mean the wrong row.
+  const options: Option[] = [
+    ...entities.map((hit) => ({ type: "entity" as const, hit })),
+    ...figures.map((hit) => ({ type: "figure" as const, hit })),
+  ];
 
   // Debounced fetch. The abort controller keeps a slow early request from
   // overwriting the results of a faster later one.
@@ -67,11 +104,13 @@ export function SearchBox({
           signal: controller.signal,
         });
         if (!res.ok) throw new Error(String(res.status));
-        const data: { results: Suggestion[] } = await res.json();
-        setResult({ query: q, items: data.results });
+        const data: { results: FigureHit[]; entities?: EntityHit[] } = await res.json();
+        setResult({ query: q, figures: data.results, entities: data.entities ?? [] });
         setHighlight(-1);
       } catch (err) {
-        if ((err as Error).name !== "AbortError") setResult({ query: q, items: [] });
+        if ((err as Error).name !== "AbortError") {
+          setResult({ query: q, figures: [], entities: [] });
+        }
       }
     }, 180);
 
@@ -89,16 +128,22 @@ export function SearchBox({
     return () => document.removeEventListener("mousedown", onClickAway);
   }, []);
 
-  function go(slug: string) {
+  function go(option: Option) {
     setOpen(false);
-    router.push(`/figures/${slug}`);
+    router.push(
+      option.type === "entity"
+        ? // The browse page's own filter, so a shared link and the back button
+          // both behave, and the panel opens showing what was picked.
+          `/figures?${option.hit.kind}=${encodeURIComponent(option.hit.slug)}`
+        : `/figures/${option.hit.slug}`,
+    );
   }
 
   function onKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
     if (e.key === "ArrowDown") {
       e.preventDefault();
       setOpen(true);
-      setHighlight((h) => Math.min(h + 1, items.length - 1));
+      setHighlight((h) => Math.min(h + 1, options.length - 1));
     } else if (e.key === "ArrowUp") {
       e.preventDefault();
       setHighlight((h) => Math.max(h - 1, -1));
@@ -106,15 +151,16 @@ export function SearchBox({
       setOpen(false);
     } else if (e.key === "Enter") {
       e.preventDefault();
-      if (highlight >= 0 && items[highlight]) go(items[highlight].slug);
-      else if (query.trim()) {
+      const picked = highlight >= 0 ? options[highlight] : undefined;
+      if (picked) go(picked);
+      else if (q) {
         setOpen(false);
-        router.push(`/figures?q=${encodeURIComponent(query.trim())}`);
+        router.push(`/figures?q=${encodeURIComponent(q)}`);
       }
     }
   }
 
-  const showDropdown = open && query.trim().length >= 2;
+  const showDropdown = open && q.length >= 2;
 
   return (
     <div ref={rootRef} className={cn("relative", className)}>
@@ -146,45 +192,68 @@ export function SearchBox({
         <ul
           id={listId}
           role="listbox"
-          className="absolute z-50 mt-1.5 w-full overflow-hidden rounded-lg border border-border bg-surface shadow-2xl"
+          // Filters made this list half again as long, and on a phone it now
+          // runs past the bottom of the screen. Scrolls rather than clips, so
+          // the last rows stay reachable.
+          className="absolute z-50 mt-1.5 max-h-[70vh] w-full overflow-y-auto overscroll-contain rounded-lg border border-border bg-surface shadow-2xl"
         >
-          {items.length === 0 && !loading && (
-            <li className="px-3 py-3 text-sm text-muted">No matches for “{query.trim()}”.</li>
+          {options.length === 0 && !loading && (
+            <li className="px-3 py-3 text-sm text-muted">No matches for “{q}”.</li>
           )}
-          {items.map((item, i) => (
-            <li key={item.slug} role="option" aria-selected={i === highlight}>
+
+          {options.map((option, i) => (
+            <li
+              key={`${option.type}:${option.hit.slug}`}
+              role="option"
+              aria-selected={i === highlight}
+            >
               <button
                 type="button"
                 onMouseEnter={() => setHighlight(i)}
-                onClick={() => go(item.slug)}
+                onClick={() => go(option)}
                 className={cn(
                   "flex w-full items-center justify-between gap-3 px-3 py-2 text-left transition",
+                  // The seam between the filters and the figures, drawn only
+                  // when there is something on both sides of it.
+                  option.type === "figure" &&
+                    i === entities.length &&
+                    i > 0 &&
+                    "border-t border-border",
                   i === highlight ? "bg-accent-soft" : "hover:bg-surface-2",
                 )}
               >
                 <span className="min-w-0">
-                  <span className="block truncate text-sm">{item.name}</span>
+                  <span className="block truncate text-sm">{option.hit.name}</span>
                   <span className="block truncate text-xs text-muted">
-                    {item.series?.franchise?.name ?? "Unknown franchise"}
+                    {option.type === "entity"
+                      ? KIND_LABELS[option.hit.kind]
+                      : (option.hit.series?.franchise?.name ?? "Unknown franchise")}
                   </span>
                 </span>
-                <span className="tabular shrink-0 text-sm font-medium">
-                  {formatMoney(item.marketValueUsd, money)}
-                </span>
+                {option.type === "entity" ? (
+                  <span className="tabular shrink-0 text-xs text-muted">
+                    {option.hit.count.toLocaleString()} figure{option.hit.count === 1 ? "" : "s"}
+                  </span>
+                ) : (
+                  <span className="tabular shrink-0 text-sm font-medium">
+                    {formatMoney(option.hit.marketValueUsd, money)}
+                  </span>
+                )}
               </button>
             </li>
           ))}
-          {query.trim() && (
+
+          {q && (
             <li>
               <button
                 type="button"
                 onClick={() => {
                   setOpen(false);
-                  router.push(`/figures?q=${encodeURIComponent(query.trim())}`);
+                  router.push(`/figures?q=${encodeURIComponent(q)}`);
                 }}
                 className="w-full border-t border-border px-3 py-2 text-left text-xs text-muted transition hover:bg-surface-2 hover:text-foreground"
               >
-                See all results for “{query.trim()}”
+                See all results for “{q}”
               </button>
             </li>
           )}

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { entityMatches } from "@/lib/filter-options";
 import { quickSearch } from "@/lib/queries";
 import { LIMITS, clientIp, rateLimitHeaders } from "@/lib/rate-limit";
 import { rateLimit } from "@/lib/rate-limit-store";
@@ -34,10 +35,16 @@ export async function GET(request: Request) {
     return NextResponse.json({ results: [] }, { headers });
   }
 
-  const results = await quickSearch(parsed.data.q);
+  // Together, because they are one dropdown and the slower of the two decides
+  // how long it takes either way.
+  const [results, entities] = await Promise.all([
+    quickSearch(parsed.data.q),
+    entityMatches(parsed.data.q),
+  ]);
 
   return NextResponse.json(
     {
+      entities,
       results: results.map((r) => ({
         slug: r.slug,
         name: r.name,
