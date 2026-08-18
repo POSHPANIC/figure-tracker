@@ -106,6 +106,18 @@ export const FRANCHISES: FranchiseDefinition[] = [
     series: ["The Rising of the Shield Hero Season 2"],
   },
   {
+    // The same show twice, once in each language: the archive files 17 figures
+    // under "Ghost in the Shell S.A.C" and an Art Storm Tachikoma under the
+    // Japanese title, so each was promoted to a franchise of its own and the
+    // filter offered the browser a choice between two spellings of one thing.
+    //
+    // Named for the whole franchise, not Stand Alone Complex, so the 1995 film
+    // and Arise join this rather than starting a third entry — the same reason
+    // Shield Hero is not named for its second season.
+    name: "Ghost in the Shell",
+    series: ["Ghost in the Shell S.A.C", "攻殻機動隊S.A.C."],
+  },
+  {
     name: "Love Live!",
     series: [
       "Love Live! Nijigasaki High School Idol Club",
