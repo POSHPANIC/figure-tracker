@@ -30,6 +30,7 @@
     "merge:character": "tsx scripts/merge-character.ts",
     "discover:figures": "tsx scripts/discover-figures.ts",
     "review:candidates": "tsx scripts/review-candidates.ts",
+    "list:franchises": "tsx scripts/list-franchises.ts",
     "dedupe:series": "tsx scripts/dedupe-series.ts",
     "assign:franchises": "tsx scripts/assign-franchises.ts",
     "fix:markup-series": "tsx scripts/fix-markup-series.ts",
