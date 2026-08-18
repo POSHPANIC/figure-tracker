@@ -1,9 +1,10 @@
 import { notFound, redirect } from "next/navigation";
 import type { Metadata } from "next";
-import { Inbox } from "lucide-react";
+import { Inbox, PackageSearch } from "lucide-react";
 import { currentUser } from "@/auth";
+import { CandidateRow } from "@/components/candidate-row";
 import { SubmissionRow } from "@/components/submission-row";
-import { getSubmissionQueue } from "@/lib/user-queries";
+import { getFigureCandidates, getSubmissionQueue } from "@/lib/user-queries";
 
 export const metadata: Metadata = {
   title: "Submissions",
@@ -18,7 +19,10 @@ export default async function ModerationPage() {
   // can't use it.
   if (user.role !== "MODERATOR" && user.role !== "ADMIN") notFound();
 
-  const { items, openCount, counts } = await getSubmissionQueue();
+  const [{ items, openCount, counts }, candidates] = await Promise.all([
+    getSubmissionQueue(),
+    getFigureCandidates(),
+  ]);
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-8">
@@ -64,6 +68,32 @@ export default async function ModerationPage() {
             <SubmissionRow key={item.id} submission={item} />
           ))}
         </ul>
+      )}
+
+      {candidates.openCount > 0 && (
+        <section className="mt-10">
+          <h2 className="flex items-center gap-2 text-lg font-semibold tracking-tight">
+            <PackageSearch className="size-4 text-accent" />
+            Possibly missing
+          </h2>
+          <p className="mt-1 text-sm text-muted">
+            <span className="tabular">{candidates.openCount}</span> release{" "}
+            {candidates.openCount === 1 ? "number" : "numbers"} that several sellers list and the
+            catalogue does not have. Found in listings we could not attach to any figure — the Good
+            Smile archive stopped publishing in February 2024, so anything released since is absent.
+            Nothing here is in the catalogue until you put it there.
+          </p>
+          <ul className="mt-4 space-y-3">
+            {candidates.items.map((candidate) => (
+              <CandidateRow key={candidate.id} candidate={candidate} />
+            ))}
+          </ul>
+          {candidates.openCount > candidates.items.length && (
+            <p className="mt-3 text-xs text-muted">
+              Showing {candidates.items.length} of {candidates.openCount}.
+            </p>
+          )}
+        </section>
       )}
     </div>
   );

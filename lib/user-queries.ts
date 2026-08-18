@@ -236,3 +236,30 @@ export async function getPublicProfile(username: string) {
     },
   };
 }
+
+/**
+ * Products the catalogue looks to be missing, worst gap first.
+ *
+ * Ordered by how many listings named the number, because that is the closest
+ * thing to a measure of how much the absence costs: a product twenty sellers
+ * are listing is one people are looking for.
+ */
+export async function getFigureCandidates(take = 40) {
+  const [items, openCount] = await Promise.all([
+    prisma.figureCandidate.findMany({
+      where: { status: "OPEN" },
+      select: {
+        id: true,
+        line: true,
+        number: true,
+        listingCount: true,
+        sampleTitles: true,
+        firstSeenAt: true,
+      },
+      orderBy: [{ listingCount: "desc" }, { firstSeenAt: "asc" }],
+      take,
+    }),
+    prisma.figureCandidate.count({ where: { status: "OPEN" } }),
+  ]);
+  return { items, openCount };
+}

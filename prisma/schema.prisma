@@ -163,6 +163,7 @@ model Figure {
   images      FigureImage[]
   identifiers FigureIdentifier[]
   submissions Submission[]
+  candidates  FigureCandidate[]
   fieldLocks  FigureFieldLock[]
   listings    Listing[]
   sales       Sale[]
@@ -730,4 +731,60 @@ model PriceAlert {
 
   @@unique([userId, figureId, condition])
   @@index([active])
+}
+
+enum CandidateStatus {
+  /// Waiting for a person to look at it.
+  OPEN
+  /// Turned into a catalogue entry.
+  ACCEPTED
+  /// Looked at and rejected — a bundle, a bootleg, a number that meant
+  /// something else. Kept rather than deleted so discovery does not keep
+  /// proposing it every night.
+  DISMISSED
+}
+
+/// A product the catalogue appears to be missing, inferred from listings.
+///
+/// The Good Smile archive we imported from stopped publishing in February 2024,
+/// so everything released since is absent — while the eBay poll keeps pulling in
+/// listings for those very products and finding nothing to attach them to. This
+/// is that pile read the other way round: not "which figure is this listing?"
+/// but "which figure does this catalogue not have?".
+///
+/// A candidate is never a figure. It is a note saying several sellers agree a
+/// product exists, with the titles they wrote, for a person to check. Writing a
+/// catalogue entry straight from marketplace text would put seller shorthand
+/// into the field a price guide is judged on.
+model FigureCandidate {
+  id String @id @default(cuid())
+
+  /// "NENDOROID:2509" — the line and the number on the box, which is the one
+  /// thing sellers copy accurately. Unique, so a nightly re-run updates the
+  /// count instead of stacking duplicates.
+  key    String @unique
+  line   String
+  number String
+
+  /// How many distinct listings named this number. Corroboration is the whole
+  /// basis for believing the product exists: one seller is a typo, several
+  /// independently typing the same number is not.
+  listingCount Int @default(0)
+
+  /// A few of those titles verbatim, so a moderator can see what the sellers
+  /// actually said rather than a summary of it.
+  sampleTitles String[]
+
+  status CandidateStatus @default(OPEN)
+
+  /// Set when accepted, linking the candidate to the entry it became — so the
+  /// same number is never proposed twice.
+  figureId String?
+  figure   Figure? @relation(fields: [figureId], references: [id], onDelete: SetNull)
+
+  firstSeenAt DateTime  @default(now())
+  lastSeenAt  DateTime  @updatedAt
+  reviewedAt  DateTime?
+
+  @@index([status, listingCount])
 }
