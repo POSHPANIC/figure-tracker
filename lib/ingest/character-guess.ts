@@ -205,6 +205,57 @@ export function stripSeriesName(name: string, series: string): string {
  *
  * Empty when the name doesn't describe a single character at all.
  */
+/**
+ * The separate characters a figure name lists, if it lists several.
+ *
+ * "Asuka/Rei/Mari: Newtype Cover ver." is three characters on one base. The
+ * existing candidate list already splits on a slash, but treats the parts as
+ * competing guesses at one character, because a slash means that too:
+ * "Saber/Altria Pendragon" is one person under two names.
+ *
+ * Nothing in the string distinguishes the two cases, so this only proposes the
+ * parts. The caller decides, and the deciding test is whether the parts resolve
+ * to *different* characters — two names for one character resolve to the same
+ * row and collapse back to a single result.
+ */
+export function splitCharacterNames(figureName: string): string[] {
+  const base = stripQualifiers(stripProductLine(figureName));
+  if (!base) return [];
+
+  // Everything before a colon, since the variant suffix belongs to the whole
+  // group rather than to the last character: "Asuka/Rei/Mari: Newtype Cover
+  // ver." must not make "Mari: Newtype Cover ver." a name to look up.
+  const head = base.split(/\s*[:\-–—]\s*/)[0]?.trim() ?? base;
+
+  // "&", "+" and "and" join two characters. A slash usually does not: in Fate
+  // it is the class — "Saber/Nero Claudius" is Nero of the Saber class — and
+  // elsewhere it is an alias, "Archer/Altria Pendragon" being one person. Read
+  // as two, both are wrong, and worse the class words match real servants, so
+  // "Archer" resolved to Gilgamesh and put him on Altria's figure.
+  //
+  // A slash is only a list at three parts or more, where the class reading
+  // runs out: "Asuka/Rei/Mari" is a cast, and nothing is named for one
+  // character's class, alias and self at once.
+  const joined = head.split(/\s*(?:&|×|\+|\band\b)\s*/i).map((part) => part.trim());
+  const slashed = head.split("/").map((part) => part.trim());
+  const listed = joined.length >= 2 ? joined : slashed.length >= 3 ? slashed : [];
+
+  const parts = listed
+    .map((part) => stripQualifiers(part.trim()))
+    .filter((part) => part.length >= 2);
+
+  // A name that splits into a crowd is more likely a description than a cast.
+  if (parts.length < 2 || parts.length > 6) return [];
+
+  const seen = new Set<string>();
+  return parts.filter((part) => {
+    const key = part.toLowerCase();
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
 export function characterCandidates(figureName: string, seriesNames: string[] = []): string[] {
   if (NOT_A_SINGLE_CHARACTER.some((p) => p.test(figureName))) return [];
 

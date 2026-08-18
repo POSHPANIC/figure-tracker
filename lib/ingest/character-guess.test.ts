@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
   characterCandidates,
+  splitCharacterNames,
   sameCharacter,
   sameCharacterWithinSeries,
   stripProductLine,
@@ -179,3 +180,49 @@ describe("characterCandidates", () => {
     assert.deepEqual(characterCandidates("Nendoroid"), ["Nendoroid"]);
   });
 });
+
+describe("splitCharacterNames", () => {
+  it("splits a figure that lists several characters", () => {
+    // The real one: https://figureindex.com/figures/asuka-rei-mari-newtype-cover-ver
+    assert.deepEqual(splitCharacterNames("Asuka/Rei/Mari: Newtype Cover ver."), [
+      "Asuka",
+      "Rei",
+      "Mari",
+    ]);
+  });
+
+  it("drops the variant suffix rather than gluing it to the last name", () => {
+    const parts = splitCharacterNames("Tanjiro & Nezuko: Blood Explosion Ver.");
+    assert.deepEqual(parts, ["Tanjiro", "Nezuko"]);
+  });
+
+  it("handles the separators sellers actually use", () => {
+    assert.deepEqual(splitCharacterNames("Rin and Len"), ["Rin", "Len"]);
+    assert.deepEqual(splitCharacterNames("Miku + Luka"), ["Miku", "Luka"]);
+  });
+
+  it("refuses a two-part slash, which is a class or an alias", () => {
+    // Fate names figures Class/Character. Read as two people these are wrong,
+    // and dangerously so: the class words are themselves servants, so a dry
+    // run proposed adding Gilgamesh to "figma Archer/Altria Pendragon" and
+    // Nero to "Saber/Nero Claudius".
+    assert.deepEqual(splitCharacterNames("figma Archer/Altria Pendragon"), []);
+    assert.deepEqual(splitCharacterNames("Saber/Nero Claudius: Yukata Ver."), []);
+    assert.deepEqual(splitCharacterNames("Nendoroid Alter Ego/Okita Souji"), []);
+  });
+
+  it("still reads three slashed parts as a cast", () => {
+    // Nothing is named for one character's class, alias and self at once.
+    assert.deepEqual(splitCharacterNames("Asuka/Rei/Mari: Newtype Cover ver."), [
+      "Asuka",
+      "Rei",
+      "Mari",
+    ]);
+  });
+
+  it("returns nothing for an ordinary single name", () => {
+    assert.deepEqual(splitCharacterNames("Nendoroid Marin Kitagawa"), []);
+    assert.deepEqual(splitCharacterNames("Megumin: Light Novel Ver."), []);
+  });
+});
+
