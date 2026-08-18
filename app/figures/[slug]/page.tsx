@@ -189,7 +189,22 @@ export default async function FigurePage({ params, searchParams }: PageProps<"/f
               )}
             </Spec>
             <Spec label="Character">
-              {figure.characters.map((c) => c.name).join(", ") || "—"}
+              {figure.characters.length === 0
+                ? "—"
+                : // Each one links to its own filter rather than the row linking
+                  // to the first: a figure can depict several, and which of them
+                  // someone wants more of is not ours to assume.
+                  figure.characters.map((c, i) => (
+                    <span key={c.id}>
+                      {i > 0 && ", "}
+                      <Link
+                        href={`/figures?character=${c.slug}`}
+                        className="text-accent hover:underline"
+                      >
+                        {c.name}
+                      </Link>
+                    </span>
+                  ))}
             </Spec>
             <Spec label="Type">{CATEGORY_LABELS[figure.category]}</Spec>
             {figure.scale && <Spec label="Scale">{figure.scale}</Spec>}
