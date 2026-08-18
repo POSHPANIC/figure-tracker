@@ -101,6 +101,17 @@ async function main() {
     console.log(`  promoted ${promoted} of them to a franchise of their own`);
   }
 
+  // Curating a franchise moves series off the placeholders they were promoted
+  // to, leaving those behind with nothing in them. They are invisible in the
+  // UI, which filters on a figure count, but leaving them would slowly turn
+  // the table into a graveyard of names the catalogue no longer uses.
+  if (APPLY) {
+    const { count } = await prisma.franchise.deleteMany({
+      where: { series: { none: {} } },
+    });
+    if (count > 0) console.log(`  removed ${count} franchise(s) left empty by curation`);
+  }
+
   if (missing.length) {
     console.log("\n  Named in the list but not in the catalogue:");
     for (const m of missing) console.log(`    ${m}`);

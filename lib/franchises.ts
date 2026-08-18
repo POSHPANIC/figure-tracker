@@ -37,6 +37,29 @@ export const FRANCHISES: FranchiseDefinition[] = [
     ],
   },
   {
+    // Miku is the famous one, so the catalogue files nearly everything under
+    // her — but Piapro Characters, KAITO, MEIKO, Megpoid and the rest are the
+    // same software line, and a Kagamine figure has no business being
+    // unreachable from it.
+    //
+    // Not "Kaitou Tenshi Twin Angel", which contains KAITO and is a magical
+    // girl anime. That is the sort of thing string matching gets wrong and a
+    // person does not.
+    name: "VOCALOID",
+    series: [
+      "Hatsune Miku",
+      "Piapro Characters",
+      "Kagamine Rin/Len: Append",
+      "KAITO",
+      "MEIKO",
+      "VOCALOID Megpoid",
+      "VOCALOID SEASON COLLECTION ~NOW SONGS~",
+      "Virtual Vocalist Gackpoid",
+      "Virtual Vocalist Megpoid",
+      "IA -ARIA ON THE PLANETES-",
+    ],
+  },
+  {
     name: "Fate",
     series: [
       "Fate/Apocrypha",
