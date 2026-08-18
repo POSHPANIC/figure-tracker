@@ -198,7 +198,19 @@ export function SearchBox({
           className="absolute z-50 mt-1.5 max-h-[70vh] w-full overflow-y-auto overscroll-contain rounded-lg border border-border bg-surface shadow-2xl"
         >
           {options.length === 0 && !loading && (
-            <li className="px-3 py-3 text-sm text-muted">No matches for “{q}”.</li>
+            // A dead end otherwise, and the wrong conclusion to leave someone
+            // with: the catalogue is hand-built and stops at early 2024, so
+            // "no matches" usually means not added yet rather than no such
+            // figure. The search text carries over so it isn't typed twice.
+            <li className="px-3 py-3 text-sm text-muted">
+              No matches for “{q}”.{" "}
+              <a
+                href={`/feedback?kind=figure&name=${encodeURIComponent(q)}`}
+                className="text-accent hover:underline"
+              >
+                Tell us it&rsquo;s missing
+              </a>
+            </li>
           )}
 
           {options.map((option, i) => (

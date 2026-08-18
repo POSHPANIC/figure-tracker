@@ -78,6 +78,7 @@ export default async function FeedbackPage({ searchParams }: PageProps<"/feedbac
     >
       <SubmissionForm
         initialKind={parseKind(sp.kind)}
+        initialFigureName={typeof sp.name === "string" ? sp.name.slice(0, 200) : undefined}
         initialPageUrl={page}
         figure={figure}
         signedIn={user !== null}

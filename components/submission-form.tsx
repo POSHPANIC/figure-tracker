@@ -76,11 +76,14 @@ const KINDS: {
 export function SubmissionForm({
   initialKind = "FEEDBACK",
   initialPageUrl,
+  initialFigureName,
   figure,
   signedIn,
 }: {
   initialKind?: Kind;
   initialPageUrl?: string;
+  /** What they searched for and did not find, so they don't type it twice. */
+  initialFigureName?: string;
   /** Set when arriving from a figure's page, which is the only route to EDIT. */
   figure?: {
     id: string;
@@ -301,6 +304,7 @@ export function SubmissionForm({
               type="text"
               name="figureName"
               required
+              defaultValue={initialFigureName}
               placeholder="Nendoroid Marin Kitagawa: Swimsuit Ver."
               className={inputClass}
             />
