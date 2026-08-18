@@ -38,6 +38,7 @@ export default async function FiguresPage({ searchParams }: PageProps<"/figures"
     category: pick<FigureCategory>(first(sp.category), CATEGORY_ORDER),
     seriesSlug: first(sp.series),
     franchiseSlug: first(sp.franchise),
+    characterSlug: first(sp.character),
     manufacturerSlug: first(sp.manufacturer),
     minUsd: toNumber(first(sp.min)),
     maxUsd: toNumber(first(sp.max)),

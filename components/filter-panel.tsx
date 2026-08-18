@@ -2,13 +2,16 @@
 
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
-import { X } from "lucide-react";
+import { Search, X } from "lucide-react";
 import { CATEGORY_LABELS, CATEGORY_ORDER, SORT_LABELS } from "@/lib/labels";
 import type { FigureCategory } from "@/lib/generated/prisma/enums";
 import { cn } from "@/lib/utils";
 
+type Option = { name: string; slug: string; count: number };
+
 type Facets = {
-  franchises: { name: string; slug: string; count: number }[];
+  franchises: Option[];
+  characters: Option[];
   manufacturers: { name: string; slug: string; _count: { figures: number } }[];
   categories: { category: FigureCategory; count: number }[];
 };
@@ -38,9 +41,17 @@ export function FilterPanel({ facets }: { facets: Facets }) {
   const activeCategory = params.get("category");
   const activeFranchise = params.get("franchise");
   const activeManufacturer = params.get("manufacturer");
-  const hasFilters = ["q", "category", "series", "manufacturer", "min", "max"].some((k) =>
-    params.get(k),
-  );
+  const activeCharacter = params.get("character");
+  const hasFilters = [
+    "q",
+    "category",
+    "series",
+    "franchise",
+    "character",
+    "manufacturer",
+    "min",
+    "max",
+  ].some((k) => params.get(k));
 
   return (
     <aside className="space-y-6">
@@ -140,36 +151,101 @@ export function FilterPanel({ facets }: { facets: Facets }) {
         groups them — so nothing is unreachable and Evangelion appears once
         rather than five times.
       */}
-      <FilterGroup label="Franchise">
-        <ScrollList>
-          {facets.franchises.map((f) => (
-            <FilterRow
-              key={f.slug}
-              label={f.name}
-              count={f.count}
-              active={activeFranchise === f.slug}
-              onClick={() => apply({ franchise: activeFranchise === f.slug ? null : f.slug })}
-            />
-          ))}
-        </ScrollList>
-      </FilterGroup>
+      <SearchableGroup
+        label="Franchise"
+        placeholder="Search franchises"
+        options={facets.franchises}
+        activeSlug={activeFranchise}
+        onPick={(slug) => apply({ franchise: slug })}
+      />
 
-      <FilterGroup label="Manufacturer">
+      <SearchableGroup
+        label="Character"
+        placeholder="Search characters"
+        options={facets.characters}
+        activeSlug={activeCharacter}
+        onPick={(slug) => apply({ character: slug })}
+      />
+
+      <SearchableGroup
+        label="Manufacturer"
+        placeholder="Search manufacturers"
+        options={facets.manufacturers.map((m) => ({
+          name: m.name,
+          slug: m.slug,
+          count: m._count.figures,
+        }))}
+        activeSlug={activeManufacturer}
+        onPick={(slug) => apply({ manufacturer: slug })}
+      />
+    </aside>
+  );
+}
+
+/**
+ * A filter group with a search box over its options.
+ *
+ * These lists are far too long to scroll: 1,403 franchises and 2,083
+ * characters, where the one you want is a specific name you already have in
+ * mind. Typing it is the only realistic way to reach it, and a scrollbar over
+ * a thousand entries is a list you give up on rather than read.
+ *
+ * The box filters what is already loaded — it does not query. That keeps
+ * picking a filter instant, and it is why the character list is capped and
+ * ordered by figure count: the ones worth browsing to are at the top, and
+ * anything past that is found by typing.
+ *
+ * The selected option stays visible even when the search excludes it, so a
+ * filter can always be turned off without first clearing the box that hid it.
+ */
+function SearchableGroup({
+  label,
+  placeholder,
+  options,
+  activeSlug,
+  onPick,
+}: {
+  label: string;
+  placeholder: string;
+  options: Option[];
+  activeSlug: string | null;
+  onPick: (slug: string | null) => void;
+}) {
+  const [query, setQuery] = useState("");
+  const needle = query.trim().toLowerCase();
+
+  const shown = needle
+    ? options.filter((o) => o.slug === activeSlug || o.name.toLowerCase().includes(needle))
+    : options;
+
+  return (
+    <FilterGroup label={label}>
+      <div className="relative mb-1.5">
+        <Search className="pointer-events-none absolute left-2 top-1/2 size-3.5 -translate-y-1/2 text-muted" />
+        <input
+          type="search"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder={placeholder}
+          className="w-full rounded-lg border border-border bg-surface py-1.5 pl-7 pr-2 text-sm outline-none transition focus:border-accent"
+        />
+      </div>
+      {shown.length === 0 ? (
+        <p className="px-2 py-3 text-sm text-muted">Nothing matching “{query.trim()}”.</p>
+      ) : (
         <ScrollList>
-          {facets.manufacturers.map((m) => (
+          {shown.map((o) => (
             <FilterRow
-              key={m.slug}
-              label={m.name}
-              count={m._count.figures}
-              active={activeManufacturer === m.slug}
-              onClick={() =>
-                apply({ manufacturer: activeManufacturer === m.slug ? null : m.slug })
-              }
+              key={o.slug}
+              label={o.name}
+              count={o.count}
+              active={activeSlug === o.slug}
+              onClick={() => onPick(activeSlug === o.slug ? null : o.slug)}
             />
           ))}
         </ScrollList>
-      </FilterGroup>
-    </aside>
+      )}
+    </FilterGroup>
   );
 }
 

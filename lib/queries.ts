@@ -48,6 +48,7 @@ export type FigureFilters = {
   category?: FigureCategory;
   seriesSlug?: string;
   franchiseSlug?: string;
+  characterSlug?: string;
   manufacturerSlug?: string;
   minUsd?: number;
   maxUsd?: number;
@@ -84,6 +85,9 @@ function buildWhere(f: FigureFilters): Prisma.FigureWhereInput {
     };
   }
   if (f.manufacturerSlug) where.manufacturer = { slug: f.manufacturerSlug };
+  // Many-to-many: a figure can depict several characters, and one of them
+  // matching is what the filter means.
+  if (f.characterSlug) where.characters = { some: { slug: f.characterSlug } };
   if (f.minUsd !== undefined || f.maxUsd !== undefined) {
     where.marketValueUsd = {
       ...(f.minUsd !== undefined ? { gte: f.minUsd } : {}),
@@ -245,7 +249,7 @@ export type FranchiseFacet = {
 };
 
 export async function getFacets() {
-  const [franchises, manufacturers, categoryCounts] = await Promise.all([
+  const [franchises, characters, manufacturers, categoryCounts] = await Promise.all([
     prisma.franchise.findMany({
       select: {
         name: true,
@@ -255,6 +259,15 @@ export async function getFacets() {
         series: { select: { _count: { select: { figures: true } } } },
       },
       orderBy: { name: "asc" },
+    }),
+    // Only characters something is actually filed under. 2,083 exist and the
+    // long tail has a single figure each, so the list is ordered by how many
+    // figures a character has rather than alphabetically — the search box is
+    // what finds a specific one.
+    prisma.character.findMany({
+      select: { name: true, slug: true, _count: { select: { figures: true } } },
+      orderBy: [{ figures: { _count: "desc" } }, { name: "asc" }],
+      take: 400,
     }),
     prisma.manufacturer.findMany({
       select: { name: true, slug: true, _count: { select: { figures: true } } },
@@ -271,6 +284,9 @@ export async function getFacets() {
         count: f.series.reduce((n, s) => n + s._count.figures, 0),
       }))
       .filter((f) => f.count > 0),
+    characters: characters
+      .map((c) => ({ name: c.name, slug: c.slug, count: c._count.figures }))
+      .filter((c) => c.count > 0),
     manufacturers: manufacturers.filter((m) => m._count.figures > 0),
     categories: categoryCounts
       .map((c) => ({ category: c.category, count: c._count._all }))
