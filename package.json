@@ -27,6 +27,7 @@
     "import:gsc": "tsx scripts/import-gsc.ts",
     "derive:characters": "tsx scripts/derive-characters.ts",
     "derive:multi-characters": "tsx scripts/derive-multi-characters.ts",
+    "merge:character": "tsx scripts/merge-character.ts",
     "dedupe:series": "tsx scripts/dedupe-series.ts",
     "assign:franchises": "tsx scripts/assign-franchises.ts",
     "fix:markup-series": "tsx scripts/fix-markup-series.ts",
