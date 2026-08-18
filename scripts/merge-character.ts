@@ -19,8 +19,8 @@ import { prisma } from "../lib/prisma";
  * figure titles would otherwise become unsearchable.
  *
  * Never guesses which characters are the same. Both slugs are given by hand,
- * because "Miku Nakano" and "Miku Hatsune" are in this catalogue too and a rule
- * loose enough to merge Racing Miku would reach them.
+ * because "Miku Nakano" is in this catalogue too and a rule loose enough to
+ * merge Racing Miku would reach her.
  *
  *   npm run merge:character -- --from racing-miku-… --into hatsune-miku-…
  *   npm run merge:character -- --from … --into … --yes
@@ -49,6 +49,7 @@ async function main() {
     name: true,
     aliases: true,
     figures: { select: { id: true } },
+    anilistId: true,
     series: { select: { name: true, franchiseId: true } },
   } as const;
 
@@ -62,8 +63,21 @@ async function main() {
   console.log(`    into ${into.name}  (${into.figures.length} figures, ${into.series?.name ?? "no series"})`);
 
   // A merge across franchises is almost certainly two different people who
-  // share a name — "Miku Hatsune" appears in Shinkalion as well as VOCALOID.
-  if (from.series?.franchiseId !== into.series?.franchiseId) {
+  // share a name, so it is refused — unless AniList has already said they are
+  // one person by giving both rows the same character id.
+  //
+  // This comment used to cite "Miku Hatsune", who appears in Shinkalion as well
+  // as VOCALOID, as the example of what the rule was protecting against. She was
+  // the wrong example: both rows carry AniList id 7156, because a crossover
+  // cameo is the same character in another show, and the guard was keeping two
+  // entries for one person. Franchise is a good proxy for identity; a matching
+  // id is better evidence than a proxy.
+  const sameOnAniList =
+    from.anilistId !== null && into.anilistId !== null && from.anilistId === into.anilistId;
+
+  if (sameOnAniList && from.series?.franchiseId !== into.series?.franchiseId) {
+    console.log(`\n  Different franchises, but both are AniList character ${from.anilistId}.`);
+  } else if (from.series?.franchiseId !== into.series?.franchiseId) {
     console.log("\n  Refusing: these belong to different franchises, so they are");
     console.log("  probably different characters with similar names.\n");
     process.exit(1);
