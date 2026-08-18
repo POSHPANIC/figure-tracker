@@ -211,6 +211,14 @@ describe("splitCharacterNames", () => {
     assert.deepEqual(splitCharacterNames("Nendoroid Alter Ego/Okita Souji"), []);
   });
 
+  it("does not let a scale marker make a third part", () => {
+    // "Saber/Altria Pendragon 1/7 Alter Ver." splits into three on a naive
+    // read — Saber, "Altria Pendragon 1", "7 Alter Ver." — which is exactly
+    // the shape the two-part rule refuses. The scale smuggles it past.
+    assert.deepEqual(splitCharacterNames("Saber/Altria Pendragon 1/7 Alter Ver."), []);
+    assert.deepEqual(splitCharacterNames("figma Archer/Altria Pendragon 1/8"), []);
+  });
+
   it("still reads three slashed parts as a cast", () => {
     // Nothing is named for one character's class, alias and self at once.
     assert.deepEqual(splitCharacterNames("Asuka/Rei/Mari: Newtype Cover ver."), [

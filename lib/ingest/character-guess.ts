@@ -237,7 +237,12 @@ export function splitCharacterNames(figureName: string): string[] {
   // runs out: "Asuka/Rei/Mari" is a cast, and nothing is named for one
   // character's class, alias and self at once.
   const joined = head.split(/\s*(?:&|×|\+|\band\b)\s*/i).map((part) => part.trim());
-  const slashed = head.split("/").map((part) => part.trim());
+  // Scale markers carry a slash, and that slash counts. "Saber/Altria
+  // Pendragon 1/7 Alter Ver." splits into three parts, which is the very
+  // shape the two-part rule exists to refuse — the scale smuggles a Fate
+  // class list past it. Removed before counting, never after.
+  const withoutScale = head.replace(/\b1\s*\/\s*\d{1,2}\b/g, " ");
+  const slashed = withoutScale.split("/").map((part) => part.trim()).filter(Boolean);
   const listed = joined.length >= 2 ? joined : slashed.length >= 3 ? slashed : [];
 
   const parts = listed

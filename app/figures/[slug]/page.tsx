@@ -189,22 +189,25 @@ export default async function FigurePage({ params, searchParams }: PageProps<"/f
               )}
             </Spec>
             <Spec label="Character">
-              {figure.characters.length === 0
-                ? "—"
-                : // Each one links to its own filter rather than the row linking
-                  // to the first: a figure can depict several, and which of them
-                  // someone wants more of is not ours to assume.
-                  figure.characters.map((c, i) => (
-                    <span key={c.id}>
-                      {i > 0 && ", "}
-                      <Link
-                        href={`/figures?character=${c.slug}`}
-                        className="text-accent hover:underline"
-                      >
-                        {c.name}
-                      </Link>
-                    </span>
+              {figure.characters.length === 0 ? (
+                "—"
+              ) : (
+                // One per line rather than comma-separated. Several of these
+                // names carry commas of their own — "Altria Pendragon, Alter" —
+                // so a comma between them reads as one long list of unclear
+                // length, and each is a link, which wants its own target.
+                <span className="flex flex-col items-end gap-0.5">
+                  {figure.characters.map((c) => (
+                    <Link
+                      key={c.id}
+                      href={`/figures?character=${c.slug}`}
+                      className="text-accent hover:underline"
+                    >
+                      {c.name}
+                    </Link>
                   ))}
+                </span>
+              )}
             </Spec>
             <Spec label="Type">{CATEGORY_LABELS[figure.category]}</Spec>
             {figure.scale && <Spec label="Scale">{figure.scale}</Spec>}
