@@ -97,6 +97,15 @@ export const FRANCHISES: FranchiseDefinition[] = [
     ],
   },
   {
+    // One series, and curated anyway. The archive files these under the
+    // season that was airing, so the franchise inherited "Season 2" from a
+    // catalogue of 24 figures that are not all from it — and a season is not
+    // what anyone browses by. A later season arriving joins this rather than
+    // starting a third name.
+    name: "The Rising of the Shield Hero",
+    series: ["The Rising of the Shield Hero Season 2"],
+  },
+  {
     name: "Love Live!",
     series: [
       "Love Live! Nijigasaki High School Idol Club",
