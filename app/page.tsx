@@ -94,12 +94,12 @@ export default async function HomePage() {
       </section>
 
       <section className="mt-14 pb-8">
-        <h2 className="mb-4 text-lg font-semibold tracking-tight">Browse by series</h2>
+        <h2 className="mb-4 text-lg font-semibold tracking-tight">Browse by franchise</h2>
         <div className="flex flex-wrap gap-2">
-          {facets.series.map((s) => (
+          {facets.franchises.map((s) => (
             <Link
               key={s.slug}
-              href={`/figures?${s.kind}=${s.slug}`}
+              href={`/figures?franchise=${s.slug}`}
               className="rounded-full border border-border bg-surface px-3 py-1.5 text-sm transition hover:border-accent/60 hover:bg-surface-2"
             >
               {s.name}

@@ -10,6 +10,11 @@ import { FRANCHISES } from "../lib/franchises";
  * misses. A rename upstream should show up as a line to fix in
  * lib/franchises.ts, not as a silent no-op that leaves a franchise short.
  *
+ * Applies the curated list first, then promotes every remaining series to a
+ * franchise of its own. Browsing is by franchise, so a series without one is
+ * unreachable — and only 27 of 1,435 are curated, so the placeholders are what
+ * keeps the other nine tenths of the catalogue visible while that catches up.
+ *
  *   npm run assign:franchises
  *   npm run assign:franchises -- --yes
  */
@@ -58,6 +63,42 @@ async function main() {
       data: { franchiseId: record.id },
     });
     assigned += count;
+  }
+
+  // Everything the curated list does not mention becomes a franchise of one,
+  // named after itself. Browsing is by franchise now, so a series with none
+  // would simply be unreachable — and with 27 of 1,435 curated that would hide
+  // most of the catalogue.
+  //
+  // These are placeholders, not judgements. Curating a franchise later means
+  // pointing its series at the real one and deleting the leftover, which is
+  // why this only ever fills gaps and never reassigns.
+  const ungrouped = await prisma.series.findMany({
+    where: { franchiseId: null },
+    select: { id: true, name: true, slug: true },
+  });
+  console.log(`
+  ${ungrouped.length} series not in the curated list`);
+
+  if (APPLY && ungrouped.length > 0) {
+    // Two statements rather than two per series. Upserting and updating in a
+    // loop is 2,800 sequential round trips to a hosted database, which took
+    // over nine minutes and did not finish; this is a bulk insert and a single
+    // join, and the whole thing lands in seconds.
+    await prisma.franchise.createMany({
+      data: ungrouped.map((series) => ({ name: series.name, slug: series.slug })),
+      skipDuplicates: true,
+    });
+
+    // Matched on name, which is unique on both tables and is exactly what the
+    // promotion means: this franchise is that series.
+    const promoted = await prisma.$executeRaw`
+      UPDATE "Series" s
+      SET "franchiseId" = f.id
+      FROM "Franchise" f
+      WHERE s."franchiseId" IS NULL AND f.name = s.name
+    `;
+    console.log(`  promoted ${promoted} of them to a franchise of their own`);
   }
 
   if (missing.length) {

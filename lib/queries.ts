@@ -232,22 +232,22 @@ export async function getMostTracked(take = 8) {
   });
 }
 
-/** A filter entry: either a franchise standing in for its series, or a series. */
-export type SeriesFacet = {
-  kind: "franchise" | "series";
+/** A filter entry. Browsing is by franchise, so that is all these are. */
+export type FranchiseFacet = {
   name: string;
   slug: string;
   count: number;
 };
 
 export async function getFacets() {
-  const [series, manufacturers, categoryCounts] = await Promise.all([
-    prisma.series.findMany({
+  const [franchises, manufacturers, categoryCounts] = await Promise.all([
+    prisma.franchise.findMany({
       select: {
         name: true,
         slug: true,
-        _count: { select: { figures: true } },
-        franchise: { select: { name: true, slug: true } },
+        // Figures hang off series, so a franchise's total is the sum of its
+        // series' rather than something Prisma can count directly.
+        series: { select: { _count: { select: { figures: true } } } },
       },
       orderBy: { name: "asc" },
     }),
@@ -258,37 +258,14 @@ export async function getFacets() {
     prisma.figure.groupBy({ by: ["category"], _count: { _all: true } }),
   ]);
 
-  // One list, where a franchise stands in place of the series it holds. Five
-  // Evangelion entries become one, and a series with no franchise appears as
-  // itself — which is nearly all of them: 27 series of 1,435 are grouped so
-  // far, so dropping the ungrouped ones would leave most of the catalogue
-  // unfilterable.
-  const grouped = new Map<string, SeriesFacet>();
-  for (const row of series) {
-    if (row._count.figures === 0) continue;
-    if (row.franchise) {
-      const key = `f:${row.franchise.slug}`;
-      const existing = grouped.get(key);
-      if (existing) existing.count += row._count.figures;
-      else
-        grouped.set(key, {
-          kind: "franchise",
-          name: row.franchise.name,
-          slug: row.franchise.slug,
-          count: row._count.figures,
-        });
-    } else {
-      grouped.set(`s:${row.slug}`, {
-        kind: "series",
-        name: row.name,
-        slug: row.slug,
-        count: row._count.figures,
-      });
-    }
-  }
-
   return {
-    series: [...grouped.values()].sort((a, b) => a.name.localeCompare(b.name)),
+    franchises: franchises
+      .map((f) => ({
+        name: f.name,
+        slug: f.slug,
+        count: f.series.reduce((n, s) => n + s._count.figures, 0),
+      }))
+      .filter((f) => f.count > 0),
     manufacturers: manufacturers.filter((m) => m._count.figures > 0),
     categories: categoryCounts
       .map((c) => ({ category: c.category, count: c._count._all }))
