@@ -366,3 +366,41 @@ describe("rejectedByCategory", () => {
     assert.equal(rejectedByCategory(tile()), null);
   });
 });
+
+describe("a spec field holding an advertisement", () => {
+  /**
+   * Real page, product 15154. The archive put a KDcolle marketing block in the
+   * Series cell, escaped, so stripTags left 525 characters of promotional copy
+   * that became a series, then a franchise, then a filter entry that looked
+   * like a page of source.
+   */
+  const page = `
+    <dl>
+      <dt>Product Name</dt><dd>Riselia: Light Novel Ver.</dd>
+      <dt>Series</dt><dd>[html]&lt;div class="clearfix" style="border: #bbb solid 1px;"&gt;[/html]
+        &lt;strong&gt;What is KDcolle?&lt;/strong&gt; KADOKAWA presents a new figure brand.
+        [html]&lt;/div&gt;[/html]</dd>
+      <dt>Manufacturer</dt><dd>KADOKAWA Corporation</dd>
+    </dl>`;
+
+  it("drops the field rather than storing the advert", () => {
+    const product = parseProduct(page);
+    assert.equal(product?.["Series"], undefined);
+  });
+
+  it("keeps the fields either side of it", () => {
+    const product = parseProduct(page);
+    assert.equal(product?.["Product Name"], "Riselia: Light Novel Ver.");
+    assert.equal(product?.["Manufacturer"], "KADOKAWA Corporation");
+  });
+
+  it("leaves an ordinary series alone", () => {
+    const product = parseProduct(`
+      <dl>
+        <dt>Product Name</dt><dd>Marin Kitagawa</dd>
+        <dt>Series</dt><dd>My Dress-Up Darling</dd>
+      </dl>`);
+    assert.equal(product?.["Series"], "My Dress-Up Darling");
+  });
+});
+

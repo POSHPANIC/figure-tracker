@@ -28,6 +28,7 @@
     "derive:characters": "tsx scripts/derive-characters.ts",
     "dedupe:series": "tsx scripts/dedupe-series.ts",
     "assign:franchises": "tsx scripts/assign-franchises.ts",
+    "fix:markup-series": "tsx scripts/fix-markup-series.ts",
     "sync:characters": "tsx scripts/sync-characters.ts",
     "rematch": "tsx scripts/rematch.ts",
     "test": "tsx --test lib/**/*.test.ts",

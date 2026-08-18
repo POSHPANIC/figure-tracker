@@ -270,6 +270,24 @@ function normalizeImageUrl(url: string): string {
 /** The archive's spec table, as labelled key/value pairs. */
 export type GscProduct = Record<string, string>;
 
+/**
+ * Whether a spec value is really an advertisement that landed in the wrong cell.
+ *
+ * The archive occasionally puts a marketing block in a product field, wrapped
+ * in its own [html] pseudo-tags. One product's Series read as 525 characters of
+ * KDcolle promotional copy, which became a series in the catalogue, then a
+ * franchise, and finally an entry in the browse filter that looked like a page
+ * of source code.
+ *
+ * stripTags cannot catch it: the markup arrives HTML-escaped inside the cell,
+ * so it is text by the time the tags are removed. Recognising it as markup is
+ * the only way, and a field that contains a div is not a series name whatever
+ * else it might be.
+ */
+function looksLikeMarkup(value: string): boolean {
+  return /\[html\]|<\s*(div|p|a|span|br|img|table)\b/i.test(value);
+}
+
 export function parseProduct(html: string): GscProduct | null {
   // The page carries several definition lists — the footer link columns are
   // also <dl>. The product one is whichever contains the Product Name row.
@@ -286,7 +304,10 @@ export function parseProduct(html: string): GscProduct | null {
   for (const row of table.matchAll(/<dt[^>]*>([\s\S]*?)<\/dt>\s*<dd[^>]*>([\s\S]*?)<\/dd>/g)) {
     const key = stripTags(row[1]);
     const value = stripTags(row[2]);
-    if (key && value && !(key in fields)) fields[key] = value;
+    // Dropped rather than cleaned. Whatever is left after stripping an advert
+    // is not the field's value, and a missing series is honest where a
+    // mangled one is not.
+    if (key && value && !looksLikeMarkup(value) && !(key in fields)) fields[key] = value;
   }
   return Object.keys(fields).length > 0 ? fields : null;
 }
