@@ -165,6 +165,26 @@ export default async function FigurePage({ params, searchParams }: PageProps<"/f
                 "—"
               )}
             </Spec>
+            {/*
+              Above Series, matching the order of the thing itself: the
+              franchise is the body of work, the series is the entry within it.
+              For most figures the two read the same, because a series with no
+              franchise of its own gets one named after it — the pair only
+              diverges where someone has curated it, which is exactly where the
+              distinction is worth showing.
+            */}
+            <Spec label="Franchise">
+              {figure.series?.franchise ? (
+                <Link
+                  href={`/figures?franchise=${figure.series.franchise.slug}`}
+                  className="text-accent hover:underline"
+                >
+                  {figure.series.franchise.name}
+                </Link>
+              ) : (
+                "—"
+              )}
+            </Spec>
             <Spec label="Series">
               {figure.series ? (
                 <Link
