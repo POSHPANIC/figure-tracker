@@ -71,3 +71,18 @@ jobs:
             --production \
             --total "${{ github.event.inputs.total || '4800' }}" \
             --batch 500
+
+      # After the sweep, not before: the listings that arrived tonight are the
+      # ones most likely to name a product the catalogue does not have. Reads
+      # only the database, so it costs no eBay quota.
+      #
+      # Runs even when the sweep was cut short by the timeout. A partial sweep
+      # still leaves new listings worth reading, and this is the catalogue's
+      # only source of new products now that the Good Smile archive it was
+      # imported from has stopped publishing.
+      - name: Look for missing figures
+        if: always()
+        env:
+          DIRECT_DATABASE_URL: ${{ secrets.DIRECT_DATABASE_URL }}
+          DATABASE_URL: ${{ secrets.DIRECT_DATABASE_URL }}
+        run: npm run discover:figures -- --yes

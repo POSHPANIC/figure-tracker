@@ -14,6 +14,16 @@ trouble, so read it before flipping anything on in production.
 | **MyFigureCollection** | Best catalog data anywhere | Not implemented | **Their ToS forbids scraping** |
 | **Mandarake / Suruga-ya / Yahoo Auctions** | Deep Japanese secondary market | Ruled out — see below | Blocked or disallowed, and asking prices rather than sales |
 
+Catalogue sources — where the list of *products* comes from, as opposed to their
+prices — are a separate question, and the answer changed under us:
+
+| Source | What it gives you | Status | Risk |
+| --- | --- | --- | --- |
+| **goodsmile.info archive** | Name, manufacturer, series, MSRP, release date, scale | **Dead — stopped publishing February 2024** | — |
+| **goodsmile.com** | The same, for current products | No permitted way to enumerate it | Browse is disallowed by robots.txt |
+| **Unattached eBay listings** | Release numbers of products we lack | Implemented — see below | None; data we already hold |
+| **AmiAmi product feed** | The full replacement | Not asked for yet — see `AMIAMI_APPLICATION.md` | None; a licensed feed |
+
 ## eBay
 
 The single most important source, and completely legitimate.
@@ -82,6 +92,60 @@ serious option. Until then the honest position is that the clock started when it
 started, and that MSRP plus a current price already answers the question
 collectors ask most — what did this cost new, and what is it worth now — without
 needing a curve between the two.
+
+## The catalogue stopped growing in 2024
+
+Checked 2026-08-18.
+
+`lib/ingest/gsc.ts` reads Good Smile's product archive at goodsmile.info, which
+was the right choice when it was written: it paginated at a plain URL, had no
+robots.txt, went back to 2008, and covered the whole group rather than one
+brand.
+
+**It stopped publishing in February 2024.** Fetching page one of the archive —
+the page carrying the newest thirty-six products — returns no date later than
+`2024/02`. The catalogue shows the same shape from the inside: 681 figures dated
+2024, then five in 2025 and two in 2026, and those seven are seed data.
+
+Nothing was silently failing. `import:gsc` is a manual command and was never on
+a schedule, so no cron has been reporting success while importing nothing.
+
+### goodsmile.com cannot be enumerated
+
+Good Smile's current site is goodsmile.com, and it is closed to this in a way
+the archive was not:
+
+| Checked | Result |
+| --- | --- |
+| `robots.txt` | `Disallow: /*/search` — and `/en/search?tag=…` is where every browse listing lives |
+| `sitemap.xml`, `sitemap_index.xml` | 404 |
+| A JSON API behind the pages | None. The site is server-rendered HTML; its own front end makes no data calls |
+| `/en/news` | Crawlable, but the posts do not link to products |
+| `/en/product/<id>` | Permitted, and the only way in — but with no index, reaching them means walking numeric ids |
+
+Walking ids is not a route worth taking. It is thousands of requests at a site
+that has published no invitation to do so, and it would put the site's name
+behind a crawl indistinguishable from a scrape.
+
+### What replaced it
+
+Two things, neither of which is a straight substitute.
+
+**Discovery from listings we could not place.** The daily eBay poll leaves
+tens of thousands of listings attached to no figure — 43,638 at the time of
+writing. Clustered by the release number printed on the box, and requiring three
+separate listings to agree, that pile yields products the catalogue lacks:
+83 on the first run. `npm run discover:figures` records them and the moderation
+queue shows them.
+
+This is corroboration, not invention — several sellers independently reading the
+same number off a box — and nothing becomes a catalogue entry without a person.
+Its limits are real: it only finds products people are currently selling, and
+only lines that carry a number, so scale figures and POP UP PARADE are invisible
+to it.
+
+**Asking AmiAmi for a feed.** The actual replacement, and it needs a person to
+ask. See `AMIAMI_APPLICATION.md`.
 
 ## AmiAmi
 
