@@ -80,3 +80,48 @@ describe("readReleaseNumber", () => {
     assert.equal(readReleaseNumber("Nendoroid 628 Alice")!.line, "NENDOROID");
   });
 });
+
+/**
+ * Cases from the first real queue. The reader proposed 83 products and a
+ * moderator reading them found these, which is the review step working —
+ * but they are cheap to exclude and a queue is only worth opening if the
+ * rows in it are plausible.
+ */
+describe("readReleaseNumber, against the first real queue", () => {
+  it("does not read a series called No.6 as number six", () => {
+    // Nendoroid Nezumi is #2006, and all six listings gathered under "6" were
+    // that figure — "No.6" is the name of the show.
+    assert.equal(readReleaseNumber("Good Smile Arts Shanghai Nendoroid No.6 Nezumi 13+"), null);
+    assert.equal(readReleaseNumber("Good Smile Nendoroid No.6 Mouse 2006 Unopened"), null);
+    // Even where the real number is in the same title, it goes unread: a number
+    // only counts next to the line word, and this one sits after "Figure".
+    // Reaching it would mean accepting any four-digit #number in a title, and
+    // those collide head-on with years — a Nendoroid marked "#2024" for the
+    // year is indistinguishable from Nendoroid 2024, which exists.
+    assert.equal(
+      readReleaseNumber("Nendoroid NO.6 Nezumi Action Figure #2006 Good Smile Arts"),
+      null,
+    );
+  });
+
+  it("still reads a genuine two-digit number the seller marked", () => {
+    assert.deepEqual(readReleaseNumber("Melissa Seraphy Chu×Chu Paradise Nendoroid #41 GoodSmile"), {
+      line: "NENDOROID",
+      number: "41",
+    });
+  });
+
+  it("keeps the padded forms of a real early release", () => {
+    assert.deepEqual(readReleaseNumber("ChuxChu Paradise - Melissa Seraphy - Nendoroid 041 - Devil ver."), {
+      line: "NENDOROID",
+      number: "41",
+    });
+  });
+
+  it("reads the number from a title that repeats it", () => {
+    assert.deepEqual(readReleaseNumber("figma 246 Horse White Movable Action Figure figma 246"), {
+      line: "FIGMA",
+      number: "246",
+    });
+  });
+});

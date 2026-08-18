@@ -154,6 +154,25 @@ async function main() {
     });
   }
 
+  // Drop open candidates the evidence no longer supports. Listings expire, and
+  // the reader gets corrected — "Nendoroid No.6" was six listings for a figure
+  // whose number is 2006, gathered under the name of the show. Without this
+  // they would sit in the queue forever, since nothing else deletes them.
+  //
+  // Only OPEN ones. A dismissal is a decision and has to survive, or the same
+  // rejection comes back tomorrow.
+  const supported = new Set(found.map(([key]) => key));
+  const stale = (
+    await prisma.figureCandidate.findMany({ where: { status: "OPEN" }, select: { key: true } })
+  )
+    .map((c) => c.key)
+    .filter((key) => !supported.has(key));
+
+  if (stale.length > 0) {
+    await prisma.figureCandidate.deleteMany({ where: { key: { in: stale }, status: "OPEN" } });
+    console.log(`\n  withdrew ${stale.length} candidate(s) no longer supported`);
+  }
+
   const open = await prisma.figureCandidate.count({ where: { status: "OPEN" } });
   console.log(`\n  Recorded. ${open} candidate(s) now waiting for review.\n`);
   await prisma.$disconnect();

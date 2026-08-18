@@ -41,8 +41,8 @@ export type ReleaseNumber = {
  * early releases we already hold; the cost of accepting them is every size in
  * centimetres and every "ver. 2".
  */
-const MARKED = /\b(nendoroid|figma)\s*(?:no\.?|#)\s*(\d{1,4})\b/i;
-const BARE = /\b(nendoroid|figma)\s+(\d{3,4})\b/i;
+const MARKED = /\b(nendoroid|figma)\s*(?:no\.?|#)\s*(\d{2,4})\b/gi;
+const BARE = /\b(nendoroid|figma)\s+(\d{3,4})\b/gi;
 
 /**
  * What must not follow the digits. A unit means it was a measurement, a
@@ -52,20 +52,33 @@ const BARE = /\b(nendoroid|figma)\s+(\d{3,4})\b/i;
 const NOT_A_NUMBER = /^\s*(?:cm|mm|in\b|inch|["'”″]|th\b|st\b|nd\b|rd\b|\.\d|\s*-\s*\d+\s*(?:cm|mm))/i;
 
 export function readReleaseNumber(title: string): ReleaseNumber | null {
-  const match = MARKED.exec(title) ?? BARE.exec(title);
-  if (!match) return null;
+  const found: ReleaseNumber[] = [];
 
-  const after = title.slice(match.index + match[0].length);
-  if (NOT_A_NUMBER.test(after)) return null;
+  for (const pattern of [MARKED, BARE]) {
+    // Shared regex objects carry lastIndex between calls, and this one is
+    // called once per listing across tens of thousands of them.
+    pattern.lastIndex = 0;
+    for (let m = pattern.exec(title); m; m = pattern.exec(title)) {
+      if (NOT_A_NUMBER.test(title.slice(m.index + m[0].length))) continue;
+      // Leading zeros would make "No. 0042" and "42" different products.
+      const number = String(Number(m[2]));
+      if (number === "0") continue;
+      found.push({ line: m[1]!.toLowerCase() === "figma" ? "FIGMA" : "NENDOROID", number });
+    }
+    if (found.length) break;
+  }
 
-  // Leading zeros would make "No. 0042" and "42" different products.
-  const number = String(Number(match[2]));
-  if (number === "0") return null;
+  if (found.length === 0) return null;
 
-  return {
-    line: match[1]!.toLowerCase() === "figma" ? "FIGMA" : "NENDOROID",
-    number,
-  };
+  // Where a title offers several, take the largest.
+  //
+  // "Nendoroid NO.6 Nezumi Action Figure #2006" contains both, and only one of
+  // them is a release number — the other is the name of the series, which is
+  // called No.6. Every listing for that figure was gathered under 6, and two of
+  // them carried the real number in the same string. Release numbers only ever
+  // increase, so on a modern release the larger number is the product and a
+  // small one is something else that happened to sit after the word.
+  return found.reduce((a, b) => (Number(b.number) > Number(a.number) ? b : a));
 }
 
 /** The catalogue's identifier kind for a line, so the two can be compared. */
