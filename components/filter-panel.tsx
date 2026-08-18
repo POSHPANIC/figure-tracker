@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter, useSearchParams } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Search, X } from "lucide-react";
 import { CATEGORY_LABELS, CATEGORY_ORDER, SORT_LABELS } from "@/lib/labels";
 import type { FigureCategory } from "@/lib/generated/prisma/enums";
@@ -12,7 +12,7 @@ type Option = { name: string; slug: string; count: number };
 type Facets = {
   franchises: Option[];
   characters: Option[];
-  manufacturers: { name: string; slug: string; _count: { figures: number } }[];
+  manufacturers: Option[];
   categories: { category: FigureCategory; count: number }[];
 };
 
@@ -152,6 +152,7 @@ export function FilterPanel({ facets }: { facets: Facets }) {
         rather than five times.
       */}
       <SearchableGroup
+        kind="franchise"
         label="Franchise"
         placeholder="Search franchises"
         options={facets.franchises}
@@ -160,6 +161,7 @@ export function FilterPanel({ facets }: { facets: Facets }) {
       />
 
       <SearchableGroup
+        kind="character"
         label="Character"
         placeholder="Search characters"
         options={facets.characters}
@@ -168,13 +170,10 @@ export function FilterPanel({ facets }: { facets: Facets }) {
       />
 
       <SearchableGroup
+        kind="manufacturer"
         label="Manufacturer"
         placeholder="Search manufacturers"
-        options={facets.manufacturers.map((m) => ({
-          name: m.name,
-          slug: m.slug,
-          count: m._count.figures,
-        }))}
+        options={facets.manufacturers}
         activeSlug={activeManufacturer}
         onPick={(slug) => apply({ manufacturer: slug })}
       />
@@ -199,12 +198,14 @@ export function FilterPanel({ facets }: { facets: Facets }) {
  * filter can always be turned off without first clearing the box that hid it.
  */
 function SearchableGroup({
+  kind,
   label,
   placeholder,
   options,
   activeSlug,
   onPick,
 }: {
+  kind: string;
   label: string;
   placeholder: string;
   options: Option[];
@@ -212,11 +213,42 @@ function SearchableGroup({
   onPick: (slug: string | null) => void;
 }) {
   const [query, setQuery] = useState("");
-  const needle = query.trim().toLowerCase();
+  // The result carries the query that produced it, so a stale list is
+  // recognisable rather than merely old — and nothing has to be cleared on the
+  // way in, which is what turns an effect into cascading renders.
+  const [result, setResult] = useState<{ query: string; options: Option[] } | null>(null);
+  const needle = query.trim();
 
-  const shown = needle
-    ? options.filter((o) => o.slug === activeSlug || o.name.toLowerCase().includes(needle))
-    : options;
+  // Typing asks the database. Filtering the loaded head in the browser would
+  // be faster but wrong: it is a head, so an exact name outside it would come
+  // back empty and look like the catalogue does not have it.
+  useEffect(() => {
+    if (!needle) return;
+    const controller = new AbortController();
+    // A keystroke is not a query. Waiting a moment collapses a typed word into
+    // one request instead of one per letter.
+    const timer = setTimeout(async () => {
+      try {
+        const res = await fetch(
+          `/api/filter-options?kind=${kind}&q=${encodeURIComponent(needle)}`,
+          { signal: controller.signal },
+        );
+        const body = (await res.json()) as { options?: Option[] };
+        setResult({ query: needle, options: body.options ?? [] });
+      } catch {
+        // An aborted request is the normal case here — the next keystroke
+        // cancelled it — and a failed one should leave the last result alone
+        // rather than blanking the list under the cursor.
+      }
+    }, 200);
+    return () => {
+      controller.abort();
+      clearTimeout(timer);
+    };
+  }, [kind, needle]);
+
+  const current = result?.query === needle ? result.options : null;
+  const shown = needle ? (current ?? []) : options;
 
   return (
     <FilterGroup label={label}>
@@ -231,7 +263,9 @@ function SearchableGroup({
         />
       </div>
       {shown.length === 0 ? (
-        <p className="px-2 py-3 text-sm text-muted">Nothing matching “{query.trim()}”.</p>
+        <p className="px-2 py-3 text-sm text-muted">
+          {current === null ? "Searching…" : `Nothing matching “${needle}”.`}
+        </p>
       ) : (
         <ScrollList>
           {shown.map((o) => (

@@ -1,5 +1,6 @@
 import "server-only";
 import { prisma } from "./prisma";
+import { filterOptions } from "./filter-options";
 import { normalizeQuery } from "./search-text";
 import type { Prisma } from "./generated/prisma/client";
 import type { FigureCategory, ItemCondition } from "./generated/prisma/enums";
@@ -241,53 +242,22 @@ export async function getMostTracked(take = 8) {
   });
 }
 
-/** A filter entry. Browsing is by franchise, so that is all these are. */
-export type FranchiseFacet = {
-  name: string;
-  slug: string;
-  count: number;
-};
-
 export async function getFacets() {
+  // A head of each list, ordered by how many figures it holds, so the first
+  // screen is the part of the catalogue worth browsing. The rest is reached by
+  // typing, which asks the database — see lib/filter-options.ts for why the
+  // whole list is not sent.
   const [franchises, characters, manufacturers, categoryCounts] = await Promise.all([
-    prisma.franchise.findMany({
-      select: {
-        name: true,
-        slug: true,
-        // Figures hang off series, so a franchise's total is the sum of its
-        // series' rather than something Prisma can count directly.
-        series: { select: { _count: { select: { figures: true } } } },
-      },
-      orderBy: { name: "asc" },
-    }),
-    // Only characters something is actually filed under. 2,083 exist and the
-    // long tail has a single figure each, so the list is ordered by how many
-    // figures a character has rather than alphabetically — the search box is
-    // what finds a specific one.
-    prisma.character.findMany({
-      select: { name: true, slug: true, _count: { select: { figures: true } } },
-      orderBy: [{ figures: { _count: "desc" } }, { name: "asc" }],
-      take: 400,
-    }),
-    prisma.manufacturer.findMany({
-      select: { name: true, slug: true, _count: { select: { figures: true } } },
-      orderBy: { name: "asc" },
-    }),
+    filterOptions("franchise"),
+    filterOptions("character"),
+    filterOptions("manufacturer"),
     prisma.figure.groupBy({ by: ["category"], _count: { _all: true } }),
   ]);
 
   return {
-    franchises: franchises
-      .map((f) => ({
-        name: f.name,
-        slug: f.slug,
-        count: f.series.reduce((n, s) => n + s._count.figures, 0),
-      }))
-      .filter((f) => f.count > 0),
-    characters: characters
-      .map((c) => ({ name: c.name, slug: c.slug, count: c._count.figures }))
-      .filter((c) => c.count > 0),
-    manufacturers: manufacturers.filter((m) => m._count.figures > 0),
+    franchises,
+    characters,
+    manufacturers,
     categories: categoryCounts
       .map((c) => ({ category: c.category, count: c._count._all }))
       .sort((a, b) => b.count - a.count),
