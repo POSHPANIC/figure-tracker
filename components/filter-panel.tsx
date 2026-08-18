@@ -8,10 +8,9 @@ import type { FigureCategory } from "@/lib/generated/prisma/enums";
 import { cn } from "@/lib/utils";
 
 type Facets = {
-  // Counted rather than related: figures hang off series, so a franchise's
-  // total is the sum of its series' and cannot be a _count.
-  franchises: { name: string; slug: string; count: number }[];
-  series: { name: string; slug: string; _count: { figures: number } }[];
+  // Each entry is either a franchise standing in for the series it holds, or a
+  // series with no franchise. Never both, so Evangelion appears once.
+  series: { kind: "franchise" | "series"; name: string; slug: string; count: number }[];
   manufacturers: { name: string; slug: string; _count: { figures: number } }[];
   categories: { category: FigureCategory; count: number }[];
 };
@@ -138,45 +137,28 @@ export function FilterPanel({ facets }: { facets: Facets }) {
         </form>
       </FilterGroup>
 
-      {/*
-        Above Series, because it is the coarser cut and the one most people
-        want: five Evangelion series are five entries in the list below, and
-        one entry here.
-      */}
-      {facets.franchises.length > 0 && (
-        <FilterGroup label="Franchise">
-          <ScrollList>
-            {facets.franchises.map((f) => (
+      <FilterGroup label="Series">
+        <ScrollList>
+          {facets.series.map((s) => {
+            // A row is a franchise or a series, and writes whichever parameter
+            // it is. Selecting one always clears the other, so the two can
+            // never contradict each other into an empty page.
+            const active = s.kind === "franchise" ? activeFranchise === s.slug : activeSeries === s.slug;
+            return (
               <FilterRow
-                key={f.slug}
-                label={f.name}
-                count={f.count}
-                active={activeFranchise === f.slug}
+                key={`${s.kind}:${s.slug}`}
+                label={s.name}
+                count={s.count}
+                active={active}
                 onClick={() =>
                   apply({
-                    franchise: activeFranchise === f.slug ? null : f.slug,
-                    // A series chosen inside another franchise would leave the
-                    // page showing nothing, which reads as a broken filter.
-                    series: null,
+                    franchise: s.kind === "franchise" && !active ? s.slug : null,
+                    series: s.kind === "series" && !active ? s.slug : null,
                   })
                 }
               />
-            ))}
-          </ScrollList>
-        </FilterGroup>
-      )}
-
-      <FilterGroup label="Series">
-        <ScrollList>
-          {facets.series.map((s) => (
-            <FilterRow
-              key={s.slug}
-              label={s.name}
-              count={s._count.figures}
-              active={activeSeries === s.slug}
-              onClick={() => apply({ series: activeSeries === s.slug ? null : s.slug })}
-            />
-          ))}
+            );
+          })}
         </ScrollList>
       </FilterGroup>
 

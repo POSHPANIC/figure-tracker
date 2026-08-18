@@ -54,7 +54,7 @@ export default async function HomePage() {
                   {totals.figures.toLocaleString()}
                 </span>{" "}
                 figures. Price history is built from real marketplace sales and
-                collector reports — there isn't any yet, so charts will be empty
+                collector reports — there isn’t any yet, so charts will be empty
                 until it accumulates.
               </>
             )}
@@ -99,11 +99,11 @@ export default async function HomePage() {
           {facets.series.map((s) => (
             <Link
               key={s.slug}
-              href={`/figures?series=${s.slug}`}
+              href={`/figures?${s.kind}=${s.slug}`}
               className="rounded-full border border-border bg-surface px-3 py-1.5 text-sm transition hover:border-accent/60 hover:bg-surface-2"
             >
               {s.name}
-              <span className="tabular ml-1.5 text-xs text-muted">{s._count.figures}</span>
+              <span className="tabular ml-1.5 text-xs text-muted">{s.count}</span>
             </Link>
           ))}
         </div>

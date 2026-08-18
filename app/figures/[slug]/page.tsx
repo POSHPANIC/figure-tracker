@@ -92,17 +92,16 @@ export default async function FigurePage({ params, searchParams }: PageProps<"/f
           { label: "Figures", href: "/figures" },
           ...(figure.series
             ? [
-                // Franchise first, so the trail reads from the widest thing
-                // someone might browse to the exact release.
-                ...(figure.series.franchise
-                  ? [
-                      {
-                        label: figure.series.franchise.name,
-                        href: `/figures?franchise=${figure.series.franchise.slug}`,
-                      },
-                    ]
-                  : []),
-                { label: figure.series.name, href: `/figures?series=${figure.series.slug}` },
+                // The franchise stands in for the series here, rather than
+                // sitting above it, so the trail matches what the browse
+                // filter offers. The exact series is still on the page — it
+                // has its own row in the spec box below.
+                figure.series.franchise
+                  ? {
+                      label: figure.series.franchise.name,
+                      href: `/figures?franchise=${figure.series.franchise.slug}`,
+                    }
+                  : { label: figure.series.name, href: `/figures?series=${figure.series.slug}` },
               ]
             : []),
           { label: figure.name },
