@@ -10,7 +10,7 @@ type Suggestion = {
   slug: string;
   name: string;
   marketValueUsd: string | null;
-  series: { name: string } | null;
+  series: { franchise: { name: string } | null } | null;
 };
 
 /**
@@ -22,7 +22,7 @@ type Suggestion = {
 export function SearchBox({
   defaultValue = "",
   autoFocus = false,
-  placeholder = "Search figures, characters, series…",
+  placeholder = "Search figures, characters, franchises…",
   className,
   money = USD_MONEY,
 }: {
@@ -36,23 +36,31 @@ export function SearchBox({
   const router = useRouter();
   const listId = useId();
   const [query, setQuery] = useState(defaultValue);
-  const [items, setItems] = useState<Suggestion[]>([]);
+  // Keyed to the query that produced it, so a stale list is recognisable
+  // rather than merely old.
+  const [result, setResult] = useState<{ query: string; items: Suggestion[] } | null>(null);
   const [open, setOpen] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const q = query.trim();
+  // Only this query's results count. Anything else is the previous one
+  // still on screen, and showing it under a different search is a lie.
+  const items = result?.query === q ? result.items : [];
+  // Derived rather than stored: we are loading exactly when the query is long
+  // enough to search and no result has come back for it. One less thing to set,
+  // and it cannot fall out of step with the query it describes.
+  const loading = q.length >= 2 && result?.query !== q;
   const [highlight, setHighlight] = useState(-1);
   const rootRef = useRef<HTMLDivElement>(null);
 
   // Debounced fetch. The abort controller keeps a slow early request from
   // overwriting the results of a faster later one.
   useEffect(() => {
-    const q = query.trim();
-    if (q.length < 2) {
-      setItems([]);
-      setLoading(false);
-      return;
-    }
+    // Nothing is cleared on the way in. A result carries the query that
+    // produced it, so "too short to search" and "searched, found nothing" are
+    // told apart by comparing rather than by resetting — which is what turned
+    // this effect into cascading renders.
+    if (q.length < 2) return;
+
     const controller = new AbortController();
-    setLoading(true);
     const timer = setTimeout(async () => {
       try {
         const res = await fetch(`/api/search?q=${encodeURIComponent(q)}`, {
@@ -60,12 +68,10 @@ export function SearchBox({
         });
         if (!res.ok) throw new Error(String(res.status));
         const data: { results: Suggestion[] } = await res.json();
-        setItems(data.results);
+        setResult({ query: q, items: data.results });
         setHighlight(-1);
       } catch (err) {
-        if ((err as Error).name !== "AbortError") setItems([]);
-      } finally {
-        if (!controller.signal.aborted) setLoading(false);
+        if ((err as Error).name !== "AbortError") setResult({ query: q, items: [] });
       }
     }, 180);
 
@@ -73,7 +79,7 @@ export function SearchBox({
       controller.abort();
       clearTimeout(timer);
     };
-  }, [query]);
+  }, [q]);
 
   useEffect(() => {
     function onClickAway(e: MouseEvent) {
@@ -159,7 +165,7 @@ export function SearchBox({
                 <span className="min-w-0">
                   <span className="block truncate text-sm">{item.name}</span>
                   <span className="block truncate text-xs text-muted">
-                    {item.series?.name ?? "Unknown series"}
+                    {item.series?.franchise?.name ?? "Unknown franchise"}
                   </span>
                 </span>
                 <span className="tabular shrink-0 text-sm font-medium">

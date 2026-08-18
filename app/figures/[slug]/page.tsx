@@ -256,8 +256,12 @@ export default async function FigurePage({ params, searchParams }: PageProps<"/f
         {/* --- Right column: pricing --- */}
         <div className="space-y-6">
           <header>
-            <p className="text-sm text-muted">{figure.series?.name}</p>
-            <h1 className="mt-0.5 text-2xl font-semibold tracking-tight sm:text-3xl">
+            {/*
+              No series line above the name. The breadcrumb already carries the
+              franchise, and repeating the work here said it twice — once in a
+              form nothing navigates to.
+            */}
+            <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
               {figure.name}
             </h1>
           </header>

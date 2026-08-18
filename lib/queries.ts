@@ -126,7 +126,10 @@ export async function quickSearch(q: string, limit = 8) {
       slug: true,
       name: true,
       marketValueUsd: true,
-      series: { select: { name: true } },
+      // The franchise, because that is what browsing is by now — a result
+      // labelled "Evangelion: 2.0" points at a filter the site no longer
+      // offers.
+      series: { select: { franchise: { select: { name: true } } } },
     },
     orderBy: [{ salesVolume90d: "desc" }],
     take: limit,
