@@ -23,7 +23,12 @@ export const figureCardSelect = {
   change30dPct: true,
   salesVolume90d: true,
   manufacturer: { select: { name: true, slug: true } },
-  series: { select: { name: true, slug: true } },
+  // The card shows the franchise, but the series is still selected and still
+  // stored — nothing about this grouping is destructive, and showing the series
+  // again is a one-line change in figure-card.tsx.
+  series: {
+    select: { name: true, slug: true, franchise: { select: { name: true, slug: true } } },
+  },
 } satisfies Prisma.FigureSelect;
 
 export type FigureCard = Prisma.FigureGetPayload<{ select: typeof figureCardSelect }>;

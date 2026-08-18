@@ -38,7 +38,7 @@ export async function FigureCard({ figure }: { figure: FigureCardData }) {
 
       <div className="flex flex-1 flex-col gap-1 p-3">
         <p className="text-[11px] uppercase tracking-wide text-muted">
-          {figure.series?.name ?? "Unknown series"}
+          {figure.series?.franchise?.name ?? figure.series?.name ?? "Unknown franchise"}
         </p>
         <h3 className="line-clamp-2 text-sm font-medium leading-snug">{figure.name}</h3>
         <p className="text-xs text-muted">{figure.manufacturer?.name}</p>

@@ -166,12 +166,15 @@ export default async function FigurePage({ params, searchParams }: PageProps<"/f
               )}
             </Spec>
             {/*
-              Above Series, matching the order of the thing itself: the
-              franchise is the body of work, the series is the entry within it.
-              For most figures the two read the same, because a series with no
-              franchise of its own gets one named after it — the pair only
-              diverges where someone has curated it, which is exactly where the
-              distinction is worth showing.
+              Franchise, and no Series row beside it. For most figures the two
+              read identically — a series with no curated franchise gets one
+              named after itself — so showing both was the same word twice on
+              nearly every page.
+              
+              The series is still selected, still stored, and still filterable
+              by ?series=; only the row is gone. Putting it back is a Spec block
+              and nothing else, which is why this was done in the page rather
+              than by dropping anything.
             */}
             <Spec label="Franchise">
               {figure.series?.franchise ? (
@@ -180,18 +183,6 @@ export default async function FigurePage({ params, searchParams }: PageProps<"/f
                   className="text-accent hover:underline"
                 >
                   {figure.series.franchise.name}
-                </Link>
-              ) : (
-                "—"
-              )}
-            </Spec>
-            <Spec label="Series">
-              {figure.series ? (
-                <Link
-                  href={`/figures?series=${figure.series.slug}`}
-                  className="text-accent hover:underline"
-                >
-                  {figure.series.name}
                 </Link>
               ) : (
                 "—"
