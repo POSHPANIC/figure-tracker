@@ -161,8 +161,21 @@ value.
 1. **eBay Marketplace Insights.** Real sold prices, officially. Pending.
 2. **Paid auction archives** (aucfan and similar) — see above; still the only
    route that would genuinely work for Japanese history.
-3. **Community reports.** Real transactions, moderated, and the `user` source
-   already exists for them. Low volume until there are users, but honest.
+3. **Community reports.** Implemented — a figure page with no sales offers
+   "Report a sale you made or saw", and it lands in the moderation queue.
+
+   Nothing published without a person. This feature existed once and was
+   removed because a report wrote straight into the price index, which left a
+   published number a member of the public could move. The difference now is
+   that a report is a message: it becomes a `Sale` row only when a moderator
+   presses Publish, and that is the only route from a report into a price.
+
+   Screening survived the rewrite but changed job. It used to decide what went
+   live; it now decides what the moderator is told — "6x MSRP" is the sentence
+   that makes a queue of numbers reviewable. Only unambiguous mistakes are
+   refused outright: a price of zero, a sale dated next year.
+
+   Low volume until there are users, but every row is real.
 
 Until one of those lands, the price charts stay empty and say so. That is not a
 gap to paper over before an application: an empty chart that explains itself is

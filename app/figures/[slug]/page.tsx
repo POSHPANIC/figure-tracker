@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { after } from "next/server";
 import type { Metadata } from "next";
-import { ExternalLink, Flag, PencilLine } from "lucide-react";
+import { ExternalLink, Flag, PencilLine, Receipt } from "lucide-react";
 import { currentUser } from "@/auth";
 import { recordFigureView } from "@/lib/views";
 import { EbayMark } from "@/components/ebay-mark";
@@ -406,10 +406,25 @@ export default async function FigurePage({ params, searchParams }: PageProps<"/f
               </Link>
             </div>
             {figure.sales.length === 0 ? (
-              <p className="py-6 text-center text-sm text-muted">
-                No sales recorded yet. Sales arrive from marketplace data, so this fills in as
-                the figure trades.
-              </p>
+              <div className="py-6 text-center">
+                <p className="text-sm text-muted">
+                  No sales recorded yet. Sales arrive from marketplace data, so this fills in as
+                  the figure trades.
+                </p>
+                {/*
+                  Offered here rather than under the spec box: this is where
+                  someone looking for a price finds nothing, which is the moment
+                  they might supply one. Nothing they send is published on its
+                  own — a person reviews it first.
+                */}
+                <Link
+                  href={`/feedback?kind=sale&figure=${figure.slug}`}
+                  className="mt-3 inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs font-medium transition hover:border-accent/60"
+                >
+                  <Receipt className="size-3.5" />
+                  Report a sale you made or saw
+                </Link>
+              </div>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">

@@ -1,12 +1,20 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Bug, CheckCircle2, ImagePlus, Loader2, MessageSquare, PackagePlus } from "lucide-react";
+import {
+  Bug,
+  CheckCircle2,
+  ImagePlus,
+  Loader2,
+  MessageSquare,
+  PackagePlus,
+  Receipt,
+} from "lucide-react";
 import { createSubmission } from "@/lib/actions/submissions";
 import { EDITABLE_FIELDS, FIELD_LABELS } from "@/lib/figure-fields";
 import { cn } from "@/lib/utils";
 
-type Kind = "FEEDBACK" | "BUG" | "FIGURE" | "EDIT";
+type Kind = "FEEDBACK" | "BUG" | "FIGURE" | "EDIT" | "SALE";
 
 const KINDS: {
   value: Kind;
@@ -30,6 +38,14 @@ const KINDS: {
     blurb: "Something broken, or a page showing the wrong information.",
     placeholder:
       "Searching for “Nendoroid Rem” returns nothing, but the figure has its own page. Chrome on Windows.",
+  },
+  {
+    value: "SALE",
+    label: "Report a sale",
+    icon: <Receipt className="size-4" />,
+    blurb: "What it actually sold for — yours or one you saw completed.",
+    placeholder:
+      "Anything worth knowing — where it sold, whether the box was opened, what was included.",
   },
   {
     value: "EDIT",
@@ -85,7 +101,9 @@ export function SubmissionForm({
   // A correction has to be about something. Without a figure there is nothing
   // to correct, so the option is not offered at all rather than offered and
   // then rejected on submit.
-  const kinds = figure ? KINDS : KINDS.filter((k) => k.value !== "EDIT");
+  // Both of these are about one particular figure, so neither makes sense
+  // without one — offered only when we know which.
+  const kinds = figure ? KINDS : KINDS.filter((k) => k.value !== "EDIT" && k.value !== "SALE");
   const active = kinds.find((k) => k.value === kind) ?? kinds[0]!;
 
   function submit(formData: FormData) {
@@ -144,6 +162,57 @@ export function SubmissionForm({
         </div>
         <p className="mt-2 text-xs text-muted">{active.blurb}</p>
       </fieldset>
+
+      {kind === "SALE" && figure && (
+        <div className="space-y-4 rounded-xl border border-border bg-surface-2 p-4">
+          <input type="hidden" name="figureId" value={figure.id} />
+          <p className="text-sm">
+            <span className="text-muted">About: </span>
+            <span className="font-medium">{figure.name}</span>
+          </p>
+          <div className="grid gap-4 sm:grid-cols-3">
+            <Field label="Sold for">
+              <input
+                type="text"
+                name="saleAmount"
+                required
+                inputMode="decimal"
+                placeholder="14500"
+                className={inputClass}
+              />
+            </Field>
+            <Field label="Currency">
+              <select name="saleCurrency" defaultValue="USD" className={inputClass}>
+                {["USD", "JPY", "EUR", "GBP", "CAD", "AUD"].map((c) => (
+                  <option key={c} value={c}>{c}</option>
+                ))}
+              </select>
+            </Field>
+            <Field label="Date sold">
+              <input type="date" name="saleDate" required className={inputClass} />
+            </Field>
+          </div>
+          <Field label="Condition">
+            <select name="saleCondition" defaultValue="NEW_SEALED" className={inputClass}>
+              <option value="NEW_SEALED">New, sealed</option>
+              <option value="NEW_OPENED">New, box opened</option>
+              <option value="USED_COMPLETE">Used, complete</option>
+              <option value="USED_INCOMPLETE">Used, missing parts</option>
+              <option value="DAMAGED">Damaged</option>
+            </select>
+          </Field>
+          <Field
+            label="Link to it (optional)"
+            hint="A completed listing, invoice or screenshot. Not required, and the single most useful thing you can give whoever reviews this."
+          >
+            <input type="url" name="saleUrl" placeholder="https://…" className={inputClass} />
+          </Field>
+          <p className="text-xs text-muted">
+            A person checks every reported sale before it reaches a price chart, so
+            this won&apos;t show up straight away.
+          </p>
+        </div>
+      )}
 
       {kind === "EDIT" && figure && (
         <div className="space-y-4 rounded-xl border border-border bg-surface-2 p-4">
@@ -268,11 +337,15 @@ export function SubmissionForm({
         </div>
       )}
 
-      <Field label={kind === "FIGURE" || kind === "EDIT" ? "Anything else" : "Details"}>
+      <Field
+        label={
+          kind === "FIGURE" || kind === "EDIT" || kind === "SALE" ? "Anything else" : "Details"
+        }
+      >
         <textarea
           name="details"
-          required={kind !== "EDIT"}
-          minLength={kind === "EDIT" ? 0 : 10}
+          required={kind !== "EDIT" && kind !== "SALE"}
+          minLength={kind === "EDIT" || kind === "SALE" ? 0 : 10}
           maxLength={4000}
           rows={6}
           placeholder={active.placeholder}

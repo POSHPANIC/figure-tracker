@@ -39,6 +39,8 @@ export default async function ModerationPage() {
               {counts.FIGURE === 1 ? "request" : "requests"},{" "}
               <span className="tabular">{counts.EDIT}</span>{" "}
               {counts.EDIT === 1 ? "edit" : "edits"},{" "}
+              <span className="tabular">{counts.SALE}</span>{" "}
+              {counts.SALE === 1 ? "sale" : "sales"},{" "}
               <span className="tabular">{counts.FEEDBACK}</span> feedback. Oldest first.
             </>
           )}

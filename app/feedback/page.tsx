@@ -11,7 +11,7 @@ export const metadata: Metadata = {
   description: `Report a bug, suggest a figure, or tell us what ${SITE_NAME} is getting wrong.`,
 };
 
-type Kind = "FEEDBACK" | "BUG" | "FIGURE" | "EDIT";
+type Kind = "FEEDBACK" | "BUG" | "FIGURE" | "EDIT" | "SALE";
 
 /** Accepts ?kind=bug so other pages can link straight to the right form. */
 function parseKind(value: string | string[] | undefined): Kind {
@@ -23,6 +23,8 @@ function parseKind(value: string | string[] | undefined): Kind {
       return "FIGURE";
     case "EDIT":
       return "EDIT";
+    case "SALE":
+      return "SALE";
     default:
       return "FEEDBACK";
   }

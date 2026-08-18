@@ -157,6 +157,12 @@ export async function getSubmissionQueue(take = 50) {
         referenceUrl: true,
         imageUrl: true,
         proposedFields: true,
+        saleAmount: true,
+        saleCurrency: true,
+        saleDate: true,
+        saleCondition: true,
+        saleUrl: true,
+        saleFlag: true,
         figure: {
           select: {
             id: true,
@@ -188,6 +194,7 @@ export async function getSubmissionQueue(take = 50) {
       BUG: counts.BUG ?? 0,
       FIGURE: counts.FIGURE ?? 0,
       EDIT: counts.EDIT ?? 0,
+      SALE: counts.SALE ?? 0,
     },
   };
 }

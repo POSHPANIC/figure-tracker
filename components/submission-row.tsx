@@ -11,9 +11,11 @@ import {
   MessageSquare,
   PackagePlus,
   PencilLine,
+  Receipt,
   X,
 } from "lucide-react";
 import {
+  approveReportedSale,
   lockFigureField,
   reviewSubmission,
   unlockFigureField,
@@ -33,6 +35,12 @@ export type QueuedSubmission = {
   referenceUrl: string | null;
   imageUrl: string | null;
   proposedFields: unknown;
+  saleAmount: { toString(): string } | null;
+  saleCurrency: string | null;
+  saleDate: Date | null;
+  saleCondition: string | null;
+  saleUrl: string | null;
+  saleFlag: string | null;
   figure: { id: string; slug: string; name: string; fieldLocks: { field: string }[] } | null;
   contactEmail: string | null;
   createdAt: Date;
@@ -53,6 +61,11 @@ const KIND_META: Record<SubmissionKind, { label: string; icon: React.ReactNode; 
   FIGURE: {
     label: "Missing figure",
     icon: <PackagePlus className="size-3.5" />,
+    tone: "border-accent/40 bg-accent/10 text-accent",
+  },
+  SALE: {
+    label: "Reported sale",
+    icon: <Receipt className="size-3.5" />,
     tone: "border-accent/40 bg-accent/10 text-accent",
   },
   EDIT: {
@@ -147,6 +160,60 @@ export function SubmissionRow({ submission }: { submission: QueuedSubmission }) 
               </a>
             )}
           </Detail>
+        </dl>
+      )}
+
+      {submission.kind === "SALE" && submission.saleAmount && (
+        <dl className="mb-3 space-y-1.5 rounded-lg border border-border bg-surface-2 p-3 text-sm">
+          <Detail label="Figure">
+            {submission.figure ? (
+              <a
+                href={`/figures/${submission.figure.slug}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 text-accent hover:underline"
+              >
+                {submission.figure.name}
+                <ExternalLink className="size-3 shrink-0" />
+              </a>
+            ) : (
+              <span className="text-muted">no longer in the catalogue</span>
+            )}
+          </Detail>
+          <Detail label="Sold for">
+            <span className="tabular font-medium">
+              {submission.saleCurrency} {submission.saleAmount.toString()}
+            </span>
+            {submission.saleDate && (
+              <span className="text-muted">
+                {" "}on {new Date(submission.saleDate).toISOString().slice(0, 10)}
+              </span>
+            )}
+            {submission.saleCondition && (
+              <span className="text-muted"> · {submission.saleCondition.toLowerCase().replace(/_/g, " ")}</span>
+            )}
+          </Detail>
+          {submission.saleUrl && (
+            <Detail label="Evidence">
+              <a
+                href={submission.saleUrl}
+                target="_blank"
+                rel="noopener noreferrer nofollow"
+                className="inline-flex items-center gap-1 break-all text-accent hover:underline"
+              >
+                {submission.saleUrl}
+                <ExternalLink className="size-3 shrink-0" />
+              </a>
+            </Detail>
+          )}
+          {submission.saleFlag && (
+            // Not a verdict. Screening says what looks unusual; the decision
+            // is the moderator's, which is the whole point of this queue.
+            <p className="rounded border border-down/40 bg-down/10 px-2 py-1.5 text-xs text-down">
+              {submission.saleFlag}
+            </p>
+          )}
+          <PublishSaleButton submissionId={submission.id} />
         </dl>
       )}
 
@@ -344,5 +411,45 @@ function FieldLockButton({
       {locked ? <Lock className="size-3" /> : <LockOpen className="size-3" />}
       {locked ? "Confirmed" : "Confirm"}
     </button>
+  );
+}
+
+/**
+ * Publish a reported sale into the price index.
+ *
+ * Deliberately its own button rather than folded into "Resolved". Closing a
+ * report and publishing a price are different acts with very different
+ * consequences, and a single control that did both would eventually do the
+ * second by accident.
+ */
+function PublishSaleButton({ submissionId }: { submissionId: string }) {
+  const router = useRouter();
+  const [pending, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+
+  function publish() {
+    setError(null);
+    const formData = new FormData();
+    formData.set("submissionId", submissionId);
+    startTransition(async () => {
+      const result = await approveReportedSale(formData);
+      if (result.ok) router.refresh();
+      else setError(result.error);
+    });
+  }
+
+  return (
+    <div className="pt-1">
+      <button
+        type="button"
+        onClick={publish}
+        disabled={pending}
+        className="flex items-center gap-1.5 rounded-lg border border-up/40 bg-up/10 px-3 py-1.5 text-xs font-medium text-up transition hover:border-up disabled:opacity-60"
+      >
+        <Check className="size-3.5" />
+        Publish this sale
+      </button>
+      {error && <p className="mt-1.5 text-xs text-down">{error}</p>}
+    </div>
   );
 }

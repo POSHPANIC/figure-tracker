@@ -446,6 +446,8 @@ enum SubmissionKind {
   FIGURE
   /// A correction, or an image, for a figure already in the catalogue.
   EDIT
+  /// A completed sale someone made or saw, awaiting review.
+  SALE
 }
 
 enum SubmissionStatus {
@@ -493,6 +495,20 @@ model Submission {
   /// migration every time the page gains a row, and eight mostly-null columns
   /// on a table where the vast majority of rows are not corrections at all.
   proposedFields Json?
+
+  /// Reported sales. Held here rather than in Sale until a moderator approves
+  /// them: a Sale row is published price data, and the whole reason community
+  /// reporting was removed once before is that it wrote straight into it.
+  saleAmount    Decimal?       @db.Decimal(12, 2)
+  saleCurrency  String?        @db.VarChar(3)
+  saleDate      DateTime?
+  saleCondition ItemCondition?
+  /// A listing, invoice or screenshot backing it up. Optional, and the single
+  /// most useful thing a reviewer can be given.
+  saleUrl       String?
+  /// What screening noticed, e.g. "6x MSRP". Not a verdict — a moderator reads
+  /// it and decides.
+  saleFlag      String?
 
   /// A link to an image the sender thinks belongs on the figure. A link, never
   /// an upload: catalogue images carry a credit and a licence note because

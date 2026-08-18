@@ -5,10 +5,15 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { currentUser, requireUser } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { recomputeFigureStatsFor } from "@/lib/ingest/aggregate";
 import { clientIp, LIMITS } from "@/lib/rate-limit";
+import { buildReference } from "@/lib/sales/reference";
+import { LIMITS as SALE_LIMITS, screenReportedSale } from "@/lib/sales/validate";
+import { toUsd } from "@/lib/ingest/fx";
+import { normalizeCondition } from "@/lib/ingest/match";
 import { rateLimit } from "@/lib/rate-limit-store";
 import type { ActionResult } from "./collection";
-import type { SubmissionKind } from "@/lib/generated/prisma/enums";
+import type { ItemCondition, SubmissionKind } from "@/lib/generated/prisma/enums";
 import {
   EDITABLE_FIELD_KEYS,
   currentFieldValues,
@@ -33,7 +38,7 @@ export type SubmissionResult =
   | { ok: true; message: string }
   | { ok: false; error: string };
 
-const KINDS = ["FEEDBACK", "BUG", "FIGURE", "EDIT"] as const;
+const KINDS = ["FEEDBACK", "BUG", "FIGURE", "EDIT", "SALE"] as const;
 
 /** Trims, and turns "" into undefined so empty inputs don't become empty rows. */
 const optionalText = (max: number) =>
@@ -72,6 +77,11 @@ const submissionSchema = z
     // the page already says. Which of them changed is worked out here rather
     // than taken on trust — see proposedChanges.
     ...Object.fromEntries(EDITABLE_FIELD_KEYS.map((k) => [k, optionalText(200)])),
+    saleAmount: optionalText(20),
+    saleCurrency: optionalText(3),
+    saleDate: optionalText(10),
+    saleCondition: optionalText(20),
+    saleUrl: optionalUrl,
     contactEmail: z
       .string()
       .trim()
@@ -91,12 +101,16 @@ const submissionSchema = z
     message: "Please tell us the figure's name.",
     path: ["figureName"],
   })
-  .refine((v) => v.kind === "EDIT" || v.details.length >= 10, {
+  .refine((v) => v.kind === "EDIT" || v.kind === "SALE" || v.details.length >= 10, {
     // A correction can be nothing but a changed field — "230" in the height
     // box says everything it needs to. Every other kind is only words, so
     // there has to be enough of them to act on.
     message: "Please add a little more detail — a sentence or two is plenty.",
     path: ["details"],
+  })
+  .refine((v) => v.kind !== "SALE" || Boolean(v.figureId && v.saleAmount && v.saleDate), {
+    message: "A sale needs the figure, what it sold for, and when.",
+    path: ["saleAmount"],
   })
   .refine((v) => v.kind !== "EDIT" || Boolean(v.figureId), {
     // The form only offers this kind from a figure's own page, so a missing
@@ -113,7 +127,9 @@ function fieldsFor(kind: SubmissionKind, input: z.infer<typeof submissionSchema>
     manufacturer: kind === "FIGURE" ? (input.manufacturer ?? null) : null,
     series: kind === "FIGURE" ? (input.series ?? null) : null,
     referenceUrl: kind === "FIGURE" ? (input.referenceUrl ?? null) : null,
-    figureId: kind === "EDIT" ? (input.figureId ?? null) : null,
+    // Both kinds are about one particular figure. A sale report without it is
+    // unpublishable — there is nothing to attach the price to.
+    figureId: kind === "EDIT" || kind === "SALE" ? (input.figureId ?? null) : null,
   };
 }
 
@@ -124,6 +140,8 @@ const THANKS: Record<SubmissionKind, string> = {
     "Thanks. We'll check the product exists and get it into the catalogue — usually within a few days.",
   EDIT:
     "Thanks. We'll check this against the manufacturer before changing anything on the page.",
+  SALE:
+    "Thanks. A person checks every reported sale before it reaches a price chart, so this won't appear straight away.",
 };
 
 export async function createSubmission(formData: FormData): Promise<SubmissionResult> {
@@ -158,7 +176,7 @@ export async function createSubmission(formData: FormData): Promise<SubmissionRe
   let proposed: Record<string, string> | null = null;
   let imageUrl = input.kind === "EDIT" ? (input.imageUrl ?? null) : null;
 
-  if (input.kind === "EDIT" && input.figureId) {
+  if ((input.kind === "EDIT" || input.kind === "SALE") && input.figureId) {
     const figure = await prisma.figure.findUnique({
       where: { id: input.figureId },
       select: {
@@ -205,12 +223,63 @@ export async function createSubmission(formData: FormData): Promise<SubmissionRe
     }
     if (Object.keys(changed).length > 0) proposed = changed;
 
-    if (!proposed && !imageUrl && input.details.trim().length < 10) {
+    if (input.kind === "EDIT" && !proposed && !imageUrl && input.details.trim().length < 10) {
       return {
         ok: false,
         error: "Nothing looks changed. Edit a field, add an image, or describe the problem.",
       };
     }
+  }
+
+  // A reported sale is checked for the mistakes that are unambiguous — a price
+  // of zero, a date in the future — and otherwise stored with a note about
+  // anything unusual. It is never published from here: only a moderator turns
+  // one of these into a Sale row, which is the difference between this and the
+  // version of the feature that had to be removed.
+  let sale: {
+    amount: number;
+    currency: string;
+    soldAt: Date;
+    condition: ItemCondition;
+    flag: string | null;
+  } | null = null;
+
+  if (input.kind === "SALE" && input.figureId) {
+    const amount = Number(String(input.saleAmount).replace(/[^0-9.]/g, ""));
+    const currency = (input.saleCurrency ?? "USD").toUpperCase().slice(0, 3);
+    const soldAt = new Date(String(input.saleDate));
+
+    if (!Number.isFinite(amount) || amount <= 0) {
+      return { ok: false, error: "That price doesn't look like a number." };
+    }
+    if (Number.isNaN(soldAt.getTime())) {
+      return { ok: false, error: "That date doesn't look right." };
+    }
+    if (soldAt.getTime() > Date.now()) {
+      return { ok: false, error: "That sale is dated in the future." };
+    }
+    const oldest = new Date();
+    oldest.setFullYear(oldest.getFullYear() - SALE_LIMITS.maxAgeYears);
+    if (soldAt < oldest) {
+      return { ok: false, error: `Sales older than ${SALE_LIMITS.maxAgeYears} years are outside what we track.` };
+    }
+
+    let amountUsd: number;
+    try {
+      amountUsd = (await toUsd(amount, currency)).amountUsd;
+    } catch {
+      return { ok: false, error: `We don't have an exchange rate for ${currency}.` };
+    }
+    if (amountUsd < SALE_LIMITS.hardMinUsd || amountUsd > SALE_LIMITS.hardMaxUsd) {
+      return { ok: false, error: "That price is outside anything we can treat as a figure sale." };
+    }
+
+    const condition = normalizeCondition(input.saleCondition ?? null);
+    const reference = await buildReference(input.figureId, condition);
+    // Screening no longer decides whether it publishes — only what the
+    // moderator gets told before they look.
+    const { flagReason } = screenReportedSale(amountUsd, reference);
+    sale = { amount, currency, soldAt, condition, flag: flagReason };
   }
 
   await prisma.submission.create({
@@ -221,6 +290,12 @@ export async function createSubmission(formData: FormData): Promise<SubmissionRe
       userId: user?.id ?? null,
       imageUrl,
       proposedFields: proposed ?? undefined,
+      saleAmount: sale?.amount ?? null,
+      saleCurrency: sale?.currency ?? null,
+      saleDate: sale?.soldAt ?? null,
+      saleCondition: sale?.condition ?? null,
+      saleUrl: input.kind === "SALE" ? (input.saleUrl ?? null) : null,
+      saleFlag: sale?.flag ?? null,
       ...fieldsFor(input.kind, input),
     },
   });
@@ -351,5 +426,84 @@ export async function unlockFigureField(formData: FormData): Promise<ActionResul
 
   revalidatePath("/moderation");
   revalidatePath(`/figures/${figure.slug}`);
+  return { ok: true };
+}
+
+/**
+ * Publish a reported sale, and close the report.
+ *
+ * The only route from a community report into the price index, and it runs
+ * under a moderator's account. Community reporting was removed once because a
+ * report wrote straight into published prices; this is the same feature with a
+ * person standing in that gap.
+ */
+export async function approveReportedSale(formData: FormData): Promise<ActionResult> {
+  let moderator;
+  try {
+    moderator = await requireModerator();
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : "Not permitted." };
+  }
+
+  const id = String(formData.get("submissionId") ?? "");
+  if (!id) return { ok: false, error: "Invalid request." };
+
+  const report = await prisma.submission.findUnique({
+    where: { id },
+    select: {
+      id: true, kind: true, status: true, figureId: true,
+      saleAmount: true, saleCurrency: true, saleDate: true,
+      saleCondition: true, saleUrl: true,
+    },
+  });
+  if (!report || report.kind !== "SALE") return { ok: false, error: "Not a sale report." };
+  if (report.status !== "OPEN") return { ok: false, error: "That report is already handled." };
+  if (!report.figureId || !report.saleAmount || !report.saleDate) {
+    return { ok: false, error: "That report is missing the figure, price or date." };
+  }
+
+  const source = await prisma.source.findUnique({ where: { key: "user" }, select: { id: true } });
+  if (!source) return { ok: false, error: "The community source is missing." };
+
+  const currency = report.saleCurrency ?? "USD";
+  let converted;
+  try {
+    converted = await toUsd(Number(report.saleAmount), currency);
+  } catch {
+    return { ok: false, error: `No exchange rate available for ${currency}.` };
+  }
+
+  await prisma.sale.create({
+    data: {
+      sourceId: source.id,
+      figureId: report.figureId,
+      // Ties the published row back to the report it came from, so a sale that
+      // later looks wrong can be traced to who reported it and who approved it.
+      externalId: `submission:${report.id}`,
+      title: null,
+      url: report.saleUrl,
+      condition: report.saleCondition ?? "UNKNOWN",
+      amount: report.saleAmount,
+      currency,
+      amountUsd: converted.amountUsd,
+      fxRate: converted.fxRate,
+      soldAt: report.saleDate,
+    },
+  });
+
+  await prisma.submission.update({
+    where: { id: report.id },
+    data: {
+      status: "RESOLVED",
+      handledAt: new Date(),
+      handledById: moderator.id,
+      handlerNote: "Approved and published.",
+    },
+  });
+
+  // The figure's market value and chart are derived from sales, so they are
+  // stale the moment one lands.
+  await recomputeFigureStatsFor(report.figureId);
+  revalidatePath("/moderation");
   return { ok: true };
 }
