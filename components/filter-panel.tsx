@@ -8,6 +8,9 @@ import type { FigureCategory } from "@/lib/generated/prisma/enums";
 import { cn } from "@/lib/utils";
 
 type Facets = {
+  // Counted rather than related: figures hang off series, so a franchise's
+  // total is the sum of its series' and cannot be a _count.
+  franchises: { name: string; slug: string; count: number }[];
   series: { name: string; slug: string; _count: { figures: number } }[];
   manufacturers: { name: string; slug: string; _count: { figures: number } }[];
   categories: { category: FigureCategory; count: number }[];
@@ -37,6 +40,7 @@ export function FilterPanel({ facets }: { facets: Facets }) {
 
   const activeCategory = params.get("category");
   const activeSeries = params.get("series");
+  const activeFranchise = params.get("franchise");
   const activeManufacturer = params.get("manufacturer");
   const hasFilters = ["q", "category", "series", "manufacturer", "min", "max"].some((k) =>
     params.get(k),
@@ -133,6 +137,34 @@ export function FilterPanel({ facets }: { facets: Facets }) {
           </button>
         </form>
       </FilterGroup>
+
+      {/*
+        Above Series, because it is the coarser cut and the one most people
+        want: five Evangelion series are five entries in the list below, and
+        one entry here.
+      */}
+      {facets.franchises.length > 0 && (
+        <FilterGroup label="Franchise">
+          <ScrollList>
+            {facets.franchises.map((f) => (
+              <FilterRow
+                key={f.slug}
+                label={f.name}
+                count={f.count}
+                active={activeFranchise === f.slug}
+                onClick={() =>
+                  apply({
+                    franchise: activeFranchise === f.slug ? null : f.slug,
+                    // A series chosen inside another franchise would leave the
+                    // page showing nothing, which reads as a broken filter.
+                    series: null,
+                  })
+                }
+              />
+            ))}
+          </ScrollList>
+        </FilterGroup>
+      )}
 
       <FilterGroup label="Series">
         <ScrollList>

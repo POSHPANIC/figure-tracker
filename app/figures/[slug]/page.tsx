@@ -91,7 +91,19 @@ export default async function FigurePage({ params, searchParams }: PageProps<"/f
         items={[
           { label: "Figures", href: "/figures" },
           ...(figure.series
-            ? [{ label: figure.series.name, href: `/figures?series=${figure.series.slug}` }]
+            ? [
+                // Franchise first, so the trail reads from the widest thing
+                // someone might browse to the exact release.
+                ...(figure.series.franchise
+                  ? [
+                      {
+                        label: figure.series.franchise.name,
+                        href: `/figures?franchise=${figure.series.franchise.slug}`,
+                      },
+                    ]
+                  : []),
+                { label: figure.series.name, href: `/figures?series=${figure.series.slug}` },
+              ]
             : []),
           { label: figure.name },
         ]}

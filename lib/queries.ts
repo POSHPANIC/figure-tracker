@@ -42,6 +42,7 @@ export type FigureFilters = {
   q?: string;
   category?: FigureCategory;
   seriesSlug?: string;
+  franchiseSlug?: string;
   manufacturerSlug?: string;
   minUsd?: number;
   maxUsd?: number;
@@ -68,7 +69,15 @@ function buildWhere(f: FigureFilters): Prisma.FigureWhereInput {
     ];
   }
   if (f.category) where.category = f.category;
-  if (f.seriesSlug) where.series = { slug: f.seriesSlug };
+  // Franchise reaches a figure through its series, so the two combine into one
+  // clause rather than competing: choosing a franchise and then a series inside
+  // it narrows, as you would expect from two filters.
+  if (f.seriesSlug || f.franchiseSlug) {
+    where.series = {
+      ...(f.seriesSlug ? { slug: f.seriesSlug } : {}),
+      ...(f.franchiseSlug ? { franchise: { slug: f.franchiseSlug } } : {}),
+    };
+  }
   if (f.manufacturerSlug) where.manufacturer = { slug: f.manufacturerSlug };
   if (f.minUsd !== undefined || f.maxUsd !== undefined) {
     where.marketValueUsd = {
@@ -119,7 +128,7 @@ export async function getFigureBySlug(slug: string) {
     where: { slug },
     include: {
       manufacturer: true,
-      series: true,
+      series: { include: { franchise: { select: { name: true, slug: true } } } },
       characters: { include: { series: { select: { name: true, slug: true } } } },
       images: { orderBy: { sortOrder: "asc" } },
       listings: {
@@ -224,7 +233,17 @@ export async function getMostTracked(take = 8) {
 }
 
 export async function getFacets() {
-  const [series, manufacturers, categoryCounts] = await Promise.all([
+  const [franchises, series, manufacturers, categoryCounts] = await Promise.all([
+    prisma.franchise.findMany({
+      select: {
+        name: true,
+        slug: true,
+        // Figures hang off series, not off the franchise, so the count has to
+        // be summed rather than read.
+        series: { select: { _count: { select: { figures: true } } } },
+      },
+      orderBy: { name: "asc" },
+    }),
     prisma.series.findMany({
       select: { name: true, slug: true, _count: { select: { figures: true } } },
       orderBy: { name: "asc" },
@@ -237,6 +256,13 @@ export async function getFacets() {
   ]);
 
   return {
+    franchises: franchises
+      .map((f) => ({
+        name: f.name,
+        slug: f.slug,
+        count: f.series.reduce((n, s) => n + s._count.figures, 0),
+      }))
+      .filter((f) => f.count > 0),
     series: series.filter((s) => s._count.figures > 0),
     manufacturers: manufacturers.filter((m) => m._count.figures > 0),
     categories: categoryCounts

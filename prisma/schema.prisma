@@ -57,12 +57,40 @@ model Manufacturer {
   @@index([slug])
 }
 
+/// A body of work that shares an origin — Evangelion, Fate, THE IDOLM@STER.
+///
+/// Series are what a manufacturer prints on a box, and they are finer than what
+/// anyone browses by: "Evangelion: 3.0+1.0 Thrice Upon a Time" holds two
+/// figures, "EVANGELION RACING" another two, and someone looking for an Asuka
+/// wants all of them at once. This is the level above.
+///
+/// Assignment is curated, never inferred. A first word in common is not a
+/// franchise: the catalogue contains Demon Slayer and Demon's Souls, Love Live!
+/// and To Love-Ru, The Legend of Zelda and The Legend of Hei. Grouping those
+/// automatically would repeat the wrong-match problem the listing matcher exists
+/// to avoid, on the axis people navigate by.
+model Franchise {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  slug      String   @unique
+  createdAt DateTime @default(now())
+
+  series Series[]
+
+  @@index([slug])
+}
+
 /// The franchise a figure comes from, e.g. "Fate/Grand Order", "Oshi no Ko".
 model Series {
   id        String   @id @default(cuid())
   name      String   @unique
   slug      String   @unique
   createdAt DateTime @default(now())
+
+  /// Null until someone assigns it. A series with no franchise still browses
+  /// and filters normally — it just doesn't group with anything.
+  franchiseId String?
+  franchise   Franchise? @relation(fields: [franchiseId], references: [id], onDelete: SetNull)
 
   /// Japanese title, e.g. その着せ替え人形は恋をする.
   titleJa   String?
