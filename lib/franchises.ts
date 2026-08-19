@@ -124,4 +124,33 @@ export const FRANCHISES: FranchiseDefinition[] = [
       "Love Live! Superstar!!",
     ],
   },
+  {
+    // Named for the game rather than the numbered entry, so a fifth joins this
+    // instead of starting another franchise.
+    name: "Valkyria Chronicles",
+    series: ["Valkyria Chronicles 4"],
+  },
+  {
+    // "Xenoblade" rather than "Xenoblade Chronicles": the shorter name is the
+    // one that survives whatever the next subtitle turns out to be.
+    name: "Xenoblade",
+    series: ["Xenoblade Chronicles 3", "Xenoblade Chronicles: Definitive Edition"],
+  },
+  {
+    // One game, filed twice — the archive has it under both the arabic and the
+    // roman numeral, and neither spelling is more correct than the other.
+    name: "Xenosaga",
+    series: [
+      "Xenosaga Episode 3: Also sprach Zarathustra",
+      "Xenosaga Episode III: Also sprach Zarathustra",
+    ],
+  },
+  {
+    // The series of the same name holds 46 figures and has to be listed here
+    // too, not only the anime. A curated franchise takes a name; a series left
+    // out of the list is promoted to a franchise under its own name; and those
+    // two would be the same name, which is unique.
+    name: "Black Rock Shooter",
+    series: ["Black Rock Shooter", "TV ANIMATION BLACKROCK SHOOTER"],
+  },
 ];
