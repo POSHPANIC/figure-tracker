@@ -149,7 +149,15 @@ export async function quickSearch(q: string, limit = 8) {
   });
 }
 
-export async function getFigureBySlug(slug: string) {
+/**
+ * One figure, with the listings for the condition being looked at.
+ *
+ * The condition tabs used to move the chart and the lowest-ask figure while the
+ * listings below them ignored it, so "Used" could show a page of sealed boxes
+ * priced against a used chart. Everything in that column answers the same
+ * question now.
+ */
+export async function getFigureBySlug(slug: string, condition?: ItemCondition) {
   return prisma.figure.findUnique({
     where: { slug },
     include: {
@@ -165,7 +173,11 @@ export async function getFigureBySlug(slug: string) {
         select: { kind: true, value: true },
       },
       listings: {
-        where: { isActive: true },
+        // UNKNOWN is left out rather than shown under both tabs. A price whose
+        // condition nobody established is not evidence about either one, and
+        // 1,700 of them across the catalogue is not worth muddying the column
+        // that a buyer reads to decide.
+        where: { isActive: true, ...(condition ? { condition } : {}) },
         orderBy: { amountUsd: "asc" },
         take: 12,
         include: { source: { select: { key: true, name: true } } },

@@ -33,8 +33,25 @@ export function ebaySearchQuery(figure: SearchableFigure): string {
   return [figure.manufacturer?.name, figure.name].filter(Boolean).join(" ").slice(0, 100);
 }
 
-export function ebaySearchUrl(figure: SearchableFigure): string {
+/**
+ * eBay's own condition filter, as their search box sets it.
+ *
+ * Checked against live results rather than assumed: the same query returns 163
+ * items under 1000 and 153 under 3000, so the parameter is doing something.
+ */
+const EBAY_CONDITION: Record<string, string> = {
+  NEW_SEALED: "1000",
+  USED_COMPLETE: "3000",
+};
+
+export function ebaySearchUrl(figure: SearchableFigure, condition?: string): string {
   const params = new URLSearchParams({ _nkw: ebaySearchQuery(figure) });
+
+  // Follows the condition tabs, so the search lands on the same question the
+  // rest of the column is answering. Anything we do not have a mapping for —
+  // UNKNOWN — simply searches both, which is the honest default.
+  const filter = condition ? EBAY_CONDITION[condition] : undefined;
+  if (filter) params.set("LH_ItemCondition", filter);
 
   // eBay Partner Network parameters belong here when there is a publisher ID:
   // campid, customid, toolid. Adding them is a two-line change at this one

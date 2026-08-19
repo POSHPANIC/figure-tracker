@@ -49,7 +49,14 @@ export default async function FigurePage({ params, searchParams }: PageProps<"/f
   const { slug } = await params;
   const sp = await searchParams;
 
-  const figure = await getFigureBySlug(slug);
+  // Read before the figure is fetched, because the listings that come back
+  // with it are the ones for this condition.
+  const requested = Array.isArray(sp.condition) ? sp.condition[0] : sp.condition;
+  const condition: ItemCondition = CHARTABLE_CONDITIONS.includes(requested as ItemCondition)
+    ? (requested as ItemCondition)
+    : "NEW_SEALED";
+
+  const figure = await getFigureBySlug(slug, condition);
   if (!figure) notFound();
 
   // Which figures people actually open decides where the marketplace polling
@@ -60,11 +67,6 @@ export default async function FigurePage({ params, searchParams }: PageProps<"/f
   // The identifiers now carry release numbers as well, so the archive id has to
   // be picked out by kind rather than taken as the first one.
   const archiveId = figure.identifiers.find((i) => i.kind === "GSC_PRODUCT");
-
-  const requested = Array.isArray(sp.condition) ? sp.condition[0] : sp.condition;
-  const condition: ItemCondition = CHARTABLE_CONDITIONS.includes(requested as ItemCondition)
-    ? (requested as ItemCondition)
-    : "NEW_SEALED";
 
   const user = await currentUser();
   const [history, stats, userState, money] = await Promise.all([
@@ -407,7 +409,7 @@ export default async function FigurePage({ params, searchParams }: PageProps<"/f
           <section className="rounded-xl border border-border bg-surface p-4">
             <div className="mb-3 flex items-baseline justify-between gap-3">
               <h2 className="flex items-baseline gap-1.5 text-sm font-semibold tracking-tight">
-                Live listings
+                {CONDITION_LABELS[condition]} listings
                 {figure.listings.some((l) => l.source.key === "ebay") && (
                   <span className="text-muted">
                     on <EbayMark className="text-[0.95em]" />
@@ -431,7 +433,7 @@ export default async function FigurePage({ params, searchParams }: PageProps<"/f
               without reading the list first.
             */}
             <a
-              href={ebaySearchUrl(figure)}
+              href={ebaySearchUrl(figure, condition)}
               target="_blank"
               rel="noopener noreferrer nofollow"
               className="mb-3 inline-flex items-baseline gap-1.5 text-xs text-accent hover:underline"
@@ -447,21 +449,9 @@ export default async function FigurePage({ params, searchParams }: PageProps<"/f
               <div className="py-6 text-center">
                 <p className="text-sm text-muted">
                   {figure.lastPolledAt
-                    ? "No active listings tracked right now."
+                    ? `No ${CONDITION_LABELS[condition].toLowerCase()} listings tracked right now — try the other condition, or the search above.`
                     : "Not checked for prices yet — this figure is queued."}
                 </p>
-                {/* Nothing tracked is not the same as nothing for sale — most
-                    often it means we have not spent a call on this figure yet.
-                    Sending people to eBay's own search costs us nothing and is
-                    more use than a dead end. */}
-                <a
-                  href={ebaySearchUrl(figure)}
-                  target="_blank"
-                  rel="noopener noreferrer nofollow"
-                  className="mt-3 inline-flex items-baseline gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs font-medium transition hover:border-accent/60"
-                >
-                  Search <EbayMark /> for this figure
-                </a>
               </div>
             ) : (
               <>
