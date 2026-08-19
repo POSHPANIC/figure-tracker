@@ -10,6 +10,7 @@ import { FigureActions } from "@/components/figure-actions";
 import { FigureImagesAdmin } from "@/components/figure-images-admin";
 import { FigureThumb } from "@/components/figure-thumb";
 import { PriceChart } from "@/components/price-chart";
+import { archiveProductUrl } from "@/lib/ingest/gsc";
 import { ebaySearchUrl } from "@/lib/ebay-search";
 import { getFigureBySlug, getFigureStats, getPriceHistory } from "@/lib/queries";
 import { getFigureUserState } from "@/lib/user-queries";
@@ -313,39 +314,30 @@ export default async function FigurePage({ params, searchParams }: PageProps<"/f
             </p>
           </section>
 
-          {(figure.storeUrlUs || figure.storeUrlIntl) && (
-            // Above the marketplace listings on purpose. Everything below is a
-            // stranger's listing, matched to this figure by a scoring function
-            // that is right most of the time; this is the maker's own page for
-            // the product, and it is either right or absent.
+          {figure.identifiers[0] && (
+            // The manufacturer's own entry for this product, which is a
+            // different promise from the one made here an hour ago.
+            //
+            // That said "buy it from Good Smile" and pointed at their two
+            // shops. Both had been retired into goodsmile.com, and that
+            // redirect discards the product path, so all 4,844 of those links
+            // put a visitor on a homepage. This one is the archive page the
+            // catalogue was read from: not a shop, but the right product, and
+            // it doubles as a citation for the figures and dates on this page.
             <section className="rounded-xl border border-border bg-surface p-4">
               <h2 className="text-sm font-semibold tracking-tight">From the manufacturer</h2>
               <p className="mt-1 text-xs text-muted">
-                Good Smile&rsquo;s own page for this product. New stock at retail price, when they
-                have it.
+                Good Smile&rsquo;s own entry for this product — the specifications on this page come
+                from it.
               </p>
-              <div className="mt-3 flex flex-wrap gap-2">
-                {figure.storeUrlUs && (
-                  <a
-                    href={figure.storeUrlUs}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs font-medium transition hover:border-accent/60"
-                  >
-                    GOODSMILE ONLINE SHOP US <ExternalLink className="size-3 text-muted" />
-                  </a>
-                )}
-                {figure.storeUrlIntl && (
-                  <a
-                    href={figure.storeUrlIntl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs font-medium transition hover:border-accent/60"
-                  >
-                    GOODSMILE ONLINE SHOP <ExternalLink className="size-3 text-muted" />
-                  </a>
-                )}
-              </div>
+              <a
+                href={archiveProductUrl(figure.identifiers[0].value)}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-3 inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs font-medium transition hover:border-accent/60"
+              >
+                Product page at Good Smile Company <ExternalLink className="size-3 text-muted" />
+              </a>
             </section>
           )}
 

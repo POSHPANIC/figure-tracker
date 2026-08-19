@@ -144,6 +144,9 @@ export async function getFigureBySlug(slug: string) {
       series: { include: { franchise: { select: { name: true, slug: true } } } },
       characters: { include: { series: { select: { name: true, slug: true } } } },
       images: { orderBy: { sortOrder: "asc" } },
+      // The id in Good Smile's archive, which is how the page links back to
+      // the manufacturer's own entry for the product.
+      identifiers: { where: { kind: "GSC_PRODUCT" }, select: { value: true } },
       listings: {
         where: { isActive: true },
         orderBy: { amountUsd: "asc" },

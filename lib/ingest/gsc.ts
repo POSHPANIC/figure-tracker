@@ -41,6 +41,19 @@ export function listingUrl(page: number): string {
     : `${GSC_ARCHIVE_ORIGIN}/en/products/page/${page}`;
 }
 
+/**
+ * The archive's page for a product, from the id the import recorded.
+ *
+ * Still resolves, and is the only Good Smile URL that does. Their two shops —
+ * goodsmileus.com and goodsmileshop.com — were retired into goodsmile.com, and
+ * that redirect throws the product path away: every one of them lands on a
+ * homepage. The archive stopped publishing in February 2024 but its pages are
+ * still served, so this points at the right product where a shop link cannot.
+ */
+export function archiveProductUrl(productId: string): string {
+  return `${GSC_ARCHIVE_ORIGIN}/en/product/${productId}/`;
+}
+
 export function productUrl(path: string): string {
   return `${GSC_ARCHIVE_ORIGIN}${path}`;
 }

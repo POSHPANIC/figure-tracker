@@ -154,22 +154,6 @@ model Figure {
 
   primaryImageUrl String?
 
-  /// The manufacturer's own page for this product, in their own shops.
-  ///
-  /// Read off the Good Smile archive page the catalogue was imported from, and
-  /// the one link here that is certainly the right product — a marketplace
-  /// listing can be a bootleg, a repaint or the wrong scale, and this cannot.
-  ///
-  /// Null for most of the catalogue and that is the source's doing: products
-  /// from about 2020 carry a per-product shop link, older ones offer only the
-  /// shop's front page, which is not worth sending anyone to.
-  storeUrlUs   String?
-  storeUrlIntl String?
-
-  /// When those were last looked for, so a re-run can skip what it has already
-  /// checked rather than fetching seven thousand pages again.
-  storeCheckedAt DateTime?
-
   manufacturerId String?
   manufacturer   Manufacturer? @relation(fields: [manufacturerId], references: [id], onDelete: SetNull)
   seriesId       String?
