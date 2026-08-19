@@ -424,6 +424,21 @@ export default async function FigurePage({ params, searchParams }: PageProps<"/f
               )}
             </div>
 
+            {/*
+              At the top, because the rows below now open the listings
+              themselves. Whatever we matched is a guess about someone else's
+              title; this is the unfiltered thing, and it should be reachable
+              without reading the list first.
+            */}
+            <a
+              href={ebaySearchUrl(figure)}
+              target="_blank"
+              rel="noopener noreferrer nofollow"
+              className="mb-3 inline-flex items-baseline gap-1.5 text-xs text-accent hover:underline"
+            >
+              Search <EbayMark className="text-[0.95em]" /> for this figure
+            </a>
+
             {figure.listings.length === 0 ? (
               // "None found" and "not looked yet" are different facts, and a
               // catalogue this much larger than its marketplace quota will
@@ -473,23 +488,24 @@ export default async function FigurePage({ params, searchParams }: PageProps<"/f
                           })}
                         </span>
                         <a
-                          // eBay rows open a search for this figure rather than
-                          // this listing. Matching a seller's title to a
-                          // catalogue entry is a guess, and a wrong guess sends
-                          // someone to the wrong figure with nothing to tell
-                          // them so. A search puts them on eBay's results for
-                          // what they were looking at: right match, it is the
-                          // top result anyway; wrong match, they are still in
-                          // the right place.
-                          href={isEbay ? ebaySearchUrl(figure) : l.url}
+                          // The listing itself. These rows used to open a
+                          // search instead, because a title matched to the
+                          // wrong catalogue entry would send a buyer to the
+                          // wrong product — but a row that shows one item's
+                          // title, condition and price and then opens a page of
+                          // other items is its own kind of wrong, and the more
+                          // annoying one when the match was right.
+                          //
+                          // What makes this safe enough now is that the row
+                          // says what it is. The title is the seller's own, so
+                          // anyone can see before clicking whether it is the
+                          // figure they were reading about, and the search for
+                          // the figure is still one link below.
+                          href={l.url}
                           target="_blank"
                           rel="noopener noreferrer nofollow"
                           className="shrink-0 rounded-md border border-border p-1.5 text-muted transition hover:border-accent/60 hover:text-foreground"
-                          aria-label={
-                            isEbay
-                              ? `Search eBay for ${figure.name}`
-                              : `Open listing on ${l.source.name}`
-                          }
+                          aria-label={`Open this listing on ${isEbay ? "eBay" : l.source.name}`}
                         >
                           <ExternalLink className="size-3.5" />
                         </a>
@@ -499,18 +515,13 @@ export default async function FigurePage({ params, searchParams }: PageProps<"/f
                 </ul>
 
                 {figure.listings.some((l) => l.source.key === "ebay") && (
+                  // The caveat stays even though the link moved to the top: a
+                  // row opening a specific item is a stronger claim than a row
+                  // opening a search, so saying that the matching is automatic
+                  // matters more now, not less.
                   <p className="mt-3 border-t border-border pt-3 text-xs text-muted">
-                    Listings are matched to this figure automatically and can
-                    include similar releases.{" "}
-                    <a
-                      href={ebaySearchUrl(figure)}
-                      target="_blank"
-                      rel="noopener noreferrer nofollow"
-                      className="font-medium text-foreground underline underline-offset-2 hover:text-accent"
-                    >
-                      Search eBay for this figure
-                    </a>{" "}
-                    to see everything.
+                    Listings are matched to this figure automatically and can include similar
+                    releases. Check the title before buying.
                   </p>
                 )}
               </>
