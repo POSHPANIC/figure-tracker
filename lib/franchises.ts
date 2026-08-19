@@ -118,8 +118,11 @@ export const FRANCHISES: FranchiseDefinition[] = [
     series: ["Ghost in the Shell S.A.C", "攻殻機動隊S.A.C."],
   },
   {
+    // "LoveLive!" is the same franchise without the space, and holds 73 figures
+    // against the two spaced entries' 17 — the filter was offering both.
     name: "Love Live!",
     series: [
+      "LoveLive!",
       "Love Live! Nijigasaki High School Idol Club",
       "Love Live! Superstar!!",
     ],
@@ -165,7 +168,7 @@ export const FRANCHISES: FranchiseDefinition[] = [
     // The Japanese title slugified to nothing at all, so its franchise sat on an
     // empty slug and its browse URL led nowhere. The season joins for the same
     // reason Shield Hero does: a season is not a thing anyone browses by.
-    name: "Kantai Collection",
+    name: "KanColle",
     series: [
       "Kantai Collection -KanColle-",
       "艦隊これくしょん ‐艦これ‐",
@@ -243,5 +246,23 @@ export const FRANCHISES: FranchiseDefinition[] = [
     series: [
       "フラクタル",
     ],
+  },
+  {
+    // The full title, which is what the box says.
+    name: "Re:ZERO -Starting Life in Another World-",
+    series: ["Re:Zero"],
+  },
+  {
+    // Named for the work, not the game it started as — the stage plays and the
+    // anime are the same franchise and the "-ONLINE-" suffix only describes one
+    // of them.
+    name: "Touken Ranbu",
+    series: ["Touken Ranbu -ONLINE-"],
+  },
+  {
+    // Darkness is the second series; the franchise is To LOVE-Ru, so a figure
+    // from the first one has somewhere to go.
+    name: "To LOVE-Ru",
+    series: ["To Love-Ru Darkness"],
   },
 ];
