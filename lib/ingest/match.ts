@@ -395,9 +395,54 @@ function unexplainedVariants(titleTokens: Set<string>, figure: MatchCandidate): 
  * than confidence, so no amount of agreement elsewhere should override them —
  * a t-shirt with the right character's name on it is still a t-shirt.
  */
+/**
+ * Things that are merchandise rather than figures.
+ *
+ * A catalogue entry named for nothing but its character — "Usada Pekora", the
+ * FREEing 1/4 scale — has no line word, no number and no scale to discriminate
+ * on, so every gate below passes on the character's name alone. Card sleeves, a
+ * parka and two T-shirts all reached her page scoring 0.72, which is what the
+ * accept threshold happens to be.
+ */
+const MERCHANDISE =
+  /\b(card sleeves?|sleeve collection|t[- ]?shirts?|parka|hoodie|sweatshirt|keychains?|key ?rings?|posters?|tapestr(?:y|ies)|acrylic (?:stand|charm)|badges?|pin ?backs?|mouse ?pads?|towels?|stickers?|mugs?|blankets?|tote ?bags?|cushions?|pillow ?cases?)\b/i;
+
+/**
+ * Signs that the listing is a figure after all.
+ *
+ * Checked because some genuine products carry a garment in their own name — a
+ * Nendoroid released as a "T-Shirt Ver." is a figure — and because plenty ship
+ * with a bonus that is merchandise. A FREEing B-style went out "W/ Poster", and
+ * on the word "poster" alone it read as a poster.
+ *
+ * A bare scale counts. That listing said "1/4th" and never the word "figure",
+ * which is normal for scale figures and was the whole reason it was caught.
+ */
+const IS_A_FIGURE =
+  /(?:\b(nendoroid|figma|figure|figures|statue|bust|pop[- ]?up[- ]?parade|scale|prize|garage kit|model kit|doll|plushie|figurine)\b|\b1\s*\/\s*\d{1,2}(?:th)?\b)/i;
+
+/**
+ * True when a title is selling something that is not a figure.
+ *
+ * Deliberately narrow: it only fires when the title names a merchandise type
+ * *and* says nothing about being a figure. Anything ambiguous is left to the
+ * gates, which is the right way round — a missed rejection shows a wrong
+ * listing, but an over-eager one hides a real product with no trace.
+ */
+export function isNotAFigure(title: string): boolean {
+  return MERCHANDISE.test(title) && !IS_A_FIGURE.test(title);
+}
+
 export function scoreMatch(title: string, figure: MatchCandidate): number {
   const titleTokens = tokenize(title);
   if (titleTokens.size === 0) return 0;
+
+  // --- Gate 0: it has to be a figure. ---
+  //
+  // Every other gate asks "which figure is this?" and none asks "is this a
+  // figure at all?", which is fine while the search returns figures and useless
+  // when it returns a character's whole merchandise line.
+  if (isNotAFigure(title)) return 0;
 
   // --- Gate 1: the character must be named, in some language. ---
   //

@@ -4,6 +4,7 @@ import {
   MATCH_ACCEPT_THRESHOLD,
   bestMatch,
   extractLineNumber,
+  isNotAFigure,
   descriptorTokens,
   normalizeCondition,
   scoreMatch,
@@ -575,5 +576,68 @@ describe("release numbers in matching", () => {
   it("still matches when the title quotes no number", () => {
     const score = scoreMatch("Good Smile Company Nendoroid Marin Kitagawa", withNumber);
     assert.ok(score >= MATCH_ACCEPT_THRESHOLD, `silence is not contradiction, got ${score}`);
+  });
+});
+
+/**
+ * Merchandise. Every other gate asks which figure a listing is; these ask
+ * whether it is one, which nothing did until a Usada Pekora page filled up with
+ * clothing.
+ */
+describe("isNotAFigure", () => {
+  it("rejects the merchandise that reached a figure page", () => {
+    // All four scored 0.72 against "Usada Pekora" — a catalogue entry named for
+    // nothing but its character, so the character's name is the whole match.
+    assert.equal(isNotAFigure("Usada Pekora hololive Anime Card Sleeves Vol.2996 *NEW* 75ct"), true);
+    assert.equal(
+      isNotAFigure("Bushiroad Sleeve Collection HG Hololive Production Usada Pekora 1st fes version"),
+      true,
+    );
+    assert.equal(
+      isNotAFigure('Pekora Usada UP2M+ Parka Navy Free Size "Hololive Usada Pekora 5th Anniversary"'),
+      true,
+    );
+    assert.equal(isNotAFigure("Hololive Usada Pekora PEKO collaboration T-shirts Free size NEW"), true);
+  });
+
+  it("keeps a figure whose own name contains a garment", () => {
+    // The reason this is two rules rather than a blocklist. Rejecting these
+    // would trade one wrong answer for another.
+    assert.equal(isNotAFigure("Nendoroid Hatsune Miku: T-Shirt Ver."), false);
+    assert.equal(isNotAFigure("figma Female Body with Hoodie Outfit"), false);
+    assert.equal(isNotAFigure("POP UP PARADE Usada Pekora"), false);
+  });
+
+  it("leaves ordinary figure listings alone", () => {
+    assert.equal(isNotAFigure("Good Smile Company Nendoroid Hololive Usada Pekora No.1823"), false);
+    assert.equal(isNotAFigure("Freeing hololive Production Usada Pekora 1/4 figure"), false);
+    assert.equal(isNotAFigure("Nendoroid 2509 NANA Nana Osaki Action Figure"), false);
+  });
+
+  it("does not fire on a title that merely mentions a bonus", () => {
+    // "w/ bonus" items are figures; the bonus is not what is being sold.
+    assert.equal(isNotAFigure("Nendoroid 2839 Hatsune Miku 3.0 w/ Bonus Acrylic Stand"), false);
+  });
+});
+
+describe("isNotAFigure, against real listings it got wrong", () => {
+  it("keeps a scale figure sold with a poster", () => {
+    // Caught by "poster" on the first pass. It is a FREEing B-style and the
+    // poster is a bonus — the title never says "figure", only "1/4th", which
+    // is normal for scale figures.
+    assert.equal(
+      isNotAFigure("Magical Sempai/Senpai FREEing B-Style 1/4th Tejina Senpai Bunny Ver. W/ Poster"),
+      false,
+    );
+  });
+
+  it("reads a bare scale as a figure", () => {
+    assert.equal(isNotAFigure("Hololive Usada Pekora 1/4 Keychain Bundle"), false);
+    assert.equal(isNotAFigure("Some Character 1/7 w/ Poster"), false);
+  });
+
+  it("still rejects merchandise carrying no scale", () => {
+    assert.equal(isNotAFigure("Usada Pekora hololive Anime Card Sleeves Vol.2996 *NEW* 75ct"), true);
+    assert.equal(isNotAFigure("Minicchu The Idolmaster Kotori Otonashi Mouse Pad"), true);
   });
 });
