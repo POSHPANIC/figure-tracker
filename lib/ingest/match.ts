@@ -403,9 +403,15 @@ function unexplainedVariants(titleTokens: Set<string>, figure: MatchCandidate): 
  * on, so every gate below passes on the character's name alone. Card sleeves, a
  * parka and two T-shirts all reached her page scoring 0.72, which is what the
  * accept threshold happens to be.
+ *
+ * The list grew once the first version was live and the leftovers could be
+ * read. A figure called Veronica had collected Archie comics, a Veronica Mars
+ * DVD and a trading card; Shana had seven Blu-ray box sets, all at 0.72. A
+ * character's name is shared by everything ever made about them, and only some
+ * of it is a figure.
  */
 const MERCHANDISE =
-  /\b(card sleeves?|sleeve collection|t[- ]?shirts?|parka|hoodie|sweatshirt|keychains?|key ?rings?|posters?|tapestr(?:y|ies)|acrylic (?:stand|charm)|badges?|pin ?backs?|mouse ?pads?|towels?|stickers?|mugs?|blankets?|tote ?bags?|cushions?|pillow ?cases?)\b/i;
+  /\b(card sleeves?|sleeve collection|t[- ]?shirts?|parka|hoodie|sweatshirt|keychains?|key ?rings?|tote ?bags?|posters?|tapestr(?:y|ies)|badges?|pin ?backs?|stickers?|decals?|acrylic (?:stand|charm)|mouse ?pads?|towels?|mugs?|blankets?|cushions?|pillow ?cases?|dvds?|blu[- ]?rays?|\d+ disc|disc set|box ?set|complete (?:series|season|collection)|season \d|comics?|newsstand|graphic novel|manga vol|art ?book|light novel|paperback|trading cards?|tcg|booster (?:box|pack)|psa \d|nintendo switch|playstation|ps[45]|xbox|game cartridge|\bvol(?:ume)?s?\b|\bbooks?\b)\b/i;
 
 /**
  * Signs that the listing is a figure after all.

@@ -641,3 +641,57 @@ describe("isNotAFigure, against real listings it got wrong", () => {
     assert.equal(isNotAFigure("Minicchu The Idolmaster Kotori Otonashi Mouse Pad"), true);
   });
 });
+
+describe("isNotAFigure, the second sweep", () => {
+  it("rejects discs, comics and cards a character's name attracted", () => {
+    assert.equal(isNotAFigure("VERONICA #100 NEWSSTAND Archie Comics 2000 Dan Parent"), true);
+    assert.equal(isNotAFigure("Veronica Mars: Season 1 DVD Very Good Ex Library"), true);
+    assert.equal(isNotAFigure("VERONICA DOL TRADING CARD FREE SHIPPING"), true);
+    assert.equal(isNotAFigure("Shakugan no Shana 7 Disc DVD set"), true);
+    assert.equal(isNotAFigure("Shakugan No Shana The Complete Season 1 Blu-ray"), true);
+  });
+
+  it("misses a comic that names no product type, and that is the right miss", () => {
+    // "Betty and Veronica #269 DAN PARENT COVER (ARCHIE 2014)" is a comic, and
+    // nothing in it says so except an issue number and the word COVER. Matching
+    // "cover" would take out "Asuka Rei Mari Newtype Cover Ver.", a real figure
+    // in this catalogue. One comic on a Veronica page is the cheaper mistake.
+    assert.equal(isNotAFigure("Betty and Veronica #269 DAN PARENT COVER (ARCHIE 2014)"), false);
+    assert.equal(isNotAFigure("Asuka Rei Mari Newtype Cover Ver. Kadokawa"), false);
+  });
+
+  it("keeps a figure whose series is a card game", () => {
+    // Scores 1.0 and is a real Nendoroid. The series is called Trading Card
+    // Game, which is exactly why this is two rules and not a word list.
+    assert.equal(
+      isNotAFigure("Nendoroid 1069 - Yu-Gi-Oh! Trading Card Game - Yami Yugi"),
+      false,
+    );
+  });
+
+  it("keeps figure listings that merely tag themselves anime/manga", () => {
+    assert.equal(
+      isNotAFigure("Magical Sempai Bunny Ver. 1/4 Scale Figure FREEing Tejina senpai Anime Manga"),
+      false,
+    );
+  });
+
+  it("keeps a figure from a game whose platform is named", () => {
+    assert.equal(isNotAFigure("Nendoroid Demon's Souls PS5 Maiden in Black"), false);
+  });
+});
+
+describe("isNotAFigure, books and volumes", () => {
+  it("rejects the novels left on Shana after the discs went", () => {
+    assert.equal(isNotAFigure("Shakugan no Shana, Volume 3"), true);
+    assert.equal(isNotAFigure("5 Volumes Shakugan No Shana Anime"), true);
+    assert.equal(isNotAFigure("Shakugan no Shana Vol 7 Book Kadokawa Japanese"), true);
+  });
+
+  it("keeps an accessory set that numbers its volumes", () => {
+    // These say "Vol.1" and are products in the catalogue. They also say
+    // "Nendoroid", which is the whole reason the second rule exists.
+    assert.equal(isNotAFigure("Nendoroid More: Face Swap Vol.1"), false);
+    assert.equal(isNotAFigure("figma Styles Vol. 2 Bicycle"), false);
+  });
+});
