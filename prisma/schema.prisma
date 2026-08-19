@@ -189,6 +189,22 @@ model Figure {
   /// with its sample size beside it, this is true and useful.
   askMedianUsd     Decimal?  @db.Decimal(12, 2)
   askListings      Int       @default(0)
+
+  /// The manufacturer's own store page for this product, and what it said.
+  ///
+  /// Filled in one figure at a time, by hand or from the store-link field on
+  /// the correction form. Their store cannot be enumerated — no sitemap, and
+  /// the only index is behind a path robots.txt asks bots to leave alone — so
+  /// there is no run that fills this in for the catalogue.
+  ///
+  /// storeAvailable is deliberately nullable rather than defaulting to false.
+  /// "We could not tell" and "you cannot buy it" are different answers, and
+  /// showing the second when we mean the first costs somebody a purchase.
+  storeUrl         String?
+  storePriceJpy    Int?
+  storeAvailable   Boolean?
+  storeClosesAt    DateTime?
+  storeCheckedAt   DateTime?
   /// Percent change in marketValueUsd vs. 30 days ago. 12.5 means +12.5%.
   change30dPct     Decimal?  @db.Decimal(8, 2)
   /// Number of recorded sales in the trailing 90 days — our confidence signal.

@@ -9,7 +9,9 @@ import { EbayMark } from "@/components/ebay-mark";
 import { FigureActions } from "@/components/figure-actions";
 import { FigureImagesAdmin } from "@/components/figure-images-admin";
 import { FigureThumb } from "@/components/figure-thumb";
+import { GoodSmileMark } from "@/components/goodsmile-mark";
 import { PriceChart } from "@/components/price-chart";
+import { describeAvailability } from "@/lib/ingest/goodsmile-store";
 import { archiveProductUrl } from "@/lib/ingest/gsc";
 import { affiliateEnabled, withAffiliate } from "@/lib/ebay-affiliate";
 import { ebaySearchUrl } from "@/lib/ebay-search";
@@ -369,6 +371,41 @@ export default async function FigurePage({ params, searchParams }: PageProps<"/f
               Their store carries what is currently in production. Older figures are usually not
               listed — the marketplace prices below are the ones that matter for those.
             </p>
+
+            {figure.storeUrl && (
+              // The product itself, when somebody has supplied the link — the
+              // one row on this page that is not a guess about whose listing is
+              // whose. Whether it can still be ordered is shown either way: a
+              // closed preorder is why the marketplace prices below exist, and
+              // hiding it would leave the reader wondering.
+              <a
+                href={figure.storeUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-3 flex items-center gap-3 rounded-lg border border-border p-3 transition hover:border-accent/60"
+              >
+                <GoodSmileMark className="shrink-0 text-sm" />
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-sm">{figure.name}</span>
+                  <span
+                    className={cn(
+                      "block text-xs",
+                      figure.storeAvailable === true ? "text-up" : "text-muted",
+                    )}
+                  >
+                    {describeAvailability({
+                      orderClosesAt: figure.storeClosesAt,
+                      available: figure.storeAvailable,
+                    })}
+                  </span>
+                </span>
+                {figure.storePriceJpy !== null && (
+                  <span className="tabular shrink-0 text-sm font-medium">
+                    {formatCurrency(figure.storePriceJpy, "JPY")}
+                  </span>
+                )}
+              </a>
+            )}
             {/* Their search rather than the product, because the product cannot
                 be linked. goodsmile.com has no sitemap and its only index sits
                 under a path robots.txt asks bots to stay out of, so there is
