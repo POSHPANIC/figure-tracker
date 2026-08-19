@@ -471,7 +471,26 @@ export default async function FigurePage({ params, searchParams }: PageProps<"/f
                     return (
                       <li key={l.id} className="flex items-center gap-3 py-2.5">
                         <span className="min-w-0 flex-1">
-                          <span className="block truncate text-sm">{l.title}</span>
+                          {/*
+                            The title is the link. It is also the thing a reader
+                            has to check before buying, since the match is
+                            automatic — so the words to read and the thing to
+                            click should be the same object rather than a title
+                            and a separate icon at the far end of the row.
+
+                            title= carries the full text, because these are
+                            truncated and "check the title" is not advice you
+                            can follow on a title you cannot see.
+                          */}
+                          <a
+                            href={l.url}
+                            target="_blank"
+                            rel="noopener noreferrer nofollow"
+                            title={l.title}
+                            className="block truncate text-sm hover:text-accent hover:underline"
+                          >
+                            {l.title}
+                          </a>
                           <span className="flex items-baseline gap-1 text-xs text-muted">
                             {isEbay ? <EbayMark /> : l.source.name} ·{" "}
                             {CONDITION_LABELS[l.condition]}
@@ -487,28 +506,6 @@ export default async function FigurePage({ params, searchParams }: PageProps<"/f
                             original: { amount: l.amount, currency: l.currency },
                           })}
                         </span>
-                        <a
-                          // The listing itself. These rows used to open a
-                          // search instead, because a title matched to the
-                          // wrong catalogue entry would send a buyer to the
-                          // wrong product — but a row that shows one item's
-                          // title, condition and price and then opens a page of
-                          // other items is its own kind of wrong, and the more
-                          // annoying one when the match was right.
-                          //
-                          // What makes this safe enough now is that the row
-                          // says what it is. The title is the seller's own, so
-                          // anyone can see before clicking whether it is the
-                          // figure they were reading about, and the search for
-                          // the figure is still one link below.
-                          href={l.url}
-                          target="_blank"
-                          rel="noopener noreferrer nofollow"
-                          className="shrink-0 rounded-md border border-border p-1.5 text-muted transition hover:border-accent/60 hover:text-foreground"
-                          aria-label={`Open this listing on ${isEbay ? "eBay" : l.source.name}`}
-                        >
-                          <ExternalLink className="size-3.5" />
-                        </a>
                       </li>
                     );
                   })}
