@@ -313,6 +313,42 @@ export default async function FigurePage({ params, searchParams }: PageProps<"/f
             </p>
           </section>
 
+          {(figure.storeUrlUs || figure.storeUrlIntl) && (
+            // Above the marketplace listings on purpose. Everything below is a
+            // stranger's listing, matched to this figure by a scoring function
+            // that is right most of the time; this is the maker's own page for
+            // the product, and it is either right or absent.
+            <section className="rounded-xl border border-border bg-surface p-4">
+              <h2 className="text-sm font-semibold tracking-tight">From the manufacturer</h2>
+              <p className="mt-1 text-xs text-muted">
+                Good Smile&rsquo;s own page for this product. New stock at retail price, when they
+                have it.
+              </p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {figure.storeUrlUs && (
+                  <a
+                    href={figure.storeUrlUs}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs font-medium transition hover:border-accent/60"
+                  >
+                    GOODSMILE ONLINE SHOP US <ExternalLink className="size-3 text-muted" />
+                  </a>
+                )}
+                {figure.storeUrlIntl && (
+                  <a
+                    href={figure.storeUrlIntl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs font-medium transition hover:border-accent/60"
+                  >
+                    GOODSMILE ONLINE SHOP <ExternalLink className="size-3 text-muted" />
+                  </a>
+                )}
+              </div>
+            </section>
+          )}
+
           <section className="rounded-xl border border-border bg-surface p-4">
             <div className="mb-3 flex items-baseline justify-between gap-3">
               <h2 className="flex items-baseline gap-1.5 text-sm font-semibold tracking-tight">
