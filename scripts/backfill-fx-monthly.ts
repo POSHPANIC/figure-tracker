@@ -74,22 +74,28 @@ async function main() {
     return;
   }
 
+  // One statement per batch, not a transaction of upserts. Prisma's interactive
+  // transactions time out at five seconds, and 500 round trips to a hosted
+  // database do not fit in that — the first attempt at this died with P2028.
   let written = 0;
   const BATCH = 500;
   for (let i = 0; i < rows.length; i += BATCH) {
     const batch = rows.slice(i, i + BATCH);
-    await prisma.$transaction(
-      batch.map((r) =>
-        prisma.fxMonthly.upsert({
-          where: { currency_month: { currency: r.currency, month: r.month } },
-          create: r,
-          update: { rateToUsd: r.rateToUsd, days: r.days },
-        }),
-      ),
-    );
+    await prisma.$executeRaw`
+      INSERT INTO "FxMonthly" (id, currency, month, "rateToUsd", days)
+      SELECT gen_random_uuid()::text, c, m::date, r, d
+      FROM unnest(
+        ${batch.map((r) => r.currency)}::text[],
+        ${batch.map((r) => r.month.toISOString().slice(0, 10))}::text[],
+        ${batch.map((r) => r.rateToUsd)}::numeric[],
+        ${batch.map((r) => r.days)}::int[]
+      ) AS t(c, m, r, d)
+      ON CONFLICT (currency, month) DO UPDATE
+        SET "rateToUsd" = EXCLUDED."rateToUsd", days = EXCLUDED.days`;
     written += batch.length;
     console.log(`  saved ${written}/${rows.length}`);
   }
+
 
   console.log(`\n  Done. ${written} monthly rates stored.\n`);
   await prisma.$disconnect();
