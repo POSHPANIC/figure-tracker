@@ -144,9 +144,13 @@ export async function getFigureBySlug(slug: string) {
       series: { include: { franchise: { select: { name: true, slug: true } } } },
       characters: { include: { series: { select: { name: true, slug: true } } } },
       images: { orderBy: { sortOrder: "asc" } },
-      // The id in Good Smile's archive, which is how the page links back to
-      // the manufacturer's own entry for the product.
-      identifiers: { where: { kind: "GSC_PRODUCT" }, select: { value: true } },
+      // The archive id, which links back to the manufacturer's entry for the
+      // product, and the release number, which is what makes their store
+      // search land on the right thing.
+      identifiers: {
+        where: { kind: { in: ["GSC_PRODUCT", "NENDOROID_NO", "FIGMA_NO"] } },
+        select: { kind: true, value: true },
+      },
       listings: {
         where: { isActive: true },
         orderBy: { amountUsd: "asc" },

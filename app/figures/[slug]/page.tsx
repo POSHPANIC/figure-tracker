@@ -12,6 +12,7 @@ import { FigureThumb } from "@/components/figure-thumb";
 import { PriceChart } from "@/components/price-chart";
 import { archiveProductUrl } from "@/lib/ingest/gsc";
 import { ebaySearchUrl } from "@/lib/ebay-search";
+import { goodsmileSearchUrl } from "@/lib/goodsmile-search";
 import { getFigureBySlug, getFigureStats, getPriceHistory } from "@/lib/queries";
 import { getFigureUserState } from "@/lib/user-queries";
 import { formatCurrency, formatPercent, formatUsd, trendOf } from "@/lib/money";
@@ -55,6 +56,10 @@ export default async function FigurePage({ params, searchParams }: PageProps<"/f
   // budget goes — see lib/ingest/poll-priority.ts. Deferred with after() so a
   // page never waits on a counter.
   after(() => recordFigureView(figure.id));
+
+  // The identifiers now carry release numbers as well, so the archive id has to
+  // be picked out by kind rather than taken as the first one.
+  const archiveId = figure.identifiers.find((i) => i.kind === "GSC_PRODUCT");
 
   const requested = Array.isArray(sp.condition) ? sp.condition[0] : sp.condition;
   const condition: ItemCondition = CHARTABLE_CONDITIONS.includes(requested as ItemCondition)
@@ -314,32 +319,49 @@ export default async function FigurePage({ params, searchParams }: PageProps<"/f
             </p>
           </section>
 
-          {figure.identifiers[0] && (
-            // The manufacturer's own entry for this product, which is a
-            // different promise from the one made here an hour ago.
-            //
-            // That said "buy it from Good Smile" and pointed at their two
-            // shops. Both had been retired into goodsmile.com, and that
-            // redirect discards the product path, so all 4,844 of those links
-            // put a visitor on a homepage. This one is the archive page the
-            // catalogue was read from: not a shop, but the right product, and
-            // it doubles as a citation for the figures and dates on this page.
-            <section className="rounded-xl border border-border bg-surface p-4">
-              <h2 className="text-sm font-semibold tracking-tight">From the manufacturer</h2>
-              <p className="mt-1 text-xs text-muted">
-                Good Smile&rsquo;s own entry for this product — the specifications on this page come
-                from it.
+          <section className="rounded-xl border border-border bg-surface p-4">
+            <h2 className="text-sm font-semibold tracking-tight">From the manufacturer</h2>
+            <p className="mt-1 text-xs text-muted">
+              Their store carries what is currently in production. Older figures are usually not
+              listed — the marketplace prices below are the ones that matter for those.
+            </p>
+            {/* Their search rather than the product, because the product cannot
+                be linked. goodsmile.com has no sitemap and its only index sits
+                under a path robots.txt asks bots to stay out of, so there is
+                nothing to map our figures onto. nofollow keeps crawlers off it,
+                which is what that rule is there for — a person clicking is not
+                what they are guarding against.
+
+                Labelled as a search, not as the product. Their store sells
+                current stock only: "Nendoroid 2534" puts that figure first,
+                while "Nendoroid 280" — Santa Miku, 2012 — cannot find it
+                because it is not for sale anywhere on the site. */}
+            <a
+              href={goodsmileSearchUrl(figure)}
+              target="_blank"
+              rel="nofollow noopener noreferrer"
+              className="mt-3 inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs font-medium transition hover:border-accent/60"
+            >
+              Search Good Smile Company <ExternalLink className="size-3 text-muted" />
+            </a>
+            {archiveId && (
+              // The archive entry the specifications came from. Not a shop —
+              // it stopped publishing in February 2024 — but it is the exact
+              // product, and it says where this page's numbers come from.
+              <p className="mt-2 text-xs text-muted">
+                Specifications from{" "}
+                <a
+                  href={archiveProductUrl(archiveId.value)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-accent hover:underline"
+                >
+                  Good Smile&rsquo;s product archive
+                </a>
+                .
               </p>
-              <a
-                href={archiveProductUrl(figure.identifiers[0].value)}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="mt-3 inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs font-medium transition hover:border-accent/60"
-              >
-                Product page at Good Smile Company <ExternalLink className="size-3 text-muted" />
-              </a>
-            </section>
-          )}
+            )}
+          </section>
 
           <section className="rounded-xl border border-border bg-surface p-4">
             <div className="mb-3 flex items-baseline justify-between gap-3">
