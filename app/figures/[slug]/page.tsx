@@ -437,7 +437,10 @@ export default async function FigurePage({ params, searchParams }: PageProps<"/f
               href={ebaySearchUrl(figure, condition)}
               target="_blank"
               rel="noopener noreferrer nofollow"
-              className="mb-3 inline-flex items-baseline gap-1.5 text-xs text-accent hover:underline"
+              // Set at the same size as a listing title. It is an alternative
+              // to the list below it, not a footnote on it, and at text-xs it
+              // read as small print next to the thing it competes with.
+              className="mb-3 inline-flex items-baseline gap-1.5 text-sm text-accent hover:underline"
             >
               Search <EbayMark className="text-[0.95em]" /> for this figure
             </a>
