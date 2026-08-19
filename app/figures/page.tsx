@@ -3,6 +3,7 @@ import { Suspense } from "react";
 import type { Metadata } from "next";
 import { FigureCardGrid } from "@/components/figure-card";
 import { FilterPanel } from "@/components/filter-panel";
+import { activeFilterNames } from "@/lib/filter-options";
 import { getFacets, searchFigures, type SortKey } from "@/lib/queries";
 import { CATEGORY_ORDER } from "@/lib/labels";
 import type { FigureCategory } from "@/lib/generated/prisma/enums";
@@ -46,7 +47,17 @@ export default async function FiguresPage({ searchParams }: PageProps<"/figures"
     page: toNumber(first(sp.page)) ?? 1,
   };
 
-  const [results, facets] = await Promise.all([searchFigures(filters), getFacets()]);
+  const [results, facets, activeNames] = await Promise.all([
+    searchFigures(filters),
+    getFacets(),
+    // The panel shows only the busiest 60 of each kind, so a filtered franchise
+    // is often not in it. Resolved here, where the whole table is reachable.
+    activeFilterNames({
+      franchise: filters.franchiseSlug,
+      character: filters.characterSlug,
+      manufacturer: filters.manufacturerSlug,
+    }),
+  ]);
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-8">
@@ -63,7 +74,7 @@ export default async function FiguresPage({ searchParams }: PageProps<"/figures"
 
       <div className="grid gap-8 lg:grid-cols-[16rem_1fr]">
         <Suspense fallback={<div className="h-96 animate-pulse rounded-xl bg-surface" />}>
-          <FilterPanel facets={facets} />
+          <FilterPanel facets={facets} activeNames={activeNames} />
         </Suspense>
 
         <div>

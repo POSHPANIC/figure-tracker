@@ -110,3 +110,42 @@ export async function entityMatches(query: string, take = ENTITY_MATCHES): Promi
     })
     .slice(0, take);
 }
+
+/** What the active filters are called, for showing them back to the reader. */
+export type ActiveFilterNames = {
+  franchise?: string;
+  character?: string;
+  manufacturer?: string;
+};
+
+/**
+ * Resolve the slugs in the URL to names a person would recognise.
+ *
+ * Needed because the panel only ships the busiest 60 of each kind, and a
+ * filtered franchise is frequently not among them — anything outside the head
+ * would otherwise be labelled with its slug, which is the one form of the name
+ * nobody types or reads.
+ */
+export async function activeFilterNames(slugs: {
+  franchise?: string;
+  character?: string;
+  manufacturer?: string;
+}): Promise<ActiveFilterNames> {
+  const [franchise, character, manufacturer] = await Promise.all([
+    slugs.franchise
+      ? prisma.franchise.findUnique({ where: { slug: slugs.franchise }, select: { name: true } })
+      : null,
+    slugs.character
+      ? prisma.character.findUnique({ where: { slug: slugs.character }, select: { name: true } })
+      : null,
+    slugs.manufacturer
+      ? prisma.manufacturer.findUnique({ where: { slug: slugs.manufacturer }, select: { name: true } })
+      : null,
+  ]);
+
+  return {
+    ...(franchise ? { franchise: franchise.name } : {}),
+    ...(character ? { character: character.name } : {}),
+    ...(manufacturer ? { manufacturer: manufacturer.name } : {}),
+  };
+}

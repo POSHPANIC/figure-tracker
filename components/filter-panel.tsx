@@ -20,7 +20,14 @@ type Facets = {
  * Filter sidebar. Every control writes to the URL rather than to local state,
  * so filtered views are shareable, bookmarkable and survive a refresh.
  */
-export function FilterPanel({ facets }: { facets: Facets }) {
+export function FilterPanel({
+  facets,
+  activeNames = {},
+}: {
+  facets: Facets;
+  /** What the active slugs are called, resolved on the server. */
+  activeNames?: { franchise?: string; character?: string; manufacturer?: string };
+}) {
   const router = useRouter();
   const params = useSearchParams();
 
@@ -35,23 +42,74 @@ export function FilterPanel({ facets }: { facets: Facets }) {
     }
     // Any filter change invalidates the current page number.
     next.delete("page");
-    router.push(`/figures?${next.toString()}`);
+    // Replaces rather than pushes, like the condition tabs on a figure page.
+    // Narrowing a list is one activity, and it was taking a Back press per
+    // click to leave — six filters deep meant six presses to get out.
+    router.replace(`/figures?${next.toString()}`);
   }
 
   const activeCategory = params.get("category");
   const activeFranchise = params.get("franchise");
   const activeManufacturer = params.get("manufacturer");
   const activeCharacter = params.get("character");
-  const hasFilters = [
-    "q",
-    "category",
-    "series",
-    "franchise",
-    "character",
-    "manufacturer",
-    "min",
-    "max",
-  ].some((k) => params.get(k));
+  const min = params.get("min");
+  const max = params.get("max");
+
+  /**
+   * The filters currently narrowing the list, in the order they are worth
+   * reading. Each knows how to remove itself, so a chip is a control rather
+   * than a label — the alternative is finding the switch again further down.
+   *
+   * Names come from the server for anything slug-shaped. Falling back to the
+   * slug is deliberate: a filter nobody can name is still a filter somebody
+   * needs to be able to turn off.
+   */
+  const active: { key: string; kind: string; label: string; clears: Record<string, null> }[] = [];
+
+  const q = params.get("q");
+  if (q) active.push({ key: "q", kind: "Search", label: `“${q}”`, clears: { q: null } });
+  if (activeCategory) {
+    active.push({
+      key: "category",
+      kind: "Type",
+      label: CATEGORY_LABELS[activeCategory as FigureCategory] ?? activeCategory,
+      clears: { category: null },
+    });
+  }
+  if (activeFranchise) {
+    active.push({
+      key: "franchise",
+      kind: "Franchise",
+      label: activeNames.franchise ?? activeFranchise,
+      clears: { franchise: null },
+    });
+  }
+  if (activeCharacter) {
+    active.push({
+      key: "character",
+      kind: "Character",
+      label: activeNames.character ?? activeCharacter,
+      clears: { character: null },
+    });
+  }
+  if (activeManufacturer) {
+    active.push({
+      key: "manufacturer",
+      kind: "Maker",
+      label: activeNames.manufacturer ?? activeManufacturer,
+      clears: { manufacturer: null },
+    });
+  }
+  if (min || max) {
+    // One chip for both ends, since half a price range is not a filter anyone
+    // set on purpose.
+    active.push({
+      key: "price",
+      kind: "Price",
+      label: min && max ? `$${min}–$${max}` : min ? `over $${min}` : `under $${max}`,
+      clears: { min: null, max: null },
+    });
+  }
 
   return (
     <aside className="space-y-6">
@@ -72,16 +130,39 @@ export function FilterPanel({ facets }: { facets: Facets }) {
         </select>
       </div>
 
-      {hasFilters && (
-        <button
-          type="button"
-          onClick={() =>
-            router.push(`/figures${params.get("sort") ? `?sort=${params.get("sort")}` : ""}`)
-          }
-          className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-border px-3 py-2 text-sm text-muted transition hover:border-down/60 hover:text-down"
-        >
-          <X className="size-3.5" /> Clear filters
-        </button>
+      {active.length > 0 && (
+        // Above everything, because the panel is long and the controls that
+        // are switched on are otherwise scattered down it — a category chip
+        // near the top, a manufacturer four screens below. What is filtering
+        // the list should be readable without hunting for it.
+        <div className="space-y-2">
+          <p className="text-xs font-medium uppercase tracking-wide text-muted">Filtering by</p>
+          <ul className="flex flex-wrap gap-1.5">
+            {active.map((f) => (
+              <li key={f.key}>
+                <button
+                  type="button"
+                  onClick={() => apply(f.clears)}
+                  title={`Remove ${f.label}`}
+                  className="flex items-center gap-1.5 rounded-md border border-accent/40 bg-accent/10 px-2 py-1 text-xs text-foreground transition hover:border-down/60 hover:text-down"
+                >
+                  <span className="text-muted">{f.kind}</span>
+                  <span className="font-medium">{f.label}</span>
+                  <X className="size-3 shrink-0" />
+                </button>
+              </li>
+            ))}
+          </ul>
+          <button
+            type="button"
+            onClick={() =>
+              router.replace(`/figures${params.get("sort") ? `?sort=${params.get("sort")}` : ""}`)
+            }
+            className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-border px-3 py-2 text-sm text-muted transition hover:border-down/60 hover:text-down"
+          >
+            <X className="size-3.5" /> Clear filters
+          </button>
+        </div>
       )}
 
       <FilterGroup label="Type">
