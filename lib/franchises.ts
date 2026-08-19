@@ -263,6 +263,119 @@ export const FRANCHISES: FranchiseDefinition[] = [
     // Darkness is the second series; the franchise is To LOVE-Ru, so a figure
     // from the first one has somewhere to go.
     name: "To LOVE-Ru",
-    series: ["To Love-Ru Darkness"],
+    series: ["To Love-Ru Darkness", "ToLoveRU Darkness"],
+  },
+  {
+    // Nine entries for one series of games, split by numeral, by case and by
+    // whether the anime or the game was being described. PERSONA４ GOLDEN uses a
+    // full-width ４, which is why they never collapsed on their own.
+    name: "Persona",
+    series: [
+      "PERSONA2 Eternal Punishment.",
+      "PERSONA2 Innocent Sin.",
+      "PERSONA3",
+      "PERSONA5 the Animation",
+      "PERSONA４ GOLDEN",
+      "Persona 2: Innocent Sin",
+      "Persona 3",
+      "Persona 4 Anime",
+      "Persona 5",
+    ],
+  },
+  {
+    // Only the hunting games. Monster Strike, Monster Gathering, Monster Girl
+    // Doctor and Interviews with Monster Girls share the word and nothing else.
+    name: "Monster Hunter",
+    series: [
+      "MONSTER HUNTER WORLD: ICEBORNE",
+      "Monster Hunter 4",
+      "Monster Hunter Frontier G",
+      "Monster Hunter Tri G",
+    ],
+  },
+  {
+    // Includes two misspellings the archive shipped with — "StikerS" for
+    // StrikerS, and "Magical War" for Magical Girl. Both hold real figures, and
+    // a typo upstream is not a reason to strand them.
+    name: "Magical Girl Lyrical Nanoha",
+    series: [
+      "Magical Girl Lyrical Nanoha Force",
+      "Magical Girl Lyrical Nanoha INNOCENT",
+      "Magical Girl Lyrical Nanoha StikerS",
+      "Magical Girl Lyrical Nanoha StrikerS",
+      "Magical Girl Lyrical Nanoha The MOVIE 1st",
+      "Magical Girl Lyrical Nanoha The MOVIE 2nd A's",
+      "Magical War Lyrical Nanoha Force",
+    ],
+  },
+  {
+    // Every entry, not only 1•2 Reload: Super Danganronpa 2 is Goodbye Despair
+    // under its Japanese name, and the rest are the same series numbered.
+    name: "Danganronpa",
+    series: [
+      "Danganronpa 1•2 Reload",
+      "Danganronpa 2: Goodbye Despair",
+      "Danganronpa V3: Killing Harmony",
+      "Danganronpa: Kibou no Gakuen to Zetsubou no Koukousei The Animation",
+      "Danganronpa: Trigger Happy Havoc",
+      "Super Danganronpa 2: Sayonara Zetsubou Gakuen",
+    ],
+  },
+  {
+    // All six games. Named for the series so the next one joins rather than
+    // starting a seventh entry.
+    name: "The Legend of Zelda",
+    series: [
+      "The Legend of Zelda: A Link Between Worlds",
+      "The Legend of Zelda: Breath of the Wild",
+      "The Legend of Zelda: Majora's Mask 3D",
+      "The Legend of Zelda: Skyward Sword",
+      "The Legend of Zelda: The Wind Waker HD",
+      "The Legend of Zelda: Twilight Princess",
+    ],
+  },
+  {
+    // Three spellings of one show: Shinryaku, the misspelt Shinraku, and the
+    // English name with the Japanese in brackets.
+    name: "Squid Girl",
+    series: [
+      "Shinraku! Ika Musume (Squid Girl)",
+      "Shinryaku! Ika Musume (Squid Girl)",
+      "Squid Girl (Shinryaku! Ika Musume)",
+    ],
+  },
+  {
+    // The series of the same name is listed here too, not only Ice Queendom —
+    // a franchise takes a name, and an uncurated series is promoted under its
+    // own, so the two would collide.
+    name: "RWBY",
+    series: [
+      "RWBY",
+      "RWBY: Ice Queendom",
+    ],
+  },
+  {
+    // The season marker is not the franchise, same as Shield Hero.
+    name: "The Quintessential Quintuplets",
+    series: ["The Quintessential Quintuplets ∬"],
+  },
+  {
+    name: "Overlord",
+    series: ["Overlord IV"],
+  },
+  {
+    name: "High School DxD",
+    series: ["High School DxD HERO"],
+  },
+  {
+    // "T" is the third season and "Toaru Kagaku no Railgun S" is the second
+    // under its Japanese name — one show, filed three ways.
+    name: "A Certain Scientific Railgun",
+    series: ["A Certain Scientific Railgun T", "Toaru Kagaku no Railgun S"],
+  },
+  {
+    // Brotherhood is the second adaptation, not the franchise.
+    name: "Fullmetal Alchemist",
+    series: ["Fullmetal Alchemist: Brotherhood"],
   },
 ];
