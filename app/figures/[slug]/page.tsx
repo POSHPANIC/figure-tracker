@@ -633,6 +633,12 @@ function ConditionTabs({ slug, active }: { slug: string; active: ItemCondition }
           key={c}
           href={`/figures/${slug}?condition=${c}`}
           scroll={false}
+          // Replaces the history entry instead of adding one. Switching between
+          // new and used is looking at the same figure two ways, not visiting
+          // two pages — and pushing meant Back undid the toggle instead of
+          // leaving the figure, so anyone who flipped it a few times had to
+          // press Back that many times to get out.
+          replace
           className={cn(
             "rounded-md px-2.5 py-1 text-xs font-medium transition",
             c === active ? "bg-accent text-white" : "text-muted hover:text-foreground",
