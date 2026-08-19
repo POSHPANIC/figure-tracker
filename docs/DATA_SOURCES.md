@@ -89,7 +89,12 @@ What follows from that:
   in its own right. Whether it changes this answer is untested — but re-asking
   as a member costs one form.
 - **The reply offers "alternative options that might fit your use case".** That
-  invitation is worth taking up rather than treating the ticket as final.
+  invitation is worth taking up rather than treating the ticket as final; the
+  message to send is in a reply kept outside this repository, and the ticket can be reopened until
+  2026-08-29.
+- **EPN is the nearest thing to partner status that is open to apply for**, and
+  its own pitch is "access to feeds and APIs". See `EPN_APPLICATION.md`. Whether
+  it changes this answer is untested.
 - **Meanwhile the site has no sold prices at all**, which is why market value is
   null on every figure. Active listings are asking prices and must be labelled
   as such; see the note on that below.
