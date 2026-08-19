@@ -29,6 +29,30 @@ function slugify(name: string): string {
     .replace(/^-|-$/g, "");
 }
 
+/**
+ * A slug for a new franchise that nothing else is using yet.
+ *
+ * Curating a name usually means taking one a placeholder already holds, and it
+ * does not have to be spelled the same way to collide: the curated "Death Note"
+ * could not be created because the archive's "DEATH NOTE" was sitting on
+ * `death-note`, and upsert matches on name, so it tried to insert rather than
+ * reuse. That failed the whole run on a unique constraint.
+ *
+ * Suffixing is not the end of it. The placeholder is emptied by this same run
+ * and deleted at the end, which frees the good slug — and the reclaim pass down
+ * there takes it back, so the number is temporary rather than something the
+ * public URL keeps.
+ */
+async function freeSlug(name: string): Promise<string> {
+  const base = slugify(name);
+  if (!(await prisma.franchise.findUnique({ where: { slug: base } }))) return base;
+  for (let n = 2; n < 50; n += 1) {
+    const candidate = `${base}-${n}`;
+    if (!(await prisma.franchise.findUnique({ where: { slug: candidate } }))) return candidate;
+  }
+  throw new Error(`No free slug for "${name}" — fifty are taken, which is not a real situation.`);
+}
+
 async function main() {
   const host = new URL(process.env.DATABASE_URL ?? "postgres://unset").hostname;
   console.log(`\n  ${APPLY ? "Applying to" : "Dry run against"} ${host}\n`);
@@ -55,7 +79,7 @@ async function main() {
 
     const record = await prisma.franchise.upsert({
       where: { name: franchise.name },
-      create: { name: franchise.name, slug: slugify(franchise.name) },
+      create: { name: franchise.name, slug: await freeSlug(franchise.name) },
       update: {},
     });
     const { count } = await prisma.series.updateMany({
@@ -110,6 +134,36 @@ async function main() {
       where: { series: { none: {} } },
     });
     if (count > 0) console.log(`  removed ${count} franchise(s) left empty by curation`);
+
+    // Take back the clean slug the placeholder was sitting on.
+    //
+    // A curated franchise usually takes the name one of its series was already
+    // promoted under, so at the moment it is created that slug is taken and it
+    // lands on "black-rock-shooter-2" instead. The placeholder is deleted a few
+    // lines above, freeing the slug — but by then the URL for 47 figures is the
+    // one with the number on the end, which is the one people link to.
+    //
+    // Cheap to do here and it cannot collide: a suffixed slug is only ever
+    // claimed by a name whose plain form was in use, and this runs after
+    // everything holding those has gone.
+    const suffixed = await prisma.franchise.findMany({
+      where: { slug: { contains: "-" } },
+      select: { id: true, name: true, slug: true },
+    });
+
+    let reclaimed = 0;
+    for (const franchise of suffixed) {
+      const clean = slugify(franchise.name);
+      if (clean === franchise.slug || !/-\d+$/.test(franchise.slug)) continue;
+      // Only when the suffixed slug is this exact name's, so "portal-2" — a
+      // name that genuinely ends in a number — is left alone.
+      if (!franchise.slug.startsWith(`${clean}-`) || clean === "") continue;
+      const holder = await prisma.franchise.findUnique({ where: { slug: clean } });
+      if (holder) continue;
+      await prisma.franchise.update({ where: { id: franchise.id }, data: { slug: clean } });
+      reclaimed += 1;
+    }
+    if (reclaimed > 0) console.log(`  reclaimed ${reclaimed} slug(s) freed by that`);
   }
 
   if (missing.length) {

@@ -128,13 +128,17 @@ export const FRANCHISES: FranchiseDefinition[] = [
     // Named for the game rather than the numbered entry, so a fifth joins this
     // instead of starting another franchise.
     name: "Valkyria Chronicles",
-    series: ["Valkyria Chronicles 4"],
+    series: ["Valkyria Chronicles 3", "Valkyria Chronicles 4", "Valkyria Chronicles DUEL"],
   },
   {
     // "Xenoblade" rather than "Xenoblade Chronicles": the shorter name is the
     // one that survives whatever the next subtitle turns out to be.
     name: "Xenoblade",
-    series: ["Xenoblade Chronicles 3", "Xenoblade Chronicles: Definitive Edition"],
+    series: [
+      "Xenoblade Chronicles 2",
+      "Xenoblade Chronicles 3",
+      "Xenoblade Chronicles: Definitive Edition",
+    ],
   },
   {
     // One game, filed twice — the archive has it under both the arabic and the
@@ -151,6 +155,93 @@ export const FRANCHISES: FranchiseDefinition[] = [
     // out of the list is promoted to a franchise under its own name; and those
     // two would be the same name, which is unique.
     name: "Black Rock Shooter",
-    series: ["Black Rock Shooter", "TV ANIMATION BLACKROCK SHOOTER"],
+    series: [
+      "Black Rock Shooter",
+      "TV ANIMATION BLACKROCK SHOOTER",
+      "Puchitto Rock Shooter",
+    ],
+  },
+  {
+    // The Japanese title slugified to nothing at all, so its franchise sat on an
+    // empty slug and its browse URL led nowhere. The season joins for the same
+    // reason Shield Hero does: a season is not a thing anyone browses by.
+    name: "Kantai Collection",
+    series: [
+      "Kantai Collection -KanColle-",
+      "艦隊これくしょん ‐艦これ‐",
+      "KanColle Season 2: Let's Meet at Sea",
+    ],
+  },
+  {
+    // Named for the character rather than The Melancholy, so the film and the
+    // novels sit under one heading instead of three.
+    name: "Haruhi Suzumiya",
+    series: [
+      "The Melancholy of Haruhi Suzumiya",
+      "The Disappearance of Haruhi Suzumiya",
+      "Haruhi Suzumiya Series",
+      "涼宮ハルヒの憂鬱",
+    ],
+  },
+  {
+    // The same work under its Japanese title.
+    name: "Death Note",
+    series: [
+      "DEATH NOTE",
+      "デスノート",
+    ],
+  },
+  {
+    // Same work, romanised and not.
+    name: "Kara no Kyoukai",
+    series: [
+      "Kara no Kyoukai",
+      "空の境界",
+    ],
+  },
+  {
+    // Same work, romanised and not.
+    name: "Kodomo no Jikan",
+    series: [
+      "Kodomo no Jikan",
+      "こどものじかん",
+    ],
+  },
+  {
+    // The romanised entry carries a translation in brackets; the franchise name
+    // drops it.
+    name: "Kyouran Kazoku Nikki",
+    series: [
+      "Kyouran Kazoku Nikki (Diary of a Crazed Family)",
+      "狂乱家族日記",
+    ],
+  },
+  {
+    // Same game, romanised and not.
+    name: "Mabinogi",
+    series: [
+      "Mabinogi",
+      "マビノギ",
+    ],
+  },
+  {
+    // Two games, each filed twice — once as Samurai Shodown and once as Samurai
+    // Spirits, which is the same series under its Japanese name. 天下一剣客伝 is
+    // VI and 零 is Zero.
+    name: "Samurai Shodown",
+    series: [
+      "Samurai Shodown VI",
+      "Samurai Spirits Zero",
+      "サムライスピリッツ天下一剣客伝",
+      "サムライスピリッツ零",
+    ],
+  },
+  {
+    // Alone, and grouped anyway: the series is Japanese-titled and slugified to
+    // nothing, so this exists to give it a franchise with a working URL.
+    name: "Fractale",
+    series: [
+      "フラクタル",
+    ],
   },
 ];
