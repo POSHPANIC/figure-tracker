@@ -144,22 +144,39 @@ export function SubmissionRow({ submission }: { submission: QueuedSubmission }) 
 
       {submission.kind === "FIGURE" && (
         <dl className="mb-3 grid gap-x-4 gap-y-1 text-sm sm:grid-cols-[8rem_1fr]">
-          <Detail label="Name">{submission.figureName}</Detail>
-          <Detail label="Manufacturer">{submission.manufacturer}</Detail>
-          <Detail label="Series">{submission.series}</Detail>
-          <Detail label="Reference">
-            {submission.referenceUrl && (
-              <a
-                href={submission.referenceUrl}
-                target="_blank"
-                rel="noopener noreferrer nofollow"
-                className="inline-flex items-center gap-1 break-all text-accent hover:underline"
-              >
-                {submission.referenceUrl}
-                <ExternalLink className="size-3 shrink-0" />
-              </a>
-            )}
-          </Detail>
+          {/*
+            The same list a correction shows, because the two forms now ask the
+            same questions. Rendering only the columns lost everything the
+            missing-figure form gained — a character and a scale were typed in
+            and reached the database, but not this page.
+          */}
+          {isFieldMap(submission.proposedFields) ? (
+            // The store link is in here too, so it does not get a row of its
+            // own — it is kept in referenceUrl as well, but only so a moderator
+            // can sort and filter on a column.
+            <ProposedFields fields={submission.proposedFields} />
+          ) : (
+            // Requests sent before the forms were merged, which have their
+            // values in columns and nothing in proposedFields.
+            <>
+              <Detail label="Name">{submission.figureName}</Detail>
+              <Detail label="Manufacturer">{submission.manufacturer}</Detail>
+              <Detail label="Series">{submission.series}</Detail>
+              <Detail label="Reference">
+                {submission.referenceUrl && (
+                  <a
+                    href={submission.referenceUrl}
+                    target="_blank"
+                    rel="noopener noreferrer nofollow"
+                    className="inline-flex items-center gap-1 break-all text-accent hover:underline"
+                  >
+                    {submission.referenceUrl}
+                    <ExternalLink className="size-3 shrink-0" />
+                  </a>
+                )}
+              </Detail>
+            </>
+          )}
         </dl>
       )}
 
@@ -243,25 +260,10 @@ export function SubmissionRow({ submission }: { submission: QueuedSubmission }) 
             — the figure page is one click away and always right.
           */}
           {isFieldMap(submission.proposedFields) && (
-            <Detail label="Proposed">
-              <ul className="space-y-0.5">
-                {Object.entries(submission.proposedFields).map(([key, value]) => (
-                  <li key={key} className="flex items-center gap-2">
-                    <span className="min-w-0 flex-1">
-                      <span className="text-muted">{FIELD_LABELS[key] ?? key}: </span>
-                      <span className="font-medium">{String(value)}</span>
-                    </span>
-                    {submission.figure && (
-                      <FieldLockButton
-                        figureId={submission.figure.id}
-                        field={key}
-                        locked={submission.figure.fieldLocks.some((l) => l.field === key)}
-                      />
-                    )}
-                  </li>
-                ))}
-              </ul>
-            </Detail>
+            <ProposedFields
+              fields={submission.proposedFields}
+              figure={submission.figure}
+            />
           )}
           {submission.imageUrl && (
             <Detail label="Image">
@@ -338,6 +340,57 @@ export function SubmissionRow({ submission }: { submission: QueuedSubmission }) 
         </button>
       </form>
     </li>
+  );
+}
+
+/**
+ * The values a sender proposed, whether they are corrections to a figure or the
+ * description of one we lack.
+ *
+ * A list rather than a diff. Storing the old value alongside would let this
+ * print an arrow, but it would also be a snapshot going stale from the moment
+ * it was taken — the figure page is one click away and always right.
+ */
+function ProposedFields({
+  fields,
+  figure,
+}: {
+  fields: Record<string, string>;
+  figure?: QueuedSubmission["figure"];
+}) {
+  return (
+    <Detail label="Proposed">
+      <ul className="space-y-0.5">
+        {Object.entries(fields).map(([key, value]) => (
+          <li key={key} className="flex items-center gap-2">
+            <span className="min-w-0 flex-1">
+              <span className="text-muted">{FIELD_LABELS[key] ?? key}: </span>
+              {/^https?:\/\//.test(String(value)) ? (
+                <a
+                  href={String(value)}
+                  target="_blank"
+                  rel="noopener noreferrer nofollow"
+                  className="break-all font-medium text-accent hover:underline"
+                >
+                  {String(value)}
+                </a>
+              ) : (
+                <span className="font-medium">{String(value)}</span>
+              )}
+            </span>
+            {/* Only a correction can lock a field: there is no figure to lock
+                it on until a missing one has been added. */}
+            {figure && (
+              <FieldLockButton
+                figureId={figure.id}
+                field={key}
+                locked={figure.fieldLocks.some((l) => l.field === key)}
+              />
+            )}
+          </li>
+        ))}
+      </ul>
+    </Detail>
   );
 }
 

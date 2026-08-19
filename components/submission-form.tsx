@@ -299,45 +299,42 @@ export function SubmissionForm({
 
       {kind === "FIGURE" && (
         <div className="space-y-4 rounded-xl border border-border bg-surface-2 p-4">
-          <Field label="Figure name" hint="As printed on the box, if you have it in front of you.">
-            <input
-              type="text"
-              name="figureName"
-              required
-              defaultValue={initialFigureName}
-              placeholder="Nendoroid Marin Kitagawa: Swimsuit Ver."
-              className={inputClass}
-            />
-          </Field>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Manufacturer">
-              <input
-                type="text"
-                name="manufacturer"
-                placeholder="Good Smile Company"
-                className={inputClass}
-              />
-            </Field>
-            <Field label="Series">
-              <input
-                type="text"
-                name="series"
-                placeholder="My Dress-Up Darling"
-                className={inputClass}
-              />
-            </Field>
-          </div>
-          <Field
-            label="Link to it"
-            hint="A product page, shop listing or announcement. This is what we check against, so it speeds things up a lot."
-          >
-            <input
-              type="url"
-              name="referenceUrl"
-              placeholder="https://…"
-              className={inputClass}
-            />
-          </Field>
+          {/*
+            The same fields as a correction, and for the same reason: someone
+            describing a figure we lack is answering the questions someone
+            correcting a figure we have is answering. Two shapes for one job
+            meant two things to keep in step, and the missing-figure one had
+            drifted — it still asked for a series, which the site stopped
+            showing when browsing moved to franchises.
+
+            Blank rather than prefilled, since there is nothing to prefill
+            from. Only the name is required; anything else is a bonus.
+          */}
+          <fieldset className="grid gap-3 sm:grid-cols-2">
+            <legend className="mb-1 text-xs uppercase tracking-wide text-muted">
+              Tell us what you can
+            </legend>
+            {EDITABLE_FIELDS.map((f) => (
+              <label key={f.key} className="block">
+                <span className="mb-1 block text-xs text-muted">
+                  {f.label}
+                  {f.key === "name" && <span className="text-danger"> *</span>}
+                </span>
+                <input
+                  type="text"
+                  name={f.key}
+                  required={f.key === "name"}
+                  defaultValue={f.key === "name" ? initialFigureName : undefined}
+                  placeholder={f.placeholder}
+                  className={inputClass}
+                />
+              </label>
+            ))}
+          </fieldset>
+          <p className="text-xs text-muted">
+            A store or product page under Store link is what we check against, so it speeds things
+            up a lot.
+          </p>
         </div>
       )}
 

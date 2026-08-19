@@ -67,10 +67,6 @@ const submissionSchema = z
       .trim()
       .max(4000, "That's longer than this form can take. Please email us instead."),
     pageUrl: optionalText(500),
-    figureName: optionalText(200),
-    manufacturer: optionalText(120),
-    series: optionalText(120),
-    referenceUrl: optionalUrl,
     figureId: optionalText(40),
     imageUrl: optionalUrl,
     // Every editable field arrives on every correction, prefilled with what
@@ -97,9 +93,9 @@ const submissionSchema = z
     // gave them away. The discard happens after parsing instead.
     website: z.string().optional(),
   })
-  .refine((v) => v.kind !== "FIGURE" || Boolean(v.figureName), {
+  .refine((v) => v.kind !== "FIGURE" || Boolean(editable(v, "name")), {
     message: "Please tell us the figure's name.",
-    path: ["figureName"],
+    path: ["name"],
   })
   .refine((v) => v.kind === "EDIT" || v.kind === "SALE" || v.details.length >= 10, {
     // A correction can be nothing but a changed field — "230" in the height
@@ -119,14 +115,32 @@ const submissionSchema = z
     path: ["figureId"],
   });
 
+/**
+ * Read one of the editable fields off a parsed submission.
+ *
+ * Their keys are spread into the schema from EDITABLE_FIELD_KEYS so that the
+ * list stays the single source of truth, and the cost of that is they are not
+ * statically known on the parsed type. One narrow accessor beats a cast at
+ * every call site.
+ */
+function editable(input: unknown, key: EditableFieldKey): string | undefined {
+  const value = (input as Record<string, unknown>)[key];
+  return typeof value === "string" && value.trim() ? value.trim() : undefined;
+}
+
 /** Fields that only make sense for one kind are dropped for the others. */
 function fieldsFor(kind: SubmissionKind, input: z.infer<typeof submissionSchema>) {
   return {
     pageUrl: kind === "BUG" ? (input.pageUrl ?? null) : null,
-    figureName: kind === "FIGURE" ? (input.figureName ?? null) : null,
-    manufacturer: kind === "FIGURE" ? (input.manufacturer ?? null) : null,
-    series: kind === "FIGURE" ? (input.series ?? null) : null,
-    referenceUrl: kind === "FIGURE" ? (input.referenceUrl ?? null) : null,
+    // The headline two keep their own columns because the queue leads with
+    // them; everything else a figure request carries now rides in
+    // proposedFields, the same place a correction's values go.
+    figureName: kind === "FIGURE" ? (editable(input, "name") ?? null) : null,
+    manufacturer: kind === "FIGURE" ? (editable(input, "manufacturer") ?? null) : null,
+    // Series is no longer asked for — the site stopped showing it when
+    // browsing moved to franchises.
+    series: null,
+    referenceUrl: kind === "FIGURE" ? (editable(input, "storeUrl") ?? null) : null,
     // Both kinds are about one particular figure. A sale report without it is
     // unpublishable — there is nothing to attach the price to.
     figureId: kind === "EDIT" || kind === "SALE" ? (input.figureId ?? null) : null,
@@ -176,6 +190,21 @@ export async function createSubmission(formData: FormData): Promise<SubmissionRe
   let proposed: Record<string, string> | null = null;
   let imageUrl = input.kind === "EDIT" ? (input.imageUrl ?? null) : null;
 
+  // A figure request has no figure to compare against, so everything typed is
+  // a proposal. It goes to the same place a correction's values go, which is
+  // what lets one queue render both.
+  if (input.kind === "FIGURE") {
+    const filled: Record<string, string> = {};
+    for (const key of EDITABLE_FIELD_KEYS) {
+      const value = editable(input, key as EditableFieldKey);
+      if (value) filled[key] = value;
+    }
+    if (!filled.name) {
+      return { ok: false, error: "A name is needed — everything else is a bonus." };
+    }
+    if (Object.keys(filled).length > 0) proposed = filled;
+  }
+
   if ((input.kind === "EDIT" || input.kind === "SALE") && input.figureId) {
     const figure = await prisma.figure.findUnique({
       where: { id: input.figureId },
@@ -188,7 +217,6 @@ export async function createSubmission(formData: FormData): Promise<SubmissionRe
         msrpCurrency: true,
         releaseDate: true,
         manufacturer: { select: { name: true } },
-        series: { select: { name: true } },
         characters: { select: { name: true } },
         _count: { select: { images: true } },
         fieldLocks: { select: { field: true } },
