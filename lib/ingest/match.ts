@@ -34,12 +34,29 @@ import type { ItemCondition } from "../generated/prisma/enums";
 /**
  * Below this, we store the listing but leave figureId null.
  *
- * Lower than it looks: precision now comes from the six gates in scoreMatch,
- * not from this number. A terse but correct title like "Marin Kitagawa Swimsuit
- * Ver. Figure" names no maker, series or scale and so scores only 0.6 — with
- * the gates in place, rejecting that was costing real matches for nothing.
+ * Precision comes from the gates in scoreMatch rather than from this number,
+ * which is why it is lower than it looks. A terse but correct title like "Marin
+ * Kitagawa Swimsuit Ver. Figure" names no maker, series or scale and scores
+ * only 0.6.
+ *
+ * Raised from 0.55, and only this far, because the evidence would not support
+ * more. Everything above here is mostly *correct* matches whose titles put the
+ * words in a different order or omit the maker: "Good Smile Company Nendoroid
+ * Saber Lily" scores 0.75, "Nendoroid My Hero Academia Bakugo Bakugou Katsuki"
+ * 0.72, and the tests in match.test.ts exist specifically to protect titles
+ * like them. 0.80 would drop about 23,000 listings and leave 246 figures with
+ * nothing, to remove wrong matches that are a minority of what goes with them.
+ *
+ * Below here it inverts. That band holds "Myethos Douluo Continent Xiao Wu"
+ * against Wu Xie, "Nendoroid 106 Black Rock Shooter" against Nendoroid Black
+ * Gold Saw, and "Kantai Collection Shigure" against Bismarck Kai — different
+ * characters, matched on a fragment.
+ *
+ * The score is a weak instrument either way. What the Usada Pekora complaint
+ * was actually about was merchandise, and that belongs to isNotAFigure, which
+ * asks a different question and answers it far better than a number can.
  */
-export const MATCH_ACCEPT_THRESHOLD = 0.55;
+export const MATCH_ACCEPT_THRESHOLD = 0.6;
 
 /**
  * Tolerance for calling two scores equal.

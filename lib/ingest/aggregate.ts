@@ -125,6 +125,11 @@ export async function runAggregation(forDay?: Date): Promise<AggregateResult> {
  * How confident the matcher has to be before a listing counts toward the asking
  * price.
  *
+ * Deliberately stricter than MATCH_ACCEPT_THRESHOLD, which is 0.72. A listing
+ * shown in a list is one a reader can judge for themselves; a listing folded
+ * into a published number is one nobody can see. Showing more than we average
+ * over is the right way round.
+ *
  * A third of attached listings score below this — 23,235 of 67,135 — and a
  * median inherits whatever is in its sample. Applying the threshold pulls the
  * median spread between a figure's cheapest and dearest listing from 2.46x down
