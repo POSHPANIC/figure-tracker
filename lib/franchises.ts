@@ -89,14 +89,6 @@ export const FRANCHISES: FranchiseDefinition[] = [
     ],
   },
   {
-    name: "KonoSuba",
-    series: [
-      "KONO SUBARASHII SEKAI NI BAKUEN WO!",
-      "KONO SUBARASHII SEKAI NI SYUKUFU WO!",
-      "KONO SUBARASHII SEKAI NI SYUKUFUKU WO!",
-    ],
-  },
-  {
     // One series, and curated anyway. The archive files these under the
     // season that was airing, so the franchise inherited "Season 2" from a
     // catalogue of 24 figures that are not all from it — and a season is not
@@ -249,7 +241,7 @@ export const FRANCHISES: FranchiseDefinition[] = [
   },
   {
     // The full title, which is what the box says.
-    name: "Re:ZERO -Starting Life in Another World-",
+    name: "Re:ZERO",
     series: ["Re:Zero"],
   },
   {
@@ -377,5 +369,81 @@ export const FRANCHISES: FranchiseDefinition[] = [
     // Brotherhood is the second adaptation, not the franchise.
     name: "Fullmetal Alchemist",
     series: ["Fullmetal Alchemist: Brotherhood"],
+  },
+  {
+    // Was "KonoSuba". The archive writes the Japanese title in caps and the
+    // English one as a subtitle, so both spellings are here.
+    name: "KONOSUBA",
+    series: [
+      "KONO SUBARASHII SEKAI NI BAKUEN WO!",
+      "KONO SUBARASHII SEKAI NI SYUKUFU WO!",
+      "KONO SUBARASHII SEKAI NI SYUKUFUKU WO!",
+      "KONOSUBA -God's blessing on this wonderful world!",
+    ],
+  },
+  {
+    // Six entries, two of which are the same game — GUILTY GEAR -STRIVE- and
+    // GUILTY GEAR™ -STRIVE-, differing by a trademark symbol.
+    name: "GUILTY GEAR",
+    series: [
+      "GUILTY GEAR -STRIVE-",
+      "GUILTY GEAR Xrd -REVELATOR-",
+      "GUILTY GEAR Xrd -SIGN-",
+      "GUILTY GEAR Xrd REV 2",
+      "GUILTY GEAR™ -STRIVE-",
+      "Guilty Gear XX",
+    ],
+  },
+  {
+    // All four, not only 4 and Reach: HALO and Halo Infinite would have been
+    // left sitting alone. The bare "HALO" series has to be listed or the
+    // franchise name would collide with it.
+    name: "Halo",
+    series: [
+      "HALO",
+      "HALO Reach",
+      "Halo 4",
+      "Halo Infinite",
+    ],
+  },
+  {
+    // Eleven games from one series, including Meruru twice — once with colons
+    // and once with tildes around the subtitle.
+    name: "Atelier",
+    series: [
+      "Atelier Ayesha: The Alchemist of Dusk",
+      "Atelier Meruru ~The Apprentice of Arland~",
+      "Atelier Meruru: The Apprentice of Arland",
+      "Atelier Rorona: The Alchemist of Arland",
+      "Atelier Ryza 2: Lost Legends & the Secret Fairy",
+      "Atelier Ryza 3: Alchemist of the End & the Secret Key",
+      "Atelier Ryza: Ever Darkness & the Secret Hideout",
+      "Atelier Sophie 2: The Alchemist of the Mysterious Dream",
+      "Atelier Sophie: The Alchemist of the Mysterious Book",
+      "Atelier Totori: Alchemist of Arland 2",
+      "Atelier Totori: The Adventurer of Arland",
+    ],
+  },
+  {
+    // All three, so Shinovi Master and Shoujo-tachi no Shinei are not left
+    // outside the franchise being made for their sibling.
+    name: "SENRAN KAGURA",
+    series: [
+      "SENRAN KAGURA PEACH BEACH SPLASH",
+      "SENRAN KAGURA SHINOVI MASTER",
+      "Senran Kagura: Shoujo-tachi no Shinei",
+    ],
+  },
+  {
+    // An umbrella rather than a work, which is what "= MARVEL" asks for. The
+    // series literally named MARVEL is included, both because it belongs and
+    // because a franchise of that name would otherwise collide with it.
+    // Nothing else Marvel is in the catalogue — no Spider-Man, no X-Men.
+    name: "MARVEL",
+    series: [
+      "Avengers: Age of Ultron",
+      "Iron Man 3",
+      "MARVEL",
+    ],
   },
 ];
