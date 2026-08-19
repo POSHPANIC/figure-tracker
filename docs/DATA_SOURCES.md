@@ -8,7 +8,7 @@ trouble, so read it before flipping anything on in production.
 | Source | What it gives you | Status | Risk |
 | --- | --- | --- | --- |
 | **eBay Browse API** | Active listings (lowest ask, live inventory) | Implemented | None — official, free |
-| **eBay Marketplace Insights** | Real *sold* prices, last 90 days | Implemented, needs approval | None — official |
+| **eBay Marketplace Insights** | Real *sold* prices, last 90 days | **Refused, 2026-08-19** — partners only | — |
 | **AmiAmi** | Retail + preorder prices, MSRP, JPY | **Blocked by Cloudflare** — affiliate route only | — |
 | **Community reports** | User-submitted sale prices | **Removed** — see below | — |
 | **MyFigureCollection** | Best catalog data anywhere | Not implemented | **Their ToS forbids scraping** |
@@ -64,6 +64,35 @@ Higher limits exist. eBay run a free **Application Growth Check**, but approval
 needs a usage history showing you have actually hit the limit, plus evidence the
 app earns through eBay Partner Network or sends buyers and sellers to eBay.
 There is no point applying while using 4% of the current allowance.
+
+### Sold prices: asked for, refused
+
+Applied 2026-08-19 through the Application Growth Check, with the site live,
+7,068 products catalogued and API usage at about 4,840 calls a day against the
+5,000 default — which is the bar eBay's own form sets. Refused six minutes
+later:
+
+(Their reply is kept outside this repository.)
+
+The ticket was closed on reply. Nothing in the answer engaged with the
+application, and the turnaround makes clear nothing was going to. This is a
+category decision, not a judgement on the site, so improving the site does not
+by itself change it.
+
+What follows from that:
+
+- **There is no route to eBay sold prices at this tier.** Terapeak is a Seller
+  Hub interface whose programmatic access was folded into this same API, so it
+  is closed for the same reason.
+- **The phrase to take seriously is "approved partners".** eBay Partner Network
+  membership is the nearest thing available to that status, and is worth having
+  in its own right. Whether it changes this answer is untested — but re-asking
+  as a member costs one form.
+- **The reply offers "alternative options that might fit your use case".** That
+  invitation is worth taking up rather than treating the ticket as final.
+- **Meanwhile the site has no sold prices at all**, which is why market value is
+  null on every figure. Active listings are asking prices and must be labelled
+  as such; see the note on that below.
 
 ### How far back the data goes
 
