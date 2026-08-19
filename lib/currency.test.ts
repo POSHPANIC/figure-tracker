@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
+  approxAt,
   DEFAULT_CURRENCY,
   SUPPORTED_CURRENCIES,
   USD_MONEY,
@@ -130,5 +131,17 @@ describe("supported currencies", () => {
 describe("approx", () => {
   it("marks a converted figure as approximate", () => {
     assert.equal(approx("€133.00"), "≈ €133.00");
+  });
+});
+
+describe("approxAt", () => {
+  it("names the rate that produced the number", () => {
+    assert.equal(approxAt("$41", "release"), "≈ $41 at release");
+    assert.equal(approxAt("$20", "today"), "≈ $20 at today’s rate");
+  });
+
+  it("keeps the approximation marker, since it is still an estimate", () => {
+    // Averaged over a month, from a release date known only to the month.
+    assert.ok(approxAt("¥3,200", "release").startsWith("≈ "));
   });
 });

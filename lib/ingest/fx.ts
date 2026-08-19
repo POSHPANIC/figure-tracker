@@ -1,4 +1,5 @@
 import { prisma } from "../prisma";
+import { monthKey, type MonthlyRate } from "./fx-monthly";
 
 /**
  * Currency conversion.
@@ -90,4 +91,60 @@ export async function toUsd(amount: number, currency: string): Promise<Converted
 
 function round2(n: number): number {
   return Math.round(n * 100) / 100;
+}
+
+// ---------------------------------------------------------------------------
+// Monthly rates, for prices that were set in the past.
+//
+// The daily table above answers "what is this worth now". A figure's MSRP is a
+// different question — what the manufacturer charged, in a month that has
+// already happened — and today's rate answers it wrongly. See fx-monthly.ts.
+// ---------------------------------------------------------------------------
+
+let monthly: Map<string, MonthlyRate> | null = null;
+
+/**
+ * Every monthly rate we hold, keyed "JPY:2016-03".
+ *
+ * Loaded once per process and never invalidated: a past month's average is
+ * settled once the month has passed, and the table only gains rows.
+ */
+export async function loadMonthlyRates(): Promise<Map<string, MonthlyRate>> {
+  if (monthly) return monthly;
+
+  const rows = await prisma.fxMonthly.findMany({
+    select: { currency: true, month: true, rateToUsd: true, days: true },
+  });
+
+  const out = new Map<string, MonthlyRate>();
+  for (const row of rows) {
+    out.set(`${row.currency}:${monthKey(row.month)}`, {
+      rateToUsd: Number(row.rateToUsd),
+      days: row.days,
+    });
+  }
+  monthly = out;
+  return out;
+}
+
+/** Drop the cache, for the backfill script which writes and then reads back. */
+export function forgetMonthlyRates(): void {
+  monthly = null;
+}
+
+/**
+ * The rate for one currency in the month containing `when`.
+ *
+ * Null when we hold nothing for that month — a figure due next year, or a
+ * currency the provider does not carry. Callers fall back to today's rate and
+ * say so on the page, rather than invent a number for a month that has not
+ * happened.
+ */
+export async function monthlyRateToUsd(currency: string, when: Date): Promise<number | null> {
+  const code = currency.toUpperCase();
+  if (code === "USD") return 1;
+
+  const rates = await loadMonthlyRates();
+  const found = rates.get(`${code}:${monthKey(when)}`);
+  return found && found.rateToUsd > 0 ? found.rateToUsd : null;
 }

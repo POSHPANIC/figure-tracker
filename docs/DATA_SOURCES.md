@@ -304,6 +304,43 @@ forever instead of silently re-valuing itself every time the yen moves.
 Rates come from `open.er-api.com` (no key required) and are cached one row per
 currency per day in the `FxRate` table.
 
+### Prices that were set in the past
+
+MSRP is not a live price. The manufacturer set ¥3,143 in October 2011, when a
+dollar bought 76 yen — that figure retailed for about **$41**, and converting it
+at this morning's 158 would call it **$20**. That is not a rounding quibble:
+across this catalogue two thirds of MSRPs move by more than a quarter between
+the two readings, and the median moves by 40%.
+
+So MSRP converts at the average rate of the month it was set in, and the page
+says which rate it used — `≈ $41 at release`, or `≈ $20 at today's rate` when we
+hold nothing for that month. Naming the rate matters: the market value below it
+is quoted in today's money, and subtracting two prices from different eras gives
+a number that means nothing.
+
+Monthly rather than daily, because the prices this serves are only known to the
+month. The catalogue's release dates carry a placeholder day of 15
+(`scripts/import-gsc.ts`) because the source only ever gave year and month, so a
+single day's rate would imply a precision the release date never had.
+
+Both legs of a conversion go through the same month. Showing that 2011 figure in
+euros means asking what a European would have paid *then* — €30 at 2011's rates
+on both sides, not €35 from converting the yen at 2011 and the dollars at
+today's rate.
+
+These come from [Frankfurter](https://frankfurter.dev) (`api.frankfurter.dev`),
+which sources central banks directly, needs no API key, is free for commercial
+use, and can be self-hosted if it ever goes away. One request covers every
+business day back to 1999 for all five currencies we display — about half a
+megabyte — so `npm run backfill:fx` is a single call, not a crawl, and is safe to
+re-run. Averages land in the `FxMonthly` table, one row per currency per month,
+with the number of days behind each average stored alongside it.
+
+`FxMonthly` is deliberately separate from `FxRate` rather than being rows dated
+the 1st. `FxRate` is keyed by exact date and read as "the rate today", so a
+first-of-month row would be picked up as today's rate every 1st — a wrong price
+once a month, with nothing in the logs to show for it.
+
 ## Legal and presentation notes
 
 - Display prices as **estimates**, never as appraisals. The footer already says

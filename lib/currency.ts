@@ -99,3 +99,14 @@ export function isConverted(money: DisplayMoney, sourceCurrency: string | null):
 export function approx(formatted: string): string {
   return `≈ ${formatted}`;
 }
+
+/**
+ * "≈ $41 at release" — a converted figure, and which rate produced it.
+ *
+ * Naming the rate is what stops the number being read as comparable to a market
+ * value quoted in today's money. Both are true; they answer different
+ * questions, and the difference is 40% for the median figure here.
+ */
+export function approxAt(formatted: string, basis: "release" | "today"): string {
+  return `${approx(formatted)} ${basis === "release" ? "at release" : "at today’s rate"}`;
+}

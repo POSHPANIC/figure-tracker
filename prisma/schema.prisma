@@ -633,6 +633,32 @@ model FxRate {
   @@unique([currency, date])
 }
 
+/// A whole month's average rate, for converting a price that was set in the
+/// past — chiefly MSRP.
+///
+/// Deliberately not rows in `FxRate`. That table is keyed by exact date and
+/// read as "the rate today"; a row dated the 1st of a month would be picked up
+/// as today's rate every 1st, which is a wrong price once a month with nothing
+/// to show for it in the logs.
+///
+/// Monthly rather than daily because the prices this converts are only known to
+/// the month. The catalogue's release dates carry a day of 15 as a placeholder
+/// — see scripts/import-gsc.ts — so a single day's rate would imply a precision
+/// the release date never had. Averaging the month is both honest about that
+/// and steadier than whichever day the placeholder happens to name.
+model FxMonthly {
+  id       String   @id @default(cuid())
+  currency String   @db.VarChar(3)
+  /// First day of the month, in UTC. The month is the unit; the day is storage.
+  month    DateTime @db.Date
+  /// Multiply an amount in `currency` by this to get USD as of that month.
+  rateToUsd Decimal @db.Decimal(18, 8)
+  /// How many daily quotes went into the average, so a thin month is visible.
+  days     Int
+
+  @@unique([currency, month])
+}
+
 // ---------------------------------------------------------------------------
 // Users — schema is in place now so adding auth later needs no migration.
 // Model shapes follow the Auth.js (NextAuth) Prisma adapter conventions.

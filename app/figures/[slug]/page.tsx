@@ -19,8 +19,8 @@ import { goodsmileSearchUrl } from "@/lib/goodsmile-search";
 import { getFigureBySlug, getFigureStats, getPriceHistory } from "@/lib/queries";
 import { getFigureUserState } from "@/lib/user-queries";
 import { formatCurrency, formatPercent, formatUsd, trendOf } from "@/lib/money";
-import { approx, formatMoney } from "@/lib/currency";
-import { getDisplayMoney, nativeToUsd } from "@/lib/currency-server";
+import { approxAt, formatMoney } from "@/lib/currency";
+import { getDisplayMoney, historicalMoney } from "@/lib/currency-server";
 import {
   CATEGORY_LABELS,
   CHARTABLE_CONDITIONS,
@@ -81,14 +81,22 @@ export default async function FigurePage({ params, searchParams }: PageProps<"/f
 
   // MSRP is the one price we always show in the currency the manufacturer
   // actually set it in — converting it away would misquote them. The display
-  // currency appears beside it, marked approximate.
-  const msrpUsd =
+  // currency appears beside it, marked approximate and with the rate it used.
+  //
+  // A price set in 2011 converts at 2011's rate, not this morning's. See
+  // lib/ingest/fx-monthly.ts for why that matters more than it sounds.
+  const msrp =
     figure.msrpAmount && figure.msrpCurrency
-      ? await nativeToUsd(Number(figure.msrpAmount), figure.msrpCurrency)
+      ? await historicalMoney(
+          Number(figure.msrpAmount),
+          figure.msrpCurrency,
+          figure.releaseDate,
+          money.currency,
+        )
       : null;
   const msrpConverted =
-    msrpUsd !== null && figure.msrpCurrency?.toUpperCase() !== money.currency
-      ? approx(formatMoney(msrpUsd, money))
+    msrp !== null && figure.msrpCurrency?.toUpperCase() !== money.currency
+      ? approxAt(formatCurrency(msrp.amount, money.currency), msrp.basis)
       : null;
 
   const trend = trendOf(figure.change30dPct);
