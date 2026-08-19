@@ -446,4 +446,42 @@ export const FRANCHISES: FranchiseDefinition[] = [
       "MARVEL",
     ],
   },
+  {
+    // Three spellings and no plain one: the archive has IS in round brackets, IS
+    // in angle brackets, and "Inifinite" misspelt. The 29 figures are under the
+    // angle-bracket form.
+    name: "Infinite Stratos",
+    series: [
+      "IS (Infinite Stratos)",
+      "IS <Infinite Stratos>",
+      "Inifinite Stratos",
+    ],
+  },
+  {
+    // The 31-figure entry and a one-figure duplicate carrying a registered
+    // trademark sign. The plain one has to be listed or the franchise name
+    // would collide with it.
+    name: "Overwatch",
+    series: [
+      "Overwatch",
+      "Overwatch®",
+    ],
+  },
+  {
+    // Repeat and Nonstop are the second and third seasons. Nonstop was not
+    // named but would have been left alone beside its own franchise.
+    name: "Non Non Biyori",
+    series: [
+      "Non Non Biyori",
+      "Non Non Biyori Nonstop",
+      "Non Non Biyori Repeat",
+    ],
+  },
+  {
+    // The English title of Saya no Uta.
+    name: "The Song of Saya",
+    series: [
+      "Saya no Uta",
+    ],
+  },
 ];
