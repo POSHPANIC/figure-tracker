@@ -484,4 +484,38 @@ export const FRANCHISES: FranchiseDefinition[] = [
       "Saya no Uta",
     ],
   },
+  {
+    // The season's subtitle is not the franchise.
+    name: "Made in Abyss",
+    series: ["Made in Abyss: The Golden City of the Scorching Sun"],
+  },
+  {
+    // -Ars Nova- names the anime adaptation, not the work.
+    name: "Arpeggio of Blue Steel",
+    series: ["Arpeggio of Blue Steel -Ars Nova-"],
+  },
+  {
+    name: "GOD EATER",
+    series: ["GOD EATER 2 RAGE BURST"],
+  },
+  {
+    // Filed under its Japanese title; NAKAIMO is how it was released in English.
+    name: "NAKAIMO - My Little Sister Is Among Them!",
+    series: ["Kono Naka ni Hitori, Imouto ga Iru!"],
+  },
+  {
+    // The same second season twice, once in each language.
+    name: "A Certain Magical Index",
+    series: ["A Certain Magical Index II", "Toaru Majutsu no Index II"],
+  },
+  {
+    // Not "Akashic Records of Bastard Magic Instructor", which shares the word
+    // and is a different show entirely — the reason this list is written by hand.
+    name: "Bastard!! Heavy Metal, Dark Fantasy",
+    series: ["BASTARD!!: Ankoku no Hakaishin"],
+  },
+  {
+    name: "Godzilla",
+    series: ["Godzilla Singular Point"],
+  },
 ];
