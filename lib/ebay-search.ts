@@ -14,6 +14,8 @@
  * right place.
  */
 
+import { withAffiliate } from "./ebay-affiliate";
+
 const EBAY_SEARCH = "https://www.ebay.com/sch/i.html";
 
 export type SearchableFigure = {
@@ -53,8 +55,7 @@ export function ebaySearchUrl(figure: SearchableFigure, condition?: string): str
   const filter = condition ? EBAY_CONDITION[condition] : undefined;
   if (filter) params.set("LH_ItemCondition", filter);
 
-  // eBay Partner Network parameters belong here when there is a publisher ID:
-  // campid, customid, toolid. Adding them is a two-line change at this one
-  // place precisely because nothing else in the app builds an eBay URL.
-  return `${EBAY_SEARCH}?${params.toString()}`;
+  // Partner Network tracking, if it is configured. Doing it here is why the
+  // note that used to sit in this spot said it would be a two-line change.
+  return withAffiliate(`${EBAY_SEARCH}?${params.toString()}`, "figure-search");
 }

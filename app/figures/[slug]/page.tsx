@@ -11,6 +11,7 @@ import { FigureImagesAdmin } from "@/components/figure-images-admin";
 import { FigureThumb } from "@/components/figure-thumb";
 import { PriceChart } from "@/components/price-chart";
 import { archiveProductUrl } from "@/lib/ingest/gsc";
+import { affiliateEnabled, withAffiliate } from "@/lib/ebay-affiliate";
 import { ebaySearchUrl } from "@/lib/ebay-search";
 import { goodsmileSearchUrl } from "@/lib/goodsmile-search";
 import { getFigureBySlug, getFigureStats, getPriceHistory } from "@/lib/queries";
@@ -473,7 +474,7 @@ export default async function FigurePage({ params, searchParams }: PageProps<"/f
                             can follow on a title you cannot see.
                           */}
                           <a
-                            href={l.url}
+                            href={withAffiliate(l.url, "figure-listing")}
                             target="_blank"
                             rel="noopener noreferrer nofollow"
                             title={l.title}
@@ -509,6 +510,17 @@ export default async function FigurePage({ params, searchParams }: PageProps<"/f
                   <p className="mt-3 border-t border-border pt-3 text-xs text-muted">
                     Listings are matched to this figure automatically and can include similar
                     releases. Check the title before buying.
+                    {affiliateEnabled() && (
+                      // Said here, next to the links it applies to, rather than
+                      // only in a policy page nobody opens. It also has to be
+                      // true that it changes nothing: these are ordered by
+                      // price, and a commission never moves one up.
+                      <>
+                        {" "}
+                        We earn a small commission if you buy through them, at no cost to you. It
+                        does not affect what is listed or the order it appears in.
+                      </>
+                    )}
                   </p>
                 )}
               </>
