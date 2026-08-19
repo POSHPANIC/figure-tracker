@@ -286,11 +286,28 @@ export default async function FigurePage({ params, searchParams }: PageProps<"/f
           />
 
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-            <StatCard
-              label="Market value"
-              value={formatMoney(figure.marketValueUsd, money)}
-              emphasis
-            />
+            {/*
+              The headline is whichever claim we can actually make. A market
+              value says the thing sold for this; an asking price says somebody
+              wants this for it. The second is weaker and is labelled so, with
+              its sample size below — the alternative, while there is no
+              sold-price source at all, is a dash on every figure in the
+              catalogue.
+            */}
+            {figure.marketValueUsd !== null || figure.askMedianUsd === null ? (
+              <StatCard
+                label="Market value"
+                value={formatMoney(figure.marketValueUsd, money)}
+                emphasis
+              />
+            ) : (
+              <StatCard
+                label="Typical asking price"
+                value={formatMoney(figure.askMedianUsd, money)}
+                note={`median of ${figure.askListings} listings`}
+                emphasis
+              />
+            )}
             <StatCard
               label="30-day change"
               value={formatPercent(figure.change30dPct)}
@@ -313,9 +330,33 @@ export default async function FigurePage({ params, searchParams }: PageProps<"/f
 
             <PriceChart data={history} maxDays={HISTORY_DAYS} money={money} />
 
+            {/*
+              "No sales recorded" and "we have no way of recording sales" are
+              different facts, and right now it is the second: eBay refused
+              access to sold prices, so an empty chart here is not a quiet
+              figure, it is a gap in what we can see. Saying so is better than
+              letting a blank chart imply nothing sells.
+            */}
             <p className="mt-3 text-xs text-muted">
-              Based on <span className="tabular">{stats.totalSales.toLocaleString()}</span> recorded{" "}
-              {CONDITION_LABELS[condition].toLowerCase()} sales.
+              {stats.totalSales > 0 ? (
+                <>
+                  Based on <span className="tabular">{stats.totalSales.toLocaleString()}</span>{" "}
+                  recorded {CONDITION_LABELS[condition].toLowerCase()} sales.
+                </>
+              ) : (
+                <>
+                  No confirmed sales yet — we have no source for sold prices, so this chart fills in
+                  only as collectors report sales.
+                  {figure.askMedianUsd !== null && (
+                    <>
+                      {" "}
+                      The figure above is what{" "}
+                      <span className="tabular">{figure.askListings}</span> sellers are currently
+                      asking.
+                    </>
+                  )}
+                </>
+              )}
             </p>
           </section>
 
@@ -599,11 +640,14 @@ function StatCard({
   value,
   tone,
   emphasis,
+  note,
 }: {
   label: string;
   value: string;
   tone?: "up" | "down" | "flat";
   emphasis?: boolean;
+  /** What the number is drawn from, when that is not obvious from the label. */
+  note?: string;
 }) {
   return (
     <div className="rounded-xl border border-border bg-surface px-3 py-2.5">
@@ -618,6 +662,7 @@ function StatCard({
       >
         {value}
       </p>
+      {note && <p className="mt-0.5 text-[10px] text-muted">{note}</p>}
     </div>
   );
 }

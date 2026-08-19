@@ -23,6 +23,9 @@ export const figureCardSelect = {
   marketValueUsd: true,
   change30dPct: true,
   salesVolume90d: true,
+  // Shown when there is no market value, which is currently every figure.
+  askMedianUsd: true,
+  askListings: true,
   manufacturer: { select: { name: true, slug: true } },
   // The card shows the franchise, but the series is still selected and still
   // stored — nothing about this grouping is destructive, and showing the series
@@ -36,10 +39,20 @@ export type FigureCard = Prisma.FigureGetPayload<{ select: typeof figureCardSele
 
 export type SortKey = "trending" | "value-desc" | "value-asc" | "newest" | "name";
 
+// Sorting by value falls through to the asking price, because market value is
+// null on every figure and a sort on it currently orders nothing. Whichever
+// number the card shows is the one it sorts by, which is the only arrangement
+// where the order matches what a person is reading.
 const ORDER_BY: Record<SortKey, Prisma.FigureOrderByWithRelationInput[]> = {
   trending: [{ change30dPct: "desc" }, { salesVolume90d: "desc" }],
-  "value-desc": [{ marketValueUsd: "desc" }],
-  "value-asc": [{ marketValueUsd: "asc" }],
+  "value-desc": [
+    { marketValueUsd: { sort: "desc", nulls: "last" } },
+    { askMedianUsd: { sort: "desc", nulls: "last" } },
+  ],
+  "value-asc": [
+    { marketValueUsd: { sort: "asc", nulls: "last" } },
+    { askMedianUsd: { sort: "asc", nulls: "last" } },
+  ],
   newest: [{ releaseDate: "desc" }],
   name: [{ name: "asc" }],
 };

@@ -173,6 +173,22 @@ model Figure {
   // Kept on the row so list/search pages need only one query.
   /// Median USD sale price over the trailing 90 days, NEW condition.
   marketValueUsd   Decimal?  @db.Decimal(12, 2)
+
+  /// The median of what sellers are currently *asking*, and the number of
+  /// listings behind it.
+  ///
+  /// Not a market value and never to be shown as one. An asking price is what a
+  /// seller hopes for, and the ones that sell leave the sample while the ones
+  /// that do not stay in it, so a median of what is still for sale is biased
+  /// upward by construction — measured at about 2.2x the manufacturer's retail
+  /// price across the catalogue.
+  ///
+  /// It exists because eBay refused Marketplace Insights on 2026-08-19, leaving
+  /// no sold-price source at all: marketValueUsd is null on every figure, and a
+  /// price guide showing no prices helps nobody. Labelled as an asking price,
+  /// with its sample size beside it, this is true and useful.
+  askMedianUsd     Decimal?  @db.Decimal(12, 2)
+  askListings      Int       @default(0)
   /// Percent change in marketValueUsd vs. 30 days ago. 12.5 means +12.5%.
   change30dPct     Decimal?  @db.Decimal(8, 2)
   /// Number of recorded sales in the trailing 90 days — our confidence signal.

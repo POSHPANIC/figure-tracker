@@ -44,11 +44,29 @@ export async function FigureCard({ figure }: { figure: FigureCardData }) {
         <p className="text-xs text-muted">{figure.manufacturer?.name}</p>
 
         <div className="mt-auto flex items-end justify-between pt-2">
+          {/*
+            Two different claims, so two different labels. A market value is
+            what the thing sold for; an asking price is what somebody wants for
+            it, which is a weaker statement and has to read as one. Showing the
+            second under the first's label would be the most useful lie on the
+            site.
+          */}
           <div>
-            <p className="text-[10px] uppercase tracking-wide text-muted">Market value</p>
-            <p className="tabular text-base font-semibold">
-              {formatMoney(figure.marketValueUsd, money)}
-            </p>
+            {figure.marketValueUsd !== null || figure.askMedianUsd === null ? (
+              <>
+                <p className="text-[10px] uppercase tracking-wide text-muted">Market value</p>
+                <p className="tabular text-base font-semibold">
+                  {formatMoney(figure.marketValueUsd, money)}
+                </p>
+              </>
+            ) : (
+              <>
+                <p className="text-[10px] uppercase tracking-wide text-muted">Asking price</p>
+                <p className="tabular text-base font-semibold text-muted">
+                  {formatMoney(figure.askMedianUsd, money)}
+                </p>
+              </>
+            )}
           </div>
           {figure.change30dPct !== null && (
             <span

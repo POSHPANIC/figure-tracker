@@ -109,11 +109,78 @@ export async function runAggregation(forDay?: Date): Promise<AggregateResult> {
     console.info(`[aggregate] pruned ${prunedCounters} expired rate-limit counters`);
   }
 
+  // Asking prices, from whatever is listed right now. Cheap, and the only
+  // price most figures have while there is no sold-price source.
+  const asksUpdated = await recomputeAskingPrices();
+  if (asksUpdated > 0) console.info(`[aggregate] refreshed asking prices for ${asksUpdated} figures`);
+
   // Keep search in step with any catalogue metadata that changed today.
   const reindexed = await rebuildAllSearchText();
   if (reindexed > 0) console.info(`[aggregate] refreshed search text for ${reindexed} figures`);
 
   return { snapshotsWritten, figuresUpdated };
+}
+
+/**
+ * How confident the matcher has to be before a listing counts toward the asking
+ * price.
+ *
+ * A third of attached listings score below this — 23,235 of 67,135 — and a
+ * median inherits whatever is in its sample. Applying the threshold pulls the
+ * median spread between a figure's cheapest and dearest listing from 2.46x down
+ * to 2.02x, and cuts the figures showing a tenfold spread from 239 to 82.
+ */
+const ASK_MIN_MATCH_SCORE = 0.8;
+
+/**
+ * How many listings before a median means anything.
+ *
+ * With one listing a "median" is one seller's opinion. Three is where several
+ * strangers independently pricing the same product starts to say something,
+ * and it still leaves 2,437 figures with a number where today there are none.
+ */
+const ASK_MIN_LISTINGS = 3;
+
+/**
+ * Refresh Figure.askMedianUsd / askListings from active listings.
+ *
+ * One statement for the whole catalogue rather than one per figure. The sibling
+ * recomputeFigureStats already walks 7,068 figures a row at a time, and adding
+ * a second query per figure to that would double a cost that is already the
+ * wrong shape — this is a single round trip.
+ *
+ * Median rather than mean, for the same reason market value uses one: a lone
+ * $2,000 listing on a $60 figure should not move the number. And only
+ * NEW_SEALED, so a boxed figure is not priced against a loose one.
+ */
+export async function recomputeAskingPrices(): Promise<number> {
+  return prisma.$executeRaw`
+    UPDATE "Figure" f
+    SET "askMedianUsd" = s.med,
+        "askListings"  = s.n
+    FROM (
+      SELECT all_figures.id AS fid,
+             stats.med,
+             coalesce(stats.n, 0) AS n
+      FROM "Figure" all_figures
+      LEFT JOIN (
+        SELECT "figureId",
+               round(percentile_cont(0.5) WITHIN GROUP (ORDER BY "amountUsd")::numeric, 2) AS med,
+               count(*)::int AS n
+        FROM "Listing"
+        WHERE "figureId" IS NOT NULL
+          AND "isActive"
+          AND condition = 'NEW_SEALED'
+          AND "matchScore" >= ${ASK_MIN_MATCH_SCORE}
+        GROUP BY "figureId"
+        HAVING count(*) >= ${ASK_MIN_LISTINGS}
+      ) stats ON stats."figureId" = all_figures.id
+    ) s
+    WHERE f.id = s.fid
+      -- Only rows that actually changed. A figure whose listings did not move
+      -- should not be rewritten every night.
+      AND (f."askMedianUsd" IS DISTINCT FROM s.med OR f."askListings" IS DISTINCT FROM s.n)
+  `;
 }
 
 /**
