@@ -80,7 +80,17 @@ async function main() {
 
   for (let skip = 0; ; skip += PAGE) {
     const page = await prisma.listing.findMany({
-      where: { figureId: null },
+      // Narrowed in the database rather than here. A title with neither word in
+      // it can never produce a release number, and pulling all 43,638 of them
+      // across the network to discover that cost 3.7 MB a night against an
+      // allowance that suspends the database when it runs out.
+      where: {
+        figureId: null,
+        OR: [
+          { title: { contains: "nendoroid", mode: "insensitive" } },
+          { title: { contains: "figma", mode: "insensitive" } },
+        ],
+      },
       select: { externalId: true, title: true },
       orderBy: { id: "asc" },
       skip,
@@ -105,7 +115,7 @@ async function main() {
     }
   }
 
-  console.log(`  scanned ${scanned} listings attached to no figure`);
+  console.log(`  scanned ${scanned} unattached listings naming a line`);
   console.log(`  found ${listings.size} unknown release numbers\n`);
 
   const found = [...listings.entries()]

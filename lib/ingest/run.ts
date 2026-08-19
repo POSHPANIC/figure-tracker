@@ -26,6 +26,19 @@ export type IngestOptions = {
   figureLimit?: number;
   /** Skip figures aggregated more recently than this many hours ago. */
   minAgeHours?: number;
+  /**
+   * Match candidates, when the caller already holds them.
+   *
+   * Loading these means reading every figure, series and character in the
+   * catalogue — 3.6 MB over the wire, and the backfill calls this once per
+   * batch. At ten batches a night that was 36 MB of egress a day to fetch the
+   * same rows ten times, against a 5 GB monthly allowance that suspends the
+   * database when it runs out.
+   *
+   * The catalogue does not change while a sweep is running, so the sweep loads
+   * them once and passes them in.
+   */
+  candidates?: MatchCandidate[];
 };
 
 export type IngestSummary = {
@@ -113,7 +126,7 @@ export async function runIngestion(options: IngestOptions = {}): Promise<IngestS
   });
 
   const figures = await selectFigures(options);
-  const candidates = await loadCandidates(true);
+  const candidates = options.candidates ?? (await loadCandidates(true));
   const summaries: IngestSummary[] = [];
 
   for (const source of sources) {

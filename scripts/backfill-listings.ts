@@ -33,8 +33,10 @@ function flag(name: string, fallback: number): number {
 
 const PRODUCTION = process.argv.includes("--production");
 const TOTAL = flag("total", 2000);
-// Each batch reloads the match candidates — every figure and character in the
-// catalogue — so small batches waste real time. Large ones lose progress
+// Batches used to reload the match candidates each time — every figure and
+// character in the catalogue. They are loaded once now and passed in, so the
+// batch size no longer decides how much the catalogue is re-read. Large ones
+// still lose progress
 // reporting and restart further back if something fails. 250 is a middle.
 const BATCH = flag("batch", 250);
 
@@ -59,6 +61,7 @@ async function main() {
   // could redirect it.
   const { prisma } = await import("../lib/prisma");
   const { runIngestion } = await import("../lib/ingest/run");
+  const { loadCandidates } = await import("../lib/ingest/candidates");
 
   const host = new URL(process.env["DATABASE_URL"] ?? "postgres://unset").hostname;
   console.log("");
@@ -75,6 +78,13 @@ async function main() {
   console.log(`  ${before.length} figures currently have listings.`);
   console.log("");
 
+  // Once, not once per batch. This is 3.6 MB of catalogue, and re-reading it
+  // ten times a night was most of what the nightly sweep spent its network
+  // allowance on. Nothing adds figures while a sweep is running.
+  const candidates = await loadCandidates(true);
+  console.log(`  matching against ${candidates.length} catalogue entries.`);
+  console.log("");
+
   let done = 0;
   let seen = 0;
   let matched = 0;
@@ -83,7 +93,7 @@ async function main() {
     const size = Math.min(BATCH, TOTAL - done);
     const startedBatch = Date.now();
 
-    const summaries = await runIngestion({ sourceKeys: ["ebay"], figureLimit: size });
+    const summaries = await runIngestion({ sourceKeys: ["ebay"], figureLimit: size, candidates });
     const ebay = summaries.find((s) => s.source === "ebay");
 
     if (ebay?.error) {
