@@ -55,6 +55,7 @@ next-env.d.ts
 
 # Cached pages from the Good Smile archive import (scripts/import-gsc.ts)
 .gsc-cache/
+.cache/
 
 # Character export produced by "npm run sync:characters"
 characters.json

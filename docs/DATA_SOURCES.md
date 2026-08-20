@@ -181,6 +181,83 @@ to it.
 **Asking AmiAmi for a feed.** The actual replacement, and it needs a person to
 ask. See `AMIAMI_APPLICATION.md`.
 
+## Kotobukiya
+
+The catalogue was Good Smile's shape until this: `npm run import:kotobukiya`
+adds 290 figures from the Kotobukiya US store, the first source that isn't the
+Good Smile group.
+
+Their storefront is Shopify, which publishes the whole catalogue as JSON at
+`/products.json` — 1,318 products in six requests. Their robots.txt says so in
+as many words: *"Public product, collection, page, blog, policy, cart, and
+localized HTML is crawlable."* The disallowed paths are cart, checkout, account,
+admin and filtered collections, none of which the importer touches. Release
+month, scale, size and series live only on the product page, so those are
+fetched one at a time with a delay and cached on disk; `updated_at` in the index
+means later runs only re-read what changed.
+
+### Prices are US retail, in USD
+
+Every other MSRP in this catalogue is JPY. These are not, and that is a
+deliberate trade with a real cost — "MSRP" now means two things across rows.
+
+The Japanese alternative does not work. `www.kotobukiya.co.jp`, which is where
+希望小売価格 and 発売日 actually live, answers with a Cloudflare challenge
+(`Cf-Mitigated: challenge`), and we do not work around bot protection. Their own
+shop at `shop.kotobukiya.co.jp` is open and does carry yen prices, but there is
+no key to join the two stores on: the US barcode is a `190526` GTIN and the
+Japanese one a `4934054` JAN, and the US SKU appears nowhere on the Japanese
+page. Joining them would mean fuzzy English-to-Japanese title matching, which is
+how this project got wrong figures before.
+
+The release-month conversion handles USD correctly, so a yen-viewing visitor
+sees an honest "≈ ¥36,465 at today's rate" rather than a silent mismatch.
+
+### What gets excluded, and why
+
+Of their 1,318 products, 290 are imported:
+
+| Excluded | Count | Reason |
+| --- | --- | --- |
+| Plastic Model | 776 | Model kits, a different product class |
+| Bonus item | 241 | Not products |
+| Other Goods | 11 | Neither |
+
+Bonus items matter more than the count suggests. "Pokémon Hilbert with Victini
+ARTFX J STATUE Illustration Board" is a cardboard insert that ships with a
+preorder — it has a product page, images, and a price of **$0.00**. Import it
+unfiltered and the catalogue gains a figure that does not exist. 117 of the 241
+carry no `product_type` at all, so they are tested for the bonus tag *before*
+the type check; otherwise the run reports them as missing data rather than as
+what they are.
+
+### Two things the store gets wrong if you trust it
+
+**A quarter of the figures in Kotobukiya's store are not Kotobukiya's.** 61 are
+Takara Tomy, 13 PeariA, and three others — 77 of 290. Each is filed under the
+maker named on its own page, because the manufacturer is a fact about the figure
+rather than about where we found it.
+
+**A size is not always a height.** AM-Z02 BLADE LIGER states "total length: 380
+mm". Storing that in `heightMm` puts a measured-looking number beside a figure
+it does not describe, so a size naming a length, width, depth or diameter — and
+never a height — is refused. 26 products are affected.
+
+### Images
+
+`products.json` carries every product image URL, and none of them are imported.
+A public CDN URL grants no licence, exactly as with Good Smile. Kotobukiya is a
+separate ask from Good Smile, and to a separate company from Takara Tomy and
+PeariA. See docs/PRESS_IMAGES.md.
+
+### Identity
+
+Figures carry two identifiers: `KOTOBUKIYA_SKU` (their own product code, printed
+on the box and quoted in eBay titles) and `KOTOBUKIYA_US_PRODUCT` (the store's
+id). The second exists because one product has no SKU, and a figure with no
+identifier is created afresh on every run — which is precisely what happened on
+the second run before this was fixed.
+
 ## AmiAmi
 
 Japanese retail prices and, importantly, MSRP — which is hard to get anywhere
