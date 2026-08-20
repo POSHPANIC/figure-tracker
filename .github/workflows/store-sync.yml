@@ -63,10 +63,34 @@ jobs:
           DATABASE_URL: ${{ secrets.DIRECT_DATABASE_URL }}
         run: npm run import:kotobukiya -- --yes
 
-      # New products arrive with series the curated franchise list has never
-      # seen, and browsing is by franchise — a series without one is
-      # unreachable. Runs even if the sync above failed partway, because the
-      # figures it did create still need filing.
+      # Look for products the catalogue does not have. Reads a few pages of a
+      # retailer's index and writes candidates; creates nothing. Capped, so the
+      # queue stays a length somebody can actually work through.
+      - name: Look for missing figures at Solaris
+        if: always()
+        env:
+          DIRECT_DATABASE_URL: ${{ secrets.DIRECT_DATABASE_URL }}
+          DATABASE_URL: ${{ secrets.DIRECT_DATABASE_URL }}
+        run: npm run discover:solaris -- --yes --pages 8 --max 60
+
+      # Work through part of the queue. Reads each candidate's product page and
+      # either attaches it to a figure we hold, creates it, or leaves it for a
+      # person — see scripts/process-candidates.ts for why those are the tiers.
+      #
+      # Twenty a night on purpose. It is one page fetch per candidate at a
+      # polite interval, and a catalogue that grows twenty figures a day is one
+      # somebody can still check.
+      - name: Research and add candidates
+        if: always()
+        env:
+          DIRECT_DATABASE_URL: ${{ secrets.DIRECT_DATABASE_URL }}
+          DATABASE_URL: ${{ secrets.DIRECT_DATABASE_URL }}
+        run: npm run process:candidates -- --yes --take 20
+
+      # New figures — from either source above — arrive with series the curated
+      # list has never seen, and browsing is by franchise, so a series without
+      # one is unreachable. Once at the end rather than after each source: it is
+      # a full pass over the catalogue and twice a night buys nothing.
       - name: File any new series
         if: always()
         env:

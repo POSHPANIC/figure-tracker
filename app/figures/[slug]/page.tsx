@@ -10,7 +10,8 @@ import { FigureActions } from "@/components/figure-actions";
 import { FigureImagesAdmin } from "@/components/figure-images-admin";
 import { FigureThumb } from "@/components/figure-thumb";
 import { PriceChart } from "@/components/price-chart";
-import { StoreMark } from "@/components/store-mark";
+import { StoreMark, isManufacturerStore } from "@/components/store-mark";
+import { withSolarisAffiliate } from "@/lib/solaris-affiliate";
 import { describeAvailability } from "@/lib/ingest/goodsmile-store";
 import { archiveProductUrl } from "@/lib/ingest/gsc";
 import { affiliateEnabled, withAffiliate } from "@/lib/ebay-affiliate";
@@ -92,12 +93,16 @@ export default async function FigurePage({ params, searchParams }: PageProps<"/f
           figure.msrpCurrency,
           figure.releaseDate,
           money.currency,
+          figure.releaseDatePrecision === "DAY" ? "DAY" : "MONTH",
         )
       : null;
   const msrpConverted =
     msrp !== null && figure.msrpCurrency?.toUpperCase() !== money.currency
       ? approxAt(formatCurrency(msrp.amount, money.currency), msrp.basis)
       : null;
+
+  // Whether the store link is the maker's own shop or a retailer's.
+  const fromManufacturer = figure.storeUrl ? isManufacturerStore(figure.storeUrl) : true;
 
   const trend = trendOf(figure.change30dPct);
   const isModerator = user?.role === "MODERATOR" || user?.role === "ADMIN";
@@ -233,9 +238,15 @@ export default async function FigurePage({ params, searchParams }: PageProps<"/f
             {figure.heightMm && <Spec label="Height">{figure.heightMm} mm</Spec>}
             <Spec label="Released">
               {figure.releaseDate
-                ? figure.releaseDate.toLocaleDateString("en-US", {
+                ? // Shown to the precision it is actually known to. Most of the
+                  // catalogue came from sources that state a month and no day,
+                  // and printing "15 April 2027" for those would present a
+                  // placeholder as a fact.
+                  figure.releaseDate.toLocaleDateString("en-GB", {
+                    ...(figure.releaseDatePrecision === "DAY" ? { day: "numeric" } : {}),
                     month: "long",
                     year: "numeric",
+                    timeZone: "UTC",
                   })
                 : "—"}
             </Spec>
@@ -374,10 +385,16 @@ export default async function FigurePage({ params, searchParams }: PageProps<"/f
           </section>
 
           <section className="rounded-xl border border-border bg-surface p-4">
-            <h2 className="text-sm font-semibold tracking-tight">From the manufacturer</h2>
+            {/* Headed by what the link actually is. "From the manufacturer"
+                over a retailer's link would present a shop's marked-up asking
+                price as the maker's own, which is a different claim. */}
+            <h2 className="text-sm font-semibold tracking-tight">
+              {fromManufacturer ? "From the manufacturer" : "Where to buy"}
+            </h2>
             <p className="mt-1 text-xs text-muted">
-              Their store carries what is currently in production. Older figures are usually not
-              listed — the marketplace prices below are the ones that matter for those.
+              {fromManufacturer
+                ? "Their store carries what is currently in production. Older figures are usually not listed — the marketplace prices below are the ones that matter for those."
+                : "A shop that stocks this figure. Their price is what they charge, not the manufacturer's — the marketplace prices below are what it changes hands for."}
             </p>
 
             {figure.storeUrl && (
@@ -387,7 +404,7 @@ export default async function FigurePage({ params, searchParams }: PageProps<"/f
               // closed preorder is why the marketplace prices below exist, and
               // hiding it would leave the reader wondering.
               <a
-                href={figure.storeUrl}
+                href={withSolarisAffiliate(figure.storeUrl)}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="mt-3 flex items-center gap-3 rounded-lg border border-border p-3 transition hover:border-accent/60"

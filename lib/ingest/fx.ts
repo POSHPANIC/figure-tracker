@@ -148,3 +148,34 @@ export async function monthlyRateToUsd(currency: string, when: Date): Promise<nu
   const found = rates.get(`${code}:${monthKey(when)}`);
   return found && found.rateToUsd > 0 ? found.rateToUsd : null;
 }
+
+/**
+ * The rate for one currency on a specific day.
+ *
+ * Only for a date actually known to the day. A release date that means "some
+ * time in March" must not be converted at 3 March's rate — that is precision
+ * the source never had, and `monthlyRateToUsd` exists for exactly that case.
+ *
+ * Rates come from central banks, which publish on business days. A figure
+ * released on a Sunday has no Sunday rate, so this walks back to the most
+ * recent published day — up to a week, which covers a weekend plus the longest
+ * bank holiday runs. Walking *back* and not forward on purpose: the last known
+ * rate is information that existed on the day in question, and the next one is
+ * not.
+ */
+export async function dailyRateToUsd(currency: string, when: Date): Promise<number | null> {
+  const code = currency.toUpperCase();
+  if (code === "USD") return 1;
+
+  const from = new Date(Date.UTC(when.getUTCFullYear(), when.getUTCMonth(), when.getUTCDate()));
+  const earliest = new Date(from.getTime() - 7 * 86_400_000);
+
+  const row = await prisma.fxRate.findFirst({
+    where: { currency: code, date: { lte: from, gte: earliest } },
+    orderBy: { date: "desc" },
+    select: { rateToUsd: true },
+  });
+
+  const rate = row ? Number(row.rateToUsd) : null;
+  return rate && rate > 0 ? rate : null;
+}

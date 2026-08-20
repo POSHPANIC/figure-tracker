@@ -14,6 +14,21 @@ import { GoodSmileMark } from "./goodsmile-mark";
  * approximation of somebody's brand.
  */
 
+function SolarisMark({ className = "" }: { className?: string }) {
+  return (
+    <span
+      role="img"
+      aria-label="Solaris Japan"
+      className={`inline-flex select-none items-baseline gap-[0.25em] font-semibold leading-none tracking-tight ${className}`}
+    >
+      <span aria-hidden="true">Solaris</span>
+      <span aria-hidden="true" className="text-accent">
+        Japan
+      </span>
+    </span>
+  );
+}
+
 function KotobukiyaMark({ className = "" }: { className?: string }) {
   return (
     <span
@@ -60,5 +75,32 @@ export function StoreMark({ url, className = "" }: { url: string; className?: st
   if (host === "kotobukiya-us.com" || host.endsWith(".kotobukiya-us.com")) {
     return <KotobukiyaMark className={className} />;
   }
+  if (host === "solarisjapan.com" || host.endsWith(".solarisjapan.com")) {
+    return <SolarisMark className={className} />;
+  }
   return <HostMark url={url} className={className} />;
+}
+
+/**
+ * Whether a store link points at the company that made the figure or at a shop
+ * that sells it.
+ *
+ * The distinction is the reader's, not a technicality: "the manufacturer lists
+ * this at ¥5,800" and "a shop will sell you one for $46" are different claims,
+ * and heading a retailer's link "From the manufacturer" would make the second
+ * look like the first.
+ */
+export function isManufacturerStore(url: string): boolean {
+  let host = "";
+  try {
+    host = new URL(url).hostname.toLowerCase();
+  } catch {
+    return false;
+  }
+  return (
+    host === "goodsmile.com" ||
+    host.endsWith(".goodsmile.com") ||
+    host === "kotobukiya-us.com" ||
+    host.endsWith(".kotobukiya-us.com")
+  );
 }

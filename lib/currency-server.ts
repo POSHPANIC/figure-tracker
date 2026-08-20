@@ -1,7 +1,7 @@
 import "server-only";
 import { cache } from "react";
 import { cookies } from "next/headers";
-import { loadRates, monthlyRateToUsd } from "./ingest/fx";
+import { dailyRateToUsd, loadRates, monthlyRateToUsd } from "./ingest/fx";
 import {
   CURRENCY_COOKIE,
   DEFAULT_CURRENCY,
@@ -51,6 +51,17 @@ export const getDisplayMoney = cache(async (): Promise<DisplayMoney> => {
  */
 export type RateBasis = "release" | "today";
 
+/**
+ * How precisely the date behind a historical price is known.
+ *
+ * "DAY" converts at that day's published rate. "MONTH" converts at the month's
+ * average, because the date itself is only a month — the Good Smile archive and
+ * the Kotobukiya store both state a month and no day, and their dates carry a
+ * placeholder day of 15. Quoting one day's rate against a date we guessed would
+ * be inventing precision.
+ */
+export type DatePrecision = "DAY" | "MONTH";
+
 export type HistoricalConversion = { usd: number; basis: RateBasis };
 
 /**
@@ -73,20 +84,37 @@ export async function historicalMoney(
   currency: string,
   when: Date | null,
   display: CurrencyCode,
+  precision: DatePrecision = "MONTH",
 ): Promise<{ amount: number; basis: RateBasis } | null> {
   const code = currency.toUpperCase();
   if (code === display) return { amount, basis: when ? "release" : "today" };
 
   try {
     if (when) {
-      const [fromRate, toRate] = await Promise.all([
-        monthlyRateToUsd(code, when),
-        monthlyRateToUsd(display, when),
-      ]);
+      // A date known to the day gets that day's rate; a date known only to the
+      // month gets the month's average. The conversion is no more precise than
+      // the date behind it.
+      const rateFor = (c: string) =>
+        precision === "DAY" ? dailyRateToUsd(c, when) : monthlyRateToUsd(c, when);
+
+      const [fromRate, toRate] = await Promise.all([rateFor(code), rateFor(display)]);
       // Both or neither. One leg at the release rate and one at today's is a
       // number from no single moment, and the label would misdescribe it.
       if (fromRate && toRate) {
         return { amount: (amount * fromRate) / toRate, basis: "release" };
+      }
+
+      // A day with no published rate either side of it — outside what the
+      // provider covers — falls back to the month rather than to today, which
+      // is still the release period and still honest under the same label.
+      if (precision === "DAY") {
+        const [fromMonth, toMonth] = await Promise.all([
+          monthlyRateToUsd(code, when),
+          monthlyRateToUsd(display, when),
+        ]);
+        if (fromMonth && toMonth) {
+          return { amount: (amount * fromMonth) / toMonth, basis: "release" };
+        }
       }
     }
 

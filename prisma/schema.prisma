@@ -148,6 +148,16 @@ model Figure {
   heightMm    Int?
   releaseDate DateTime?
 
+  /// Whether releaseDate is known to the day or only to the month.
+  ///
+  /// The Good Smile archive and the Kotobukiya store both state a month and no
+  /// day, so those dates carry a placeholder day of 15 and mean "some time that
+  /// month". Solaris state a full date. The distinction is not cosmetic: it
+  /// decides whether MSRP converts at that day's rate or at the month's
+  /// average, and quoting a day's rate against a date we guessed would be
+  /// inventing precision. See lib/ingest/fx-monthly.ts.
+  releaseDatePrecision String @default("MONTH") @db.VarChar(5)
+
   /// Manufacturer's suggested retail price, as originally announced.
   msrpAmount   Decimal? @db.Decimal(12, 2)
   msrpCurrency String?  @db.VarChar(3)
