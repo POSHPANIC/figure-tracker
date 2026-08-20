@@ -94,3 +94,46 @@ export function describeAvailability(product: {
   }
   return "Availability not stated";
 }
+
+/**
+ * What a fetch of a stored product page means for the link we hold.
+ *
+ * Three outcomes, because two of them look alike and must not be treated alike:
+ * a product that has been withdrawn should lose its link, and a store having a
+ * bad five minutes should not.
+ */
+export type PageVerdict =
+  | { state: "ok" }
+  | { state: "gone"; why: string }
+  | { state: "transient"; why: string };
+
+export function classifyResponse(opts: {
+  status: number;
+  finalUrl: string;
+  hasProduct: boolean;
+}): PageVerdict {
+  const { status, finalUrl, hasProduct } = opts;
+
+  if (status === 404 || status === 410) return { state: "gone", why: `HTTP ${status}` };
+
+  // A network failure, a timeout (status 0 by convention here) or their server
+  // erroring says nothing about the product. Leave the link alone.
+  if (status === 0 || status >= 500) return { state: "transient", why: `HTTP ${status}` };
+  if (status < 200 || status >= 400) return { state: "transient", why: `HTTP ${status}` };
+
+  // Answered 200, but not from a product page. This is the failure that sank
+  // the first attempt at these links: a withdrawn product redirects to the
+  // storefront, which is a perfectly healthy 200 and not the product at all.
+  if (!/\/product\/\d+/.test(finalUrl)) {
+    return { state: "gone", why: `redirected to ${finalUrl}` };
+  }
+
+  // Still a product URL, but nothing parsed out of it. Deliberately NOT "gone":
+  // the likeliest cause is that they changed the page, and a format change must
+  // not silently delete every link we hold. Worth shouting about, not acting on.
+  if (!hasProduct) {
+    return { state: "transient", why: "product page did not parse — check the format" };
+  }
+
+  return { state: "ok" };
+}

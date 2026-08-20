@@ -161,6 +161,43 @@ Walking ids is not a route worth taking. It is thousands of requests at a site
 that has published no invitation to do so, and it would put the site's name
 behind a crawl indistinguishable from a scrape.
 
+### Keeping the store links true
+
+The nightly job re-reads every Good Smile product page we hold and updates the
+price and the order window from it. A page that has gone loses its link.
+
+Withdrawal is judged from the response, not from a parse failure, because those
+are different things:
+
+| Response | Verdict | Why |
+| --- | --- | --- |
+| 404 / 410 | withdrawn | the product is gone |
+| 200 from a non-product URL | withdrawn | a dead product redirects to the storefront, which answers a healthy 200 — the exact failure that sank the first attempt at these links |
+| 5xx, timeout, no answer | left alone | says nothing about the product |
+| 200, product URL, nothing parsed | left alone | far likelier a page redesign than a vanished product, and acting on it would clear every link in one run |
+
+Clearing keeps the figure and its MSRP. What the manufacturer asked for it does
+not stop being true when they stop selling it, and for an older figure that is
+the most useful number on the page.
+
+The decision is made after every page has been read, not per page, so a guard
+can refuse the wholesale case: if three or more links are held and *all* of them
+report withdrawn, nothing is cleared. That is a blocked user agent or a change
+to their URLs, not every product disappearing at once.
+
+### New Good Smile products still cannot arrive this way
+
+Kotobukiya's whole catalogue is six requests to a public `products.json`, so
+their sync can find products we have never seen. Good Smile has no equivalent,
+re-checked as of August 2026: no `sitemap.xml`, no `products.json`, no feed, and
+their only index sits behind `/*/search` — the one path their robots.txt asks
+bots to leave alone.
+
+So the nightly job maintains the Good Smile links we already have and cannot
+discover new ones. New Good Smile products reach the catalogue through the
+discovery queue built from unattached eBay listings, and would arrive far more
+directly through an AmiAmi feed (docs/AMIAMI_APPLICATION.md).
+
 ### What replaced it
 
 Two things, neither of which is a straight substitute.

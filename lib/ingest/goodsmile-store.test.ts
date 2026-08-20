@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { describeAvailability, parseStorePage } from "./goodsmile-store";
+import { classifyResponse, describeAvailability, parseStorePage } from "./goodsmile-store";
 
 /** Trimmed from the live page for product 56818, the FREEing Usada Pekora. */
 const PEKORA = `
@@ -64,5 +64,43 @@ describe("parseStorePage", () => {
   it("survives a payload that is not valid JSON", () => {
     const broken = `dataLayer.push({"event":"view_item","ecommerce":{"items":[{"item_id":oops}]`;
     assert.equal(parseStorePage(broken), null);
+  });
+});
+
+describe("classifyResponse", () => {
+  const product = "https://www.goodsmile.com/en/product/56818/Usada+Pekora";
+
+  it("treats a 404 as withdrawn", () => {
+    assert.equal(classifyResponse({ status: 404, finalUrl: product, hasProduct: false }).state, "gone");
+    assert.equal(classifyResponse({ status: 410, finalUrl: product, hasProduct: false }).state, "gone");
+  });
+
+  it("treats a redirect off the product page as withdrawn", () => {
+    // The failure that sank the first attempt at these links: a dead product
+    // redirects to the storefront, which answers a perfectly healthy 200.
+    const v = classifyResponse({ status: 200, finalUrl: "https://www.goodsmile.com/en", hasProduct: false });
+    assert.equal(v.state, "gone");
+  });
+
+  it("leaves the link alone when the store is merely unwell", () => {
+    for (const status of [0, 500, 502, 503, 429]) {
+      assert.equal(
+        classifyResponse({ status, finalUrl: product, hasProduct: false }).state,
+        "transient",
+        `status ${status}`,
+      );
+    }
+  });
+
+  it("does not delete links because the page format changed", () => {
+    // Still a product URL, still 200, but nothing parsed. Far likelier that
+    // they redesigned than that the product vanished — and acting on it would
+    // clear every link we hold in a single run.
+    const v = classifyResponse({ status: 200, finalUrl: product, hasProduct: false });
+    assert.equal(v.state, "transient");
+  });
+
+  it("passes a product page that parsed", () => {
+    assert.equal(classifyResponse({ status: 200, finalUrl: product, hasProduct: true }).state, "ok");
   });
 });
