@@ -1,0 +1,86 @@
+name: Daily store sync
+
+# Keep the manufacturer store links on figure pages true.
+#
+# Three things drift and all of them are visible to a reader:
+#
+#   new products      Kotobukiya announces figures the catalogue does not have
+#   prices            a preorder price changes, or a figure sells out
+#   withdrawn products the store link starts leading to a 404
+#
+# The last one is the reason this runs daily rather than monthly. A dead link on
+# a figure page is worse than no link — that is what sank the first attempt at
+# Good Smile store links, and it was a visitor who noticed, not us.
+#
+# Cheap by design. Kotobukiya's whole catalogue is six requests to Shopify's
+# public products.json, and a product page is only fetched for a figure we have
+# never seen. A quiet night costs six requests and no page loads.
+
+on:
+  schedule:
+    # 03:00 UTC, an hour before the Vercel ingest cron at 04:00 and two before
+    # the listing sweep at 05:00. Nothing here competes with those for eBay
+    # quota — it does not touch eBay — but staggering keeps the logs readable
+    # and keeps three jobs off the same database at once.
+    - cron: "0 3 * * *"
+  workflow_dispatch:
+
+concurrency:
+  # Two syncs at once would race on the same rows and ask the same store the
+  # same questions twice.
+  group: store-sync
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    # Measured at well under five minutes when nothing is new. The ceiling is
+    # for the case where they add a lot at once and every new product needs its
+    # page read at ~0.7s each.
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Generate Prisma client
+        run: npx prisma generate
+
+      # New products, refreshed prices and availability, and store links cleared
+      # for anything the store no longer lists. Refuses to delist when the index
+      # comes back empty, since that is far more likely to be a failed fetch
+      # than every product vanishing at once.
+      - name: Sync Kotobukiya
+        env:
+          DIRECT_DATABASE_URL: ${{ secrets.DIRECT_DATABASE_URL }}
+          DATABASE_URL: ${{ secrets.DIRECT_DATABASE_URL }}
+        run: npm run import:kotobukiya -- --yes
+
+      # New products arrive with series the curated franchise list has never
+      # seen, and browsing is by franchise — a series without one is
+      # unreachable. Runs even if the sync above failed partway, because the
+      # figures it did create still need filing.
+      - name: File any new series
+        if: always()
+        env:
+          DIRECT_DATABASE_URL: ${{ secrets.DIRECT_DATABASE_URL }}
+          DATABASE_URL: ${{ secrets.DIRECT_DATABASE_URL }}
+        run: npm run assign:franchises -- --yes
+
+      # Good Smile's links are refreshed separately because their store cannot
+      # be enumerated: there is no index to compare against, so each stored page
+      # is re-read to see whether its order window has closed. Only one figure
+      # has such a link today, so this is one request.
+      - name: Refresh Good Smile store pages
+        if: always()
+        env:
+          DIRECT_DATABASE_URL: ${{ secrets.DIRECT_DATABASE_URL }}
+          DATABASE_URL: ${{ secrets.DIRECT_DATABASE_URL }}
+        run: npm run check:store -- --refresh --yes

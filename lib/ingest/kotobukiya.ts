@@ -241,3 +241,31 @@ export function statusFor(releaseDate: Date | null, now = new Date()): "PREORDER
   if (!releaseDate) return "RELEASED";
   return releaseDate.getTime() > now.getTime() ? "PREORDER" : "RELEASED";
 }
+
+/**
+ * What a sync should do with each product, given the store's current index and
+ * what we already hold.
+ *
+ * The index is the whole truth about what they sell: it is six requests and
+ * lists every product. So a figure of ours whose store id is absent from it has
+ * been delisted, and that is worth knowing without fetching anything.
+ */
+export type SyncPlan = {
+  /** In the index, not in the catalogue. Needs its page read for specs. */
+  create: string[];
+  /** In both. Price and availability are refreshed from the index alone. */
+  update: string[];
+  /** In the catalogue, gone from the index. Its store link now leads nowhere. */
+  delist: string[];
+};
+
+export function planSync(feedProductIds: string[], storedProductIds: string[]): SyncPlan {
+  const feed = new Set(feedProductIds);
+  const stored = new Set(storedProductIds);
+
+  return {
+    create: feedProductIds.filter((id) => !stored.has(id)),
+    update: feedProductIds.filter((id) => stored.has(id)),
+    delist: storedProductIds.filter((id) => !feed.has(id)),
+  };
+}

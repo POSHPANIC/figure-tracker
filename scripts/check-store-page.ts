@@ -81,8 +81,13 @@ async function main() {
   console.log(`\n  ${APPLY ? "Writing to" : "Dry run against"} ${host}\n`);
 
   if (REFRESH) {
+    // Good Smile pages only. parseStorePage reads their dataLayer, and the
+    // catalogue now holds Kotobukiya store links too — handing those to this
+    // parser would fetch 290 pages to report "no product on that page" for
+    // every one of them. Kotobukiya's links are refreshed by its own importer,
+    // which reads their index instead.
     const stored = await prisma.figure.findMany({
-      where: { storeUrl: { not: null } },
+      where: { storeUrl: { contains: "goodsmile.com" } },
       select: { slug: true, storeUrl: true },
     });
     console.log(`  re-reading ${stored.length} stored page(s)\n`);

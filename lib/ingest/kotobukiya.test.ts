@@ -7,6 +7,7 @@ import {
   parseSalesMonth,
   parseScale,
   parseSpecs,
+  planSync,
   statusFor,
 } from "./kotobukiya";
 
@@ -217,5 +218,34 @@ describe("statusFor", () => {
 
   it("does not treat a missing date as unreleased", () => {
     assert.equal(statusFor(null, now), "RELEASED");
+  });
+});
+
+describe("planSync", () => {
+  it("splits the index against what we hold", () => {
+    const plan = planSync(["a", "b", "c"], ["b", "c", "d"]);
+    assert.deepEqual(plan.create, ["a"]);
+    assert.deepEqual(plan.update, ["b", "c"]);
+    assert.deepEqual(plan.delist, ["d"]);
+  });
+
+  it("treats a product missing from the index as delisted", () => {
+    // The index lists their whole catalogue in six requests, so absence from it
+    // is evidence rather than a gap — no need to fetch a page to find a 404.
+    assert.deepEqual(planSync([], ["gone"]).delist, ["gone"]);
+  });
+
+  it("plans nothing when the two agree", () => {
+    const plan = planSync(["a"], ["a"]);
+    assert.deepEqual([plan.create, plan.delist], [[], []]);
+    assert.deepEqual(plan.update, ["a"]);
+  });
+
+  it("does not delist the whole catalogue when the index comes back empty", () => {
+    // Guarded by the caller, not here: an empty index is far more likely to be
+    // a failed fetch than every product vanishing at once. This test records
+    // that planSync says "delist everything" so the caller must not act on it
+    // blindly — see the refusal in scripts/import-kotobukiya.ts.
+    assert.deepEqual(planSync([], ["a", "b"]).delist, ["a", "b"]);
   });
 });

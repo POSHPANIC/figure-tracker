@@ -243,6 +243,43 @@ mm". Storing that in `heightMm` puts a measured-looking number beside a figure
 it does not describe, so a size naming a length, width, depth or diameter — and
 never a height — is refused. 26 products are affected.
 
+### Keeping it current
+
+`npm run import:kotobukiya -- --yes` is a sync, not a one-off import, and runs
+nightly at 03:00 UTC from `.github/workflows/store-sync.yml`. Each run:
+
+| | |
+| --- | --- |
+| **new products** | read the product page for specs, then create the figure |
+| **known products** | refresh price and availability from the index alone |
+| **withdrawn products** | clear the store link, keep the figure |
+
+Their index lists everything they sell in six requests, so a product of ours
+missing from it has been withdrawn — no page fetch needed to discover a dead
+URL. A quiet night therefore costs six requests and no page loads.
+
+Delisting clears the link and leaves the figure. It existed, it has price
+history, and the marketplace listings below are exactly what someone wants once
+it is no longer sold new. **MSRP survives delisting** — what the manufacturer
+asked for it does not stop being true when they stop selling it.
+
+**MSRP is also never rewritten by a later sync.** It is set once, when the
+figure is first seen. A discount is not a change to what the manufacturer asked,
+and letting a sale price overwrite MSRP would quietly rewrite history on the one
+number the page presents as historical. `storePriceAmount` tracks the current
+price instead.
+
+One guard worth knowing: the sync refuses to delist anything if the index comes
+back with no figures at all. An empty index is far more likely to be a failed
+fetch or a changed endpoint than every product vanishing at once, and acting on
+it would strip the store link off the whole catalogue in a single run.
+
+Good Smile links are refreshed by a different mechanism in the same job, because
+their store cannot be enumerated: with no index to compare against, each stored
+page is re-read to see whether its order window has closed. `check:store` is
+scoped to `goodsmile.com` URLs so it never hands a Kotobukiya page to a parser
+that reads Good Smile's dataLayer.
+
 ### Images
 
 `products.json` carries every product image URL, and none of them are imported.

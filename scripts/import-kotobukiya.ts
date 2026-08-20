@@ -10,6 +10,7 @@ import {
   categoryFor,
   classify,
   parseSpecs,
+  planSync,
   statusFor,
   type Candidate,
   type ProductSpecs,
@@ -23,14 +24,23 @@ import {
  *   npm run import:kotobukiya -- --limit 25    # try a handful first
  *   npm run import:kotobukiya -- --refresh     # re-read pages already imported
  *
- * Two passes. The index comes from Shopify's own /products.json — the whole
- * catalogue in six requests — and gives titles, SKUs, prices and images. The
- * specs that matter to us (release month, scale, size, series) are only on the
- * product page, so those are fetched one at a time, politely, and cached on
- * disk so a re-run costs nothing.
+ * Safe to run on a schedule; the nightly job in .github/workflows/store-sync.yml
+ * is this with --yes. Each run does three things:
  *
- * Because /products.json carries `updated_at`, the expensive per-product pass
- * only runs for products we have not seen or that have changed since.
+ *   new products      read the product page for specs, then create the figure
+ *   known products    refresh price and availability from the index alone
+ *   delisted products clear the store link, keeping the figure
+ *
+ * The index comes from Shopify's own /products.json — their whole catalogue in
+ * six requests — and gives titles, SKUs, prices and availability. Only the
+ * specs (release month, scale, size, series) need a product page, and only for
+ * products we have never seen, so a quiet night costs six requests.
+ *
+ * Delisting matters because a store link that 404s is worse than no link. Their
+ * index lists everything they sell, so a product of ours missing from it has
+ * been withdrawn — no need to fetch a page to discover a dead URL. The figure
+ * stays: it existed, it has price history, and the marketplace listings below
+ * are exactly what someone wants once it is no longer sold new.
  *
  * Prices here are US retail in USD, not Japanese MSRP. That is a deliberate
  * choice with a real cost — "MSRP" now means two things across the catalogue —
@@ -166,15 +176,58 @@ async function freeSlug(base: string, productId: string): Promise<string> {
   return `${base}-${productId}`;
 }
 
-type Resolved = { candidate: Candidate; specs: ProductSpecs };
+/**
+ * Products we hold that the store no longer lists.
+ *
+ * Clears the store link and everything read off it, and leaves the figure
+ * alone. Their page is gone, so keeping the URL would leave a row on the figure
+ * page pointing at a 404 — the exact complaint that killed the first attempt at
+ * Good Smile store links.
+ *
+ * MSRP is kept. What the manufacturer asked for it does not stop being true
+ * when they stop selling it, and for an older figure that is the most useful
+ * number on the page.
+ */
+async function delist(productIds: string[]): Promise<number> {
+  if (productIds.length === 0) return 0;
+
+  const rows = await prisma.figureIdentifier.findMany({
+    where: { kind: STORE_KIND, value: { in: productIds } },
+    select: { figureId: true },
+  });
+  if (rows.length === 0) return 0;
+
+  const { count } = await prisma.figure.updateMany({
+    where: { id: { in: rows.map((r) => r.figureId) }, storeUrl: { not: null } },
+    data: {
+      storeUrl: null,
+      storePriceAmount: null,
+      storePriceCurrency: null,
+      storeAvailable: null,
+      storeClosesAt: null,
+      storeCheckedAt: new Date(),
+    },
+  });
+  return count;
+}
+
+/**
+ * A product ready to write. `specs` is null for one we already hold: its page
+ * was not read this run, so there is nothing new to say about its release month
+ * or scale, and the fields keep whatever they already had.
+ */
+type Resolved = { candidate: Candidate; specs: ProductSpecs | null };
 
 async function write(rows: Resolved[]) {
   let created = 0;
   let updated = 0;
 
   for (const { candidate, specs } of rows) {
-    const manufacturerId = await ensureManufacturer(specs.manufacturer);
-    const seriesId = specs.series ? await ensureSeries(specs.series) : null;
+    // A product whose page was not read this run contributes no specs. Its
+    // manufacturer and series stay as recorded rather than being reassigned
+    // from nothing.
+    const manufacturerId = specs ? await ensureManufacturer(specs.manufacturer) : null;
+    const seriesId = specs?.series ? await ensureSeries(specs.series) : null;
 
     // The SKU is Kotobukiya's own product code — printed on the box, quoted in
     // eBay titles — so it is the identity worth carrying. But not every entry
@@ -194,18 +247,15 @@ async function write(rows: Resolved[]) {
       if (existing) break;
     }
 
-    const data = {
-      name: candidate.title,
-      category: categoryFor(specs) as never,
-      status: statusFor(specs.releaseDate) as never,
-      scale: specs.scale,
-      heightMm: specs.heightMm,
-      releaseDate: specs.releaseDate,
-      msrpAmount: candidate.priceUsd,
-      msrpCurrency: "USD",
-      manufacturerId,
-      seriesId,
-
+    // Everything the store says about the product right now.
+    //
+    // MSRP is deliberately not in here. It is set once, when the figure is
+    // first seen, and never rewritten — a later discount is not a change to
+    // what the manufacturer asked for it, and letting a sale price overwrite
+    // MSRP would quietly rewrite history on the one number the page presents
+    // as historical. storePriceAmount is what tracks the current price.
+    // What the store says about the product right now, refreshed every run.
+    const storeFields = {
       // The product on the maker's own store, shown on the figure page above
       // the marketplace listings. Unlike Good Smile — whose store cannot be
       // enumerated, so links arrive one at a time — every product here comes
@@ -215,6 +265,7 @@ async function write(rows: Resolved[]) {
       // right now. No order window is stated anywhere, so storeClosesAt stays
       // null and the row reads "Currently unavailable" rather than inventing a
       // date for when ordering stopped.
+      name: candidate.title,
       storeUrl: candidate.url,
       storePriceAmount: candidate.priceUsd,
       storePriceCurrency: "USD",
@@ -222,6 +273,26 @@ async function write(rows: Resolved[]) {
       storeClosesAt: null,
       storeCheckedAt: new Date(),
     };
+
+    // Read off the product page, so only present when the page was read. MSRP
+    // is deliberately absent: it is set once, when the figure is first seen,
+    // and never rewritten — a later discount is not a change to what the
+    // manufacturer asked for it, and letting a sale price overwrite MSRP would
+    // quietly rewrite history on the one number the page presents as
+    // historical. storePriceAmount is what tracks the current price.
+    const specFields = specs
+      ? {
+          category: categoryFor(specs) as never,
+          status: statusFor(specs.releaseDate) as never,
+          scale: specs.scale,
+          heightMm: specs.heightMm,
+          releaseDate: specs.releaseDate,
+          manufacturerId,
+          seriesId,
+        }
+      : {};
+
+    const data = { ...storeFields, ...specFields };
 
     if (existing) {
       await prisma.figure.update({ where: { id: existing.figureId }, data });
@@ -237,8 +308,21 @@ async function write(rows: Resolved[]) {
       continue;
     }
 
+    if (!specs) {
+      // Only reachable if the index gained a product between the plan and the
+      // write. Skipped rather than created without specs — a figure with no
+      // series or release month is worse than one imported tomorrow.
+      console.log(`    skipped ${candidate.title.slice(0, 40)} — no specs read`);
+      continue;
+    }
+
     const figure = await prisma.figure.create({
-      data: { ...data, slug: await freeSlug(slugify(candidate.title), candidate.productId) },
+      data: {
+        ...data,
+        msrpAmount: candidate.priceUsd,
+        msrpCurrency: "USD",
+        slug: await freeSlug(slugify(candidate.title), candidate.productId),
+      },
     });
     for (const key of keys) {
       await prisma.figureIdentifier.create({ data: { figureId: figure.id, ...key } });
@@ -261,9 +345,40 @@ async function main() {
     console.log(`    ${String(n).padStart(5)}  ${reason}`);
   }
 
-  const work = LIMIT > 0 ? candidates.slice(0, LIMIT) : candidates;
-  if (LIMIT > 0) console.log(`\n  --limit ${LIMIT}: reading ${work.length} of ${candidates.length} product pages`);
-  else console.log(`\n  reading ${work.length} product pages (cached after the first run)`);
+  // What the store lists, against what we already hold.
+  const held = await prisma.figureIdentifier.findMany({
+    where: { kind: STORE_KIND },
+    select: { value: true },
+  });
+  const plan = planSync(
+    candidates.map((c) => c.productId),
+    held.map((h) => h.value),
+  );
+
+  console.log(`\n  ${plan.create.length} new, ${plan.update.length} already held, ${plan.delist.length} delisted`);
+
+  // An index that came back empty is far more likely to be a failed fetch or a
+  // changed endpoint than every product vanishing at once, and acting on it
+  // would strip the store link off the whole catalogue in one run. readIndex
+  // already throws on a failed request; this catches the subtler case where it
+  // succeeds and returns nothing useful.
+  if (candidates.length === 0 && plan.delist.length > 0) {
+    throw new Error(
+      `refusing to delist ${plan.delist.length} figures: the index returned no figures at all`,
+    );
+  }
+
+  const wanted = LIMIT > 0 ? candidates.slice(0, LIMIT) : candidates;
+
+  // Only new products need their page read. A known product's price and
+  // availability come from the index, and its specs — release month, scale,
+  // size — do not change once published. On a quiet night this fetches nothing.
+  const needsPage = new Set(REFRESH ? wanted.map((c) => c.productId) : plan.create);
+  const work = wanted.filter((c) => needsPage.has(c.productId));
+  const known = wanted.filter((c) => !needsPage.has(c.productId));
+
+  if (work.length > 0) console.log(`\n  reading ${work.length} product page(s)`);
+  else console.log(`\n  no product pages to read`);
 
   const resolved: Resolved[] = [];
   const noSpecs: string[] = [];
@@ -273,49 +388,68 @@ async function main() {
       noSpecs.push(candidate.title);
       continue;
     }
-    const specs = parseSpecs(html);
-    resolved.push({ candidate, specs });
+    resolved.push({ candidate, specs: parseSpecs(html) });
     if ((i + 1) % 25 === 0) process.stdout.write(`\r  pages: ${i + 1}/${work.length}`);
   }
-  process.stdout.write(`\r  pages: ${work.length}/${work.length}\n`);
+  if (work.length > 0) process.stdout.write(`\r  pages: ${work.length}/${work.length}\n`);
 
-  const withDate = resolved.filter((r) => r.specs.releaseDate).length;
-  const withScale = resolved.filter((r) => r.specs.scale).length;
-  const withSeries = resolved.filter((r) => r.specs.series).length;
-  const withHeight = resolved.filter((r) => r.specs.heightMm).length;
-
-  console.log(`\n  of ${resolved.length} figures read:`);
-  console.log(`    ${withSeries} have a series`);
-  console.log(`    ${withDate} have a release month`);
-  console.log(`    ${withScale} have a scale`);
-  console.log(`    ${withHeight} have a height`);
-  if (noSpecs.length > 0) console.log(`    ${noSpecs.length} page(s) could not be read`);
-
-  // Worth seeing rather than assuming: a quarter of the figures in Kotobukiya's
-  // own store are made by somebody else, and each is filed under its real maker.
-  const makers = new Map<string, number>();
-  for (const { specs } of resolved) {
-    const name = specs.manufacturer ?? `${MANUFACTURER} (not stated)`;
-    makers.set(name, (makers.get(name) ?? 0) + 1);
-  }
-  console.log("\n  manufacturers:");
-  for (const [name, n] of [...makers].sort((a, b) => b[1] - a[1])) {
-    console.log(`    ${String(n).padStart(5)}  ${name}`);
+  // Known products are refreshed from the index alone. Their specs stay as
+  // recorded — passing nulls here would blank a release month we already have.
+  for (const candidate of known) {
+    resolved.push({ candidate, specs: null });
   }
 
-  const skus = resolved.map((r) => r.candidate.sku).filter((s): s is string => Boolean(s));
-  const known = await prisma.figureIdentifier.findMany({
-    where: { kind: SKU_KIND, value: { in: skus } },
-    select: { value: true },
-  });
-  console.log(`\n  ${known.length} already imported, ${resolved.length - known.length} new`);
+  // Everything below describes the pages actually read this run. A product we
+  // already hold contributes no specs, and counting it as "0 have a release
+  // month" would report a gap that is not there.
+  const fresh = resolved.filter(
+    (r): r is { candidate: Candidate; specs: ProductSpecs } => r.specs !== null,
+  );
 
-  console.log("\n  sample:");
-  for (const { candidate, specs } of resolved.slice(0, 5)) {
-    const date = specs.releaseDate?.toISOString().slice(0, 7) ?? "no date";
-    console.log(
-      `    ${candidate.sku ?? "—"}  $${candidate.priceUsd}  ${date}  ${specs.scale ?? "—"}  ${candidate.title.slice(0, 48)}`,
-    );
+  if (fresh.length > 0) {
+    console.log(`\n  of ${fresh.length} page(s) read:`);
+    console.log(`    ${fresh.filter((r) => r.specs.series).length} have a series`);
+    console.log(`    ${fresh.filter((r) => r.specs.releaseDate).length} have a release month`);
+    console.log(`    ${fresh.filter((r) => r.specs.scale).length} have a scale`);
+    console.log(`    ${fresh.filter((r) => r.specs.heightMm).length} have a height`);
+    if (noSpecs.length > 0) console.log(`    ${noSpecs.length} page(s) could not be read`);
+
+    // Worth seeing rather than assuming: a quarter of the figures in
+    // Kotobukiya's own store are made by somebody else, and each is filed
+    // under its real maker.
+    const makers = new Map<string, number>();
+    for (const { specs } of fresh) {
+      const name = specs.manufacturer ?? `${MANUFACTURER} (not stated)`;
+      makers.set(name, (makers.get(name) ?? 0) + 1);
+    }
+    console.log("\n  manufacturers:");
+    for (const [name, n] of [...makers].sort((a, b) => b[1] - a[1])) {
+      console.log(`    ${String(n).padStart(5)}  ${name}`);
+    }
+
+    console.log("\n  sample:");
+    for (const { candidate, specs } of fresh.slice(0, 5)) {
+      const date = specs.releaseDate?.toISOString().slice(0, 7) ?? "no date";
+      console.log(
+        `    ${candidate.sku ?? "—"}  $${candidate.priceUsd}  ${date}  ${specs.scale ?? "—"}  ${candidate.title.slice(0, 48)}`,
+      );
+    }
+  }
+
+  if (plan.delist.length > 0) {
+    const going = await prisma.figure.findMany({
+      where: {
+        identifiers: { some: { kind: STORE_KIND, value: { in: plan.delist } } },
+        storeUrl: { not: null },
+      },
+      select: { slug: true },
+      take: 10,
+    });
+    console.log(`\n  delisting ${plan.delist.length} product(s); their store links are cleared:`);
+    for (const f of going) console.log(`    ${f.slug}`);
+    if (plan.delist.length > going.length) {
+      console.log(`    … and ${plan.delist.length - going.length} more`);
+    }
   }
 
   if (!APPLY) {
@@ -325,7 +459,8 @@ async function main() {
   }
 
   const { created, updated } = await write(resolved);
-  console.log(`\n  Done. ${created} created, ${updated} updated.`);
+  const cleared = await delist(plan.delist);
+  console.log(`\n  Done. ${created} created, ${updated} updated, ${cleared} store link(s) cleared.`);
   console.log("  Run `npm run assign:franchises -- --yes` to file the new series.\n");
   await prisma.$disconnect();
 }
