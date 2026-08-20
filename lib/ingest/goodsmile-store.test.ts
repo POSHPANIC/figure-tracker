@@ -47,6 +47,15 @@ describe("parseStorePage", () => {
     assert.equal(describeAvailability(p!), "Availability not stated");
   });
 
+  it("says unavailable when a store says no without naming a date", () => {
+    // Shopify's `available` flag is a plain no with no window attached. That is
+    // a different thing from "we could not tell", and reads differently.
+    assert.equal(
+      describeAvailability({ orderClosesAt: null, available: false }),
+      "Currently unavailable",
+    );
+  });
+
   it("returns nothing for a page with no product on it", () => {
     assert.equal(parseStorePage("<html><body>404</body></html>"), null);
     assert.equal(parseStorePage(""), null);

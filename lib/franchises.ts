@@ -279,6 +279,10 @@ export const FRANCHISES: FranchiseDefinition[] = [
     // Doctor and Interviews with Monster Girls share the word and nothing else.
     name: "Monster Hunter",
     series: [
+      // Kotobukiya's all-caps spelling. Left uncurated it cannot be promoted to
+      // a franchise of its own either, because the curated name already holds
+      // the slug — so the series was stranded and its figure unbrowsable.
+      "MONSTER HUNTER",
       "MONSTER HUNTER WORLD: ICEBORNE",
       "Monster Hunter 4",
       "Monster Hunter Frontier G",

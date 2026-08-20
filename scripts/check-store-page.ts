@@ -66,7 +66,8 @@ async function record(slug: string, url: string) {
     where: { slug },
     data: {
       storeUrl: url,
-      storePriceJpy: product.priceJpy,
+      storePriceAmount: product.priceJpy,
+      storePriceCurrency: product.priceJpy === null ? null : "JPY",
       storeAvailable: product.available,
       storeClosesAt: product.orderClosesAt,
       storeCheckedAt: new Date(),

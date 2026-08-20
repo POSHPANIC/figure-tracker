@@ -205,6 +205,22 @@ async function write(rows: Resolved[]) {
       msrpCurrency: "USD",
       manufacturerId,
       seriesId,
+
+      // The product on the maker's own store, shown on the figure page above
+      // the marketplace listings. Unlike Good Smile — whose store cannot be
+      // enumerated, so links arrive one at a time — every product here comes
+      // with its own URL, so all 290 get one for free.
+      //
+      // storeAvailable is Shopify's own flag: whether they will take an order
+      // right now. No order window is stated anywhere, so storeClosesAt stays
+      // null and the row reads "Currently unavailable" rather than inventing a
+      // date for when ordering stopped.
+      storeUrl: candidate.url,
+      storePriceAmount: candidate.priceUsd,
+      storePriceCurrency: "USD",
+      storeAvailable: candidate.available,
+      storeClosesAt: null,
+      storeCheckedAt: new Date(),
     };
 
     if (existing) {

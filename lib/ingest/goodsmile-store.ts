@@ -81,6 +81,9 @@ export function describeAvailability(product: {
   available: boolean | null;
 }): string {
   if (product.available === true) return "Available to order";
+  // A store can say "you cannot order this" without naming a date — Shopify's
+  // `available` flag does exactly that. Still a no, just an undated one.
+  if (product.available === false && !product.orderClosesAt) return "Currently unavailable";
   if (product.available === false && product.orderClosesAt) {
     return `Ordering closed ${product.orderClosesAt.toLocaleDateString("en-GB", {
       day: "numeric",

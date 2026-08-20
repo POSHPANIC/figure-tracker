@@ -9,8 +9,8 @@ import { EbayMark } from "@/components/ebay-mark";
 import { FigureActions } from "@/components/figure-actions";
 import { FigureImagesAdmin } from "@/components/figure-images-admin";
 import { FigureThumb } from "@/components/figure-thumb";
-import { GoodSmileMark } from "@/components/goodsmile-mark";
 import { PriceChart } from "@/components/price-chart";
+import { StoreMark } from "@/components/store-mark";
 import { describeAvailability } from "@/lib/ingest/goodsmile-store";
 import { archiveProductUrl } from "@/lib/ingest/gsc";
 import { affiliateEnabled, withAffiliate } from "@/lib/ebay-affiliate";
@@ -392,7 +392,7 @@ export default async function FigurePage({ params, searchParams }: PageProps<"/f
                 rel="noopener noreferrer"
                 className="mt-3 flex items-center gap-3 rounded-lg border border-border p-3 transition hover:border-accent/60"
               >
-                <GoodSmileMark className="shrink-0 text-sm" />
+                <StoreMark url={figure.storeUrl} className="shrink-0 text-sm" />
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-sm">{figure.name}</span>
                   <span
@@ -407,9 +407,12 @@ export default async function FigurePage({ params, searchParams }: PageProps<"/f
                     })}
                   </span>
                 </span>
-                {figure.storePriceJpy !== null && (
+                {figure.storePriceAmount !== null && figure.storePriceCurrency && (
+                  // Quoted in the currency the store quotes it in. Converting
+                  // it would misstate what they are charging, and this row
+                  // exists to say what they are charging.
                   <span className="tabular shrink-0 text-sm font-medium">
-                    {formatCurrency(figure.storePriceJpy, "JPY")}
+                    {formatCurrency(figure.storePriceAmount, figure.storePriceCurrency)}
                   </span>
                 )}
               </a>
