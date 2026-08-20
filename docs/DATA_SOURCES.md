@@ -332,6 +332,56 @@ id). The second exists because one product has no SKU, and a figure with no
 identifier is created afresh on every run — which is precisely what happened on
 the second run before this was fixed.
 
+## Solaris Japan
+
+A retailer, not a manufacturer, and that difference decides how it is used.
+`npm run discover:solaris` proposes candidates for review; it never creates a
+figure.
+
+Their storefront is Shopify, so the catalogue is public JSON at
+`/products.json` and their robots.txt permits it in the same words Kotobukiya's
+does. At least 25,000 products — page 100 still returns a full page, page 120 is
+the paging cap — of which the overwhelming majority are figures.
+
+### Why this is not the Kotobukiya importer
+
+| | Kotobukiya | Solaris |
+| --- | --- | --- |
+| Who they are | the manufacturer | a retailer |
+| Their price | list price | an asking price, 12–26% over MSRP |
+| Their SKU | the manufacturer's code | their own, joins to nothing |
+| Exactly matchable | all of it | ~10%, via a release number in the title |
+
+The markup is measured, not assumed. Against figures already in the catalogue:
+Nendoroid #1783 is ¥5,800 (about $36.59 at the same day's rate) and they ask
+$46.27; #1977 is ¥6,800, about $42.90, and they ask $53.28. That is an
+exporter's margin and it must never reach `msrpAmount`.
+
+### What it is good for
+
+Breadth. In a 1,555-figure sample: Bandai Spirits 332, MegaHouse 144, FuRyu 140,
+Sega Fave 72, Insight 48, Union Creative 31. This catalogue has almost nothing
+from any of them, and no other source found so far covers manufacturers outside
+the Good Smile group at scale.
+
+### How candidates are chosen
+
+- **Figures only**, by their own `product_type`.
+- **Good Smile group products are skipped unless they carry a release number.**
+  Unnumbered ones overlap almost entirely with the 5,644 already here. Numbered
+  ones cannot become duplicates — the number joins to identifiers we hold — and
+  the ones that fail to join are precisely the post-February-2024 releases the
+  archive stopped publishing. Those are the most valuable candidates in the feed.
+- **Anything whose release number matches a figure we hold is dropped.** It is
+  the only exact join available and the only way to be certain.
+- **Capped per run**, newest first. Their catalogue is 25,000 products against a
+  queue that held 91; a queue nobody can finish is a queue nobody opens.
+
+Accepted candidates with a release number get a real `NENDOROID_NO` or
+`FIGMA_NO` identifier. Accepted ones without get none — an invented identifier
+is worse than no identifier — and land in category `OTHER` for a moderator to
+correct, rather than having a category guessed from words in a retailer's title.
+
 ## AmiAmi
 
 Japanese retail prices and, importantly, MSRP — which is hard to get anywhere

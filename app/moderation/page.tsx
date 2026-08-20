@@ -77,11 +77,12 @@ export default async function ModerationPage() {
             Possibly missing
           </h2>
           <p className="mt-1 text-sm text-muted">
-            <span className="tabular">{candidates.openCount}</span> release{" "}
-            {candidates.openCount === 1 ? "number" : "numbers"} that several sellers list and the
-            catalogue does not have. Found in listings we could not attach to any figure — the Good
-            Smile archive stopped publishing in February 2024, so anything released since is absent.
-            Nothing here is in the catalogue until you put it there.
+            <span className="tabular">{candidates.openCount}</span>{" "}
+            {candidates.openCount === 1 ? "product" : "products"} the catalogue may be missing. Two
+            sources: release numbers that several eBay sellers list and no figure carries, and
+            products a retailer stocks — which is how manufacturers outside the Good Smile group get
+            here at all. The Good Smile archive stopped publishing in February 2024, so anything
+            released since is absent. Nothing here is in the catalogue until you put it there.
           </p>
           <ul className="mt-4 space-y-3">
             {candidates.items.map((candidate) => (

@@ -252,11 +252,17 @@ export async function getFigureCandidates(take = 40) {
         id: true,
         line: true,
         number: true,
+        source: true,
+        sourceUrl: true,
+        vendor: true,
         listingCount: true,
         sampleTitles: true,
         firstSeenAt: true,
       },
-      orderBy: [{ listingCount: "desc" }, { firstSeenAt: "asc" }],
+      // Numbered candidates first: accepting one records a release number,
+      // which is a fact, where accepting a retailer's product is a judgement.
+      // Within each, the best-corroborated and then the longest-waiting.
+      orderBy: [{ number: { sort: "desc", nulls: "last" } }, { listingCount: "desc" }, { firstSeenAt: "asc" }],
       take,
     }),
     prisma.figureCandidate.count({ where: { status: "OPEN" } }),

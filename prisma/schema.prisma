@@ -821,12 +821,30 @@ enum CandidateStatus {
 model FigureCandidate {
   id String @id @default(cuid())
 
-  /// "NENDOROID:2509" — the line and the number on the box, which is the one
-  /// thing sellers copy accurately. Unique, so a nightly re-run updates the
-  /// count instead of stacking duplicates.
+  /// "NENDOROID:2509" for a release number, "SOLARIS:8842119" for a retailer's
+  /// product. Unique, so a nightly re-run updates the row instead of stacking
+  /// duplicates.
   key    String @unique
-  line   String
-  number String
+
+  /// Where the candidate came from, because the evidence differs by source and
+  /// so does how much of it is needed. Several eBay sellers naming the same
+  /// number is corroboration; a shop listing a product for sale is a different
+  /// and stronger kind of claim.
+  source String @default("EBAY_LISTINGS")
+
+  /// The line and number on the box, when the source gives one. Null for a
+  /// retailer's product that carries no release number — most figures outside
+  /// the Nendoroid and figma lines do not have one, and those are exactly the
+  /// manufacturers the catalogue is thinnest on.
+  line   String?
+  number String?
+
+  /// The page this came from, for a moderator to check before accepting.
+  sourceUrl String?
+
+  /// The manufacturer as the source names it. A retailer knows who made what it
+  /// sells, which is worth carrying even though it still needs confirming.
+  vendor String?
 
   /// How many distinct listings named this number. Corroboration is the whole
   /// basis for believing the product exists: one seller is a typo, several

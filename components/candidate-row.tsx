@@ -8,8 +8,12 @@ import { cn } from "@/lib/utils";
 
 export type QueuedCandidate = {
   id: string;
-  line: string;
-  number: string;
+  /** Null for a retailer's product, which carries no release number. */
+  line: string | null;
+  number: string | null;
+  source: string;
+  sourceUrl: string | null;
+  vendor: string | null;
   listingCount: number;
   sampleTitles: string[];
   firstSeenAt: Date;
@@ -65,10 +69,16 @@ export function CandidateRow({ candidate }: { candidate: QueuedCandidate }) {
     };
   }, [typed]);
 
+  // A release number means the box says so and several sellers copied it. A
+  // retailer's product has no number and is instead vouched for by a shop
+  // listing it for sale — different evidence, shown differently.
+  const numbered = candidate.line !== null && candidate.number !== null;
   const line = candidate.line === "FIGMA" ? "figma" : "Nendoroid";
-  // The number as sellers write it, so searching for it finds the listings
-  // this candidate was built from.
-  const query = `${line} ${candidate.number}`;
+  const heading = numbered ? `${line} ${candidate.number}` : (candidate.vendor ?? "Unknown maker");
+  // The number as sellers write it, so searching for it finds the listings this
+  // candidate was built from. With no number, the retailer's own title is the
+  // best thing to search for.
+  const query = numbered ? `${line} ${candidate.number}` : (candidate.sampleTitles[0] ?? "");
 
   function run(action: (fd: FormData) => Promise<{ ok: boolean; error?: string }>, form: FormData) {
     setError(null);
@@ -85,22 +95,42 @@ export function CandidateRow({ candidate }: { candidate: QueuedCandidate }) {
         <div className="min-w-0">
           <p className="flex items-center gap-2 text-sm font-medium">
             <PackageSearch className="size-4 shrink-0 text-accent" />
-            {line} {candidate.number}
+            {heading}
           </p>
-          <p className="mt-0.5 text-xs text-muted">
-            <span className="tabular">{candidate.listingCount}</span>{" "}
-            {candidate.listingCount === 1 ? "listing names" : "separate listings name"} this number,
-            and the catalogue has no figure for it.
-          </p>
+          {numbered ? (
+            <p className="mt-0.5 text-xs text-muted">
+              <span className="tabular">{candidate.listingCount}</span>{" "}
+              {candidate.listingCount === 1 ? "listing names" : "separate listings name"} this number,
+              and the catalogue has no figure for it.
+            </p>
+          ) : (
+            <p className="mt-0.5 text-xs text-muted">
+              Listed for sale by a retailer, with no release number to check it against — read the
+              title below and search the catalogue before accepting.
+            </p>
+          )}
         </div>
-        <a
-          href={`https://www.ebay.com/sch/i.html?_nkw=${encodeURIComponent(query)}`}
-          target="_blank"
-          rel="noreferrer noopener"
-          className="flex shrink-0 items-center gap-1 text-xs text-accent hover:underline"
-        >
-          Search eBay <ExternalLink className="size-3" />
-        </a>
+        {candidate.sourceUrl ? (
+          // The product page it came from, which settles what it actually is
+          // far faster than a search does.
+          <a
+            href={candidate.sourceUrl}
+            target="_blank"
+            rel="nofollow noreferrer noopener"
+            className="flex shrink-0 items-center gap-1 text-xs text-accent hover:underline"
+          >
+            View product <ExternalLink className="size-3" />
+          </a>
+        ) : (
+          <a
+            href={`https://www.ebay.com/sch/i.html?_nkw=${encodeURIComponent(query)}`}
+            target="_blank"
+            rel="noreferrer noopener"
+            className="flex shrink-0 items-center gap-1 text-xs text-accent hover:underline"
+          >
+            Search eBay <ExternalLink className="size-3" />
+          </a>
+        )}
       </div>
 
       <ul className="mt-3 space-y-1 border-l-2 border-border pl-3">
@@ -120,7 +150,7 @@ export function CandidateRow({ candidate }: { candidate: QueuedCandidate }) {
         >
           <input type="hidden" name="candidateId" value={candidate.id} />
           <p className="text-xs text-muted">
-            Type what the box says, not what the sellers wrote. The release number is carried over;
+            Type what the box says, not what the sellers wrote.{numbered ? " The release number is carried over;" : ""}
             everything else is yours.
           </p>
           <label className="block">
@@ -131,7 +161,7 @@ export function CandidateRow({ candidate }: { candidate: QueuedCandidate }) {
               minLength={2}
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder={`${line} …`}
+              placeholder={numbered ? `${line} …` : "Product name …"}
               className="mt-1 w-full rounded-lg border border-border bg-surface px-2 py-1.5 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/25"
             />
           </label>

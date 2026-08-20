@@ -111,6 +111,27 @@ async function attachNumber(
   return { ok: true };
 }
 
+/**
+ * Close a candidate against a figure already in the catalogue, with nothing to
+ * record on it.
+ *
+ * The numbered path attaches the release number, which is a fact worth keeping.
+ * A retailer's product has no such fact to add — the useful outcome is simply
+ * that this product is accounted for and will not be proposed again.
+ */
+async function attachOnly(candidateId: string, slug: string): Promise<ActionResult> {
+  const figure = await prisma.figure.findUnique({ where: { slug }, select: { id: true } });
+  if (!figure) return { ok: false, error: "That figure no longer exists." };
+
+  await prisma.figureCandidate.update({
+    where: { id: candidateId },
+    data: { status: "ACCEPTED", figureId: figure.id, reviewedAt: new Date() },
+  });
+
+  revalidatePath("/moderation");
+  return { ok: true };
+}
+
 export async function acceptCandidate(formData: FormData): Promise<ActionResult> {
   try {
     await requireModerator();
@@ -126,6 +147,12 @@ export async function acceptCandidate(formData: FormData): Promise<ActionResult>
   if (!candidate) return { ok: false, error: "Candidate not found." };
   if (candidate.status !== "OPEN") return { ok: false, error: "Already reviewed." };
 
+  // A candidate from a retailer's catalogue carries no release number: most
+  // figures outside the Nendoroid and figma lines never had one. Everything
+  // below that depends on a number is therefore conditional, and a figure
+  // accepted without one is created without an identifier rather than with an
+  // invented one.
+  const numbered = candidate.line !== null && candidate.number !== null;
   const line = candidate.line === "FIGMA" ? "FIGMA" : "NENDOROID";
   const kind = identifierKind(line);
 
@@ -133,10 +160,12 @@ export async function acceptCandidate(formData: FormData): Promise<ActionResult>
   // a moderator getting to the queue. The identifier is unique on (kind,
   // value), so creating it again would throw — and a duplicate catalogue entry
   // is worse than a wasted click either way.
-  const existing = await prisma.figureIdentifier.findUnique({
-    where: { kind_value: { kind, value: candidate.number } },
-    select: { figureId: true },
-  });
+  const existing = numbered
+    ? await prisma.figureIdentifier.findUnique({
+        where: { kind_value: { kind, value: candidate.number! } },
+        select: { figureId: true },
+      })
+    : null;
   if (existing) {
     await prisma.figureCandidate.update({
       where: { id: candidate.id },
@@ -146,7 +175,11 @@ export async function acceptCandidate(formData: FormData): Promise<ActionResult>
     return { ok: false, error: "That number is already in the catalogue — candidate closed." };
   }
 
-  if (attachToSlug) return attachNumber(candidate.id, attachToSlug, kind, candidate.number);
+  if (attachToSlug) {
+    return numbered
+      ? attachNumber(candidate.id, attachToSlug, kind, candidate.number!)
+      : attachOnly(candidate.id, attachToSlug);
+  }
 
   // A figure of the same name, already listed, means this is almost certainly
   // the same product with its number never recorded. Refusing is right: the
@@ -166,16 +199,34 @@ export async function acceptCandidate(formData: FormData): Promise<ActionResult>
   // Slugs are unique, and two figures can legitimately share a name across
   // lines. The release number disambiguates without inventing anything.
   const base = slugify(name);
-  const slug = (await prisma.figure.findUnique({ where: { slug: base }, select: { id: true } }))
-    ? `${base}-${line.toLowerCase()}-${candidate.number}`
-    : base;
+  let slug = base;
+  if (await prisma.figure.findUnique({ where: { slug: base }, select: { id: true } })) {
+    // The release number disambiguates without inventing anything. With no
+    // number to use, fall back to counting up — still nothing invented, and
+    // the moderator has already confirmed this is a different product.
+    if (numbered) {
+      slug = `${base}-${line.toLowerCase()}-${candidate.number}`;
+    } else {
+      for (let n = 2; n < 50; n += 1) {
+        const next = `${base}-${n}`;
+        if (!(await prisma.figure.findUnique({ where: { slug: next }, select: { id: true } }))) {
+          slug = next;
+          break;
+        }
+      }
+    }
+  }
 
   const figure = await prisma.figure.create({
     data: {
       name,
       slug,
       // Known from the line the number belongs to, not guessed from the title.
-      category: line,
+      // Without a number the line is unknown, and OTHER is the honest answer —
+      // a moderator can set it afterwards, where guessing it from words in a
+      // retailer's title cannot be corrected because nobody would know it was
+      // a guess.
+      ...(numbered ? { category: line } : {}),
       ...(manufacturer
         ? {
             manufacturer: {
@@ -196,7 +247,7 @@ export async function acceptCandidate(formData: FormData): Promise<ActionResult>
             },
           }
         : {}),
-      identifiers: { create: { kind, value: candidate.number } },
+      ...(numbered ? { identifiers: { create: { kind, value: candidate.number! } } } : {}),
     },
     select: { id: true },
   });
