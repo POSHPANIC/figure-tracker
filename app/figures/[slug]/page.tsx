@@ -417,25 +417,33 @@ export default async function FigurePage({ params, searchParams }: PageProps<"/f
                 )}
               </a>
             )}
-            {/* Their search rather than the product, because the product cannot
-                be linked. goodsmile.com has no sitemap and its only index sits
-                under a path robots.txt asks bots to stay out of, so there is
-                nothing to map our figures onto. nofollow keeps crawlers off it,
-                which is what that rule is there for — a person clicking is not
-                what they are guarding against.
+            {archiveId && (
+              /* Their search rather than the product, because the product cannot
+                 be linked. goodsmile.com has no sitemap and its only index sits
+                 under a path robots.txt asks bots to stay out of, so there is
+                 nothing to map our figures onto. nofollow keeps crawlers off it,
+                 which is what that rule is there for — a person clicking is not
+                 what they are guarding against.
 
-                Labelled as a search, not as the product. Their store sells
-                current stock only: "Nendoroid 2534" puts that figure first,
-                while "Nendoroid 280" — Santa Miku, 2012 — cannot find it
-                because it is not for sale anywhere on the site. */}
-            <a
-              href={goodsmileSearchUrl(figure)}
-              target="_blank"
-              rel="nofollow noopener noreferrer"
-              className="mt-3 inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs font-medium transition hover:border-accent/60"
-            >
-              Search Good Smile Company <ExternalLink className="size-3 text-muted" />
-            </a>
+                 Labelled as a search, not as the product. Their store sells
+                 current stock only: "Nendoroid 2534" puts that figure first,
+                 while "Nendoroid 280" — Santa Miku, 2012 — cannot find it
+                 because it is not for sale anywhere on the site.
+
+                 Only for figures that came from Good Smile's archive. Sending
+                 someone to search goodsmile.com for a Kotobukiya figure wastes
+                 their click on a shop that never sold it — and now that the
+                 catalogue has a second source, "search the manufacturer" has to
+                 mean the manufacturer this figure actually came from. */
+              <a
+                href={goodsmileSearchUrl(figure)}
+                target="_blank"
+                rel="nofollow noopener noreferrer"
+                className="mt-3 inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs font-medium transition hover:border-accent/60"
+              >
+                Search Good Smile Company <ExternalLink className="size-3 text-muted" />
+              </a>
+            )}
             {archiveId && (
               // The archive entry the specifications came from. Not a shop —
               // it stopped publishing in February 2024 — but it is the exact
