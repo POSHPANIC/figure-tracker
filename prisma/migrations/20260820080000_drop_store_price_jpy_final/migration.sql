@@ -1,0 +1,11 @@
+-- The contract step, run in the right order this time.
+--
+-- The precondition is not "no application code reads the value" — that was the
+-- check that took production down. It is that the build serving traffic was
+-- generated from a schema without this column, so its Prisma client does not
+-- select it. Commit ec8aff4 removed the field, and its deployment reported
+-- success before this ran.
+--
+-- IF EXISTS because the earlier drop already removed it from some databases;
+-- this makes the migration safe to apply to either state.
+ALTER TABLE "Figure" DROP COLUMN IF EXISTS "storePriceJpy";
