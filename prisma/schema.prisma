@@ -206,11 +206,6 @@ model Figure {
   /// storePriceJpy holding dollars would be a lie told once and read forever.
   storePriceAmount Decimal? @db.Decimal(12, 2)
   storePriceCurrency String? @db.VarChar(3)
-  /// Superseded by storePriceAmount + storePriceCurrency, and kept only until
-  /// the code that reads it is off production. Renaming it in one step would
-  /// have broken every figure page for the minutes between the migration
-  /// running and the deploy landing — add first, drop once nothing reads it.
-  storePriceJpy    Int?
   storeAvailable   Boolean?
   storeClosesAt    DateTime?
   storeCheckedAt   DateTime?

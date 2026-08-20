@@ -1,0 +1,12 @@
+-- Puts the column back, because dropping it took production down.
+--
+-- The check before the drop was wrong: it looked for application code naming
+-- storePriceJpy and found none. But Prisma's generated client selects every
+-- scalar column of a model unless a query narrows it, so the build running in
+-- production was still asking for this column even though nothing read the
+-- value. Removing it 500'd every figure page.
+--
+-- The contract step has to wait until a build whose *client* has no such column
+-- is the one serving traffic. Restored empty: its one value already lives in
+-- storePriceAmount, and nothing reads this.
+ALTER TABLE "Figure" ADD COLUMN IF NOT EXISTS "storePriceJpy" INTEGER;
