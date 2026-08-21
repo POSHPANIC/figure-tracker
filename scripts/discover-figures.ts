@@ -9,6 +9,13 @@ import { candidateKey, identifierKind, readReleaseNumber } from "../lib/ingest/r
  *   npm run discover:figures -- --yes        # write candidates
  *   npm run discover:figures -- --min 5      # require more corroboration
  *
+ * No longer runs nightly. Discovery comes from Solaris now — a product page
+ * with a barcode, a full release date and real specs beats a release number
+ * inferred from seller shorthand that a person then has to name by hand. This
+ * is kept because the evidence it gathers is a different kind: several people
+ * who each had the box in hand, which is worth having when a product exists
+ * that no shop currently lists. Run it by hand when that is what you want.
+ *
  * The Good Smile archive we imported stopped publishing in February 2024, so
  * every release since is absent. Meanwhile the daily eBay poll keeps pulling in
  * listings for those products and finding nothing to attach them to — tens of

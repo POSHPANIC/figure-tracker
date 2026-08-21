@@ -194,9 +194,9 @@ their only index sits behind `/*/search` — the one path their robots.txt asks
 bots to leave alone.
 
 So the nightly job maintains the Good Smile links we already have and cannot
-discover new ones. New Good Smile products reach the catalogue through the
-discovery queue built from unattached eBay listings, and would arrive far more
-directly through an AmiAmi feed (docs/AMIAMI_APPLICATION.md).
+discover new ones. New Good Smile products reach the catalogue through Solaris
+discovery, which carries them as long as they have a release number, and would
+arrive far more directly through an AmiAmi feed (docs/AMIAMI_APPLICATION.md).
 
 ### What replaced it
 
@@ -211,6 +211,22 @@ queue shows them.
 
 This is corroboration, not invention — several sellers independently reading the
 same number off a box — and nothing becomes a catalogue entry without a person.
+
+**No longer scheduled.** Solaris discovery does the same job better: a product
+page with a barcode, a full release date and real specifications, against a
+release number inferred from seller shorthand that a person then has to name by
+hand. Ten of twenty Solaris candidates a night create themselves; an eBay
+candidate has always needed someone to type the name off a box they do not have.
+
+It is kept, and runs by hand, because the evidence is a different kind. Several
+people who each had the box is worth having for a product no shop currently
+lists — the back catalogue, where a retailer's index cannot help. Candidates
+already in the queue stay there.
+
+Removing it also removed a hazard. Its cleanup pass withdrew open candidates its
+own evidence no longer supported, but was not scoped to its own source, so it
+deleted every open Solaris candidate the store sync had queued ninety minutes
+earlier — 97 of them in one night, with both run summaries reporting success.
 Its limits are real: it only finds products people are currently selling, and
 only lines that carry a number, so scale figures and POP UP PARADE are invisible
 to it.
