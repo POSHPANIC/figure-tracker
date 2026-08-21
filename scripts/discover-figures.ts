@@ -171,15 +171,27 @@ async function main() {
   //
   // Only OPEN ones. A dismissal is a decision and has to survive, or the same
   // rejection comes back tomorrow.
+  //
+  // And only this source's own. `found` holds release numbers read from eBay
+  // listings and nothing else, so every candidate from anywhere else looks
+  // unsupported to it. Unscoped, this deleted all 97 open Solaris candidates
+  // the store sync had queued ninety minutes earlier — the pipeline threw away
+  // its own discovery every night and the run summaries both looked fine,
+  // because each job was correct about its own half.
   const supported = new Set(found.map(([key]) => key));
   const stale = (
-    await prisma.figureCandidate.findMany({ where: { status: "OPEN" }, select: { key: true } })
+    await prisma.figureCandidate.findMany({
+      where: { status: "OPEN", source: "EBAY_LISTINGS" },
+      select: { key: true },
+    })
   )
     .map((c) => c.key)
     .filter((key) => !supported.has(key));
 
   if (stale.length > 0) {
-    await prisma.figureCandidate.deleteMany({ where: { key: { in: stale }, status: "OPEN" } });
+    await prisma.figureCandidate.deleteMany({
+      where: { key: { in: stale }, status: "OPEN", source: "EBAY_LISTINGS" },
+    });
     console.log(`\n  withdrew ${stale.length} candidate(s) no longer supported`);
   }
 
