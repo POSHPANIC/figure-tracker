@@ -348,6 +348,55 @@ id). The second exists because one product has no SKU, and a figure with no
 identifier is created afresh on every run — which is precisely what happened on
 the second run before this was fixed.
 
+## HobbySearch (1999.co.jp)
+
+The only source found that publishes the **manufacturer's price separately from
+its own**:
+
+```
+List Price   3,960 JPY   <- the maker's
+Sales Price  3,600 JPY   <- the shop's
+```
+
+Every other retailer gives one number and it is theirs, carrying their margin.
+That is what forced the Kotobukiya compromise — US retail in dollars sitting in
+`msrpAmount` where every other row holds yen — and this is the source that can
+undo it. Their `gtin13` is a JAN, so it joins to everything else.
+
+`npm run discover:hobbysearch` reads one slice per run: part of one page of one
+category, with the slice derived from the date so it advances by itself and
+covers the store over weeks.
+
+### It creates figures directly, and why that is safe here
+
+Solaris products go to a review queue because a retailer's title is shorthand a
+person has to judge. This does not, because it has what the queue exists to
+establish: a **JAN barcode**, which proves whether the figure is already listed,
+and the **maker's own list price**. A barcode does not need a human to weigh it.
+
+Anything without a JAN is skipped rather than guessed at. That is the whole
+safety property, and it costs only the products whose data is thin.
+
+Where a figure is already held, the list price only fills a gap — `msrpAmount`
+is written when it is null and never overwritten.
+
+### They rate-limit, and hard
+
+robots.txt disallows nothing but asks several named crawlers for 60 seconds
+between requests. An early version of this treated that as aimed at search
+engines and used 2.5 seconds. They answered **403** — and not per category: a
+category that had just returned 200 began refusing while the one that had
+refused returned 200 after a wait. Twenty seconds still tripped it.
+
+So the rotation waits the sixty seconds they ask for, reads ten products a run,
+and **stops the run entirely when refused** rather than retrying. Retrying
+harder is how a source stops being available at all.
+
+Release dates are thirds of a month — "Late Jan 2027" — which is finer than a
+month and coarser than a day. There is no honest way to turn "Late" into a date,
+so they land mid-month at `MONTH` precision and the MSRP converts at the month's
+average rate.
+
 ## Solaris Japan
 
 A retailer, not a manufacturer, and that difference decides how it is used.

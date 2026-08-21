@@ -34,6 +34,7 @@
     "merge:character": "tsx scripts/merge-character.ts",
     "discover:figures": "tsx scripts/discover-figures.ts",
     "discover:solaris": "tsx scripts/discover-solaris.ts",
+    "discover:hobbysearch": "tsx scripts/discover-hobbysearch.ts",
     "process:candidates": "tsx scripts/process-candidates.ts",
     "flag:nsfw": "tsx scripts/flag-nsfw.ts",
     "fix:japanese-names": "tsx scripts/fix-japanese-names.ts",

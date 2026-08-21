@@ -87,6 +87,21 @@ jobs:
           DATABASE_URL: ${{ secrets.DIRECT_DATABASE_URL }}
         run: npm run process:candidates -- --yes --take 20
 
+      # One slice of HobbySearch. Unlike the other sources this creates figures
+      # directly, because it has what a review queue exists to establish: a JAN
+      # barcode proving the figure is not already listed, and the manufacturer's
+      # own list price in yen rather than a shop's marked-up one.
+      #
+      # Ten products a night, a minute apart. They rate-limit hard — see the
+      # note in the script — and the run stops itself if they ask it to. The
+      # slice advances by date, so the store is covered over weeks.
+      - name: Rotate through HobbySearch
+        if: always()
+        env:
+          DIRECT_DATABASE_URL: ${{ secrets.DIRECT_DATABASE_URL }}
+          DATABASE_URL: ${{ secrets.DIRECT_DATABASE_URL }}
+        run: npm run discover:hobbysearch -- --yes
+
       # New figures — from either source above — arrive with series the curated
       # list has never seen, and browsing is by franchise, so a series without
       # one is unreachable. Once at the end rather than after each source: it is
