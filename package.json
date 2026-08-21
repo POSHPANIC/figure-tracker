@@ -36,6 +36,7 @@
     "discover:solaris": "tsx scripts/discover-solaris.ts",
     "process:candidates": "tsx scripts/process-candidates.ts",
     "flag:nsfw": "tsx scripts/flag-nsfw.ts",
+    "fix:japanese-names": "tsx scripts/fix-japanese-names.ts",
     "check:store": "tsx scripts/check-store-page.ts",
     "review:candidates": "tsx scripts/review-candidates.ts",
     "list:franchises": "tsx scripts/list-franchises.ts",
