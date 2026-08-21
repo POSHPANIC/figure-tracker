@@ -46,6 +46,8 @@ export type SolarisCandidate = {
   /** From "Nendoroid (#3124)" in the title, when present. */
   line: "NENDOROID" | "FIGMA" | null;
   number: string | null;
+  /** Their own content classification. They label every figure they list. */
+  tags: string[];
 };
 
 /**
@@ -125,6 +127,7 @@ export function classify(
       available: variant?.available === true,
       line: release?.line ?? null,
       number: release?.number ?? null,
+      tags: product.tags ?? [],
     },
   };
 }

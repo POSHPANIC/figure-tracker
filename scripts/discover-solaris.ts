@@ -2,6 +2,7 @@ import "dotenv/config";
 import { prisma } from "../lib/prisma";
 import { USER_AGENT } from "../lib/site";
 import { STORE_ORIGIN, candidateKey, classify, type SolarisCandidate } from "../lib/ingest/solaris";
+import { fromRetailerTags as nsfwFromTags } from "../lib/ingest/nsfw";
 
 /**
  * Propose figures the catalogue is missing, from a retailer's catalogue.
@@ -156,8 +157,19 @@ async function main() {
         // titles in the eBay queue: evidence to read, not a name to approve.
         sampleTitles: [c.title],
         listingCount: 1,
+        // Their own content classification, carried through so the figure that
+        // eventually gets created keeps it. They label every figure they list,
+        // which is a far better signal than anything we could read off a name.
+        nsfw: nsfwFromTags(c.tags, "solaris")?.nsfw ?? false,
+        nsfwSource: nsfwFromTags(c.tags, "solaris") ? "solaris" : null,
       },
-      update: { sourceUrl: c.url, vendor: c.vendor, sampleTitles: [c.title] },
+      update: {
+        sourceUrl: c.url,
+        vendor: c.vendor,
+        sampleTitles: [c.title],
+        nsfw: nsfwFromTags(c.tags, "solaris")?.nsfw ?? false,
+        nsfwSource: nsfwFromTags(c.tags, "solaris") ? "solaris" : null,
+      },
     });
     written += 1;
   }

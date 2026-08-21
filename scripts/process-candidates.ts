@@ -4,6 +4,7 @@ import { slugify } from "../lib/utils";
 import { USER_AGENT } from "../lib/site";
 import { parseProductPage, tidyName, type SolarisSpecs } from "../lib/ingest/solaris-product";
 import { normalizeQuery } from "../lib/search-text";
+import { decide as decideNsfw } from "../lib/ingest/nsfw";
 
 /**
  * Work through the review queue, a little each day.
@@ -126,6 +127,8 @@ type Candidate = {
   sourceUrl: string | null;
   vendor: string | null;
   sampleTitles: string[];
+  nsfw: boolean;
+  nsfwSource: string | null;
 };
 
 async function close(id: string, figureId: string) {
@@ -221,6 +224,16 @@ async function handle(c: Candidate): Promise<{ outcome: Outcome; detail: string 
       storeUrl: c.sourceUrl,
       storeCheckedAt: new Date(),
 
+      // The retailer classified this themselves at discovery; only fall back to
+      // reading the name when they did not. Hidden either way — nothing renders
+      // it yet. See lib/ingest/nsfw.ts.
+      ...(() => {
+        const verdict = c.nsfwSource
+          ? { nsfw: c.nsfw, source: c.nsfwSource }
+          : decideNsfw({ name });
+        return verdict ? { nsfw: verdict.nsfw, nsfwSource: verdict.source } : {};
+      })(),
+
       ...(specs.jan ? { identifiers: { create: { kind: "JAN", value: specs.jan } } } : {}),
     },
     select: { id: true, slug: true },
@@ -237,7 +250,7 @@ async function main() {
 
   const candidates = await prisma.figureCandidate.findMany({
     where: { status: "OPEN", source: "SOLARIS", sourceUrl: { not: null } },
-    select: { id: true, key: true, line: true, number: true, sourceUrl: true, vendor: true, sampleTitles: true },
+    select: { id: true, key: true, line: true, number: true, sourceUrl: true, vendor: true, sampleTitles: true, nsfw: true, nsfwSource: true },
     // Numbered first: those can be settled exactly, so they are the cheapest
     // and safest work in the queue.
     orderBy: [{ number: { sort: "desc", nulls: "last" } }, { firstSeenAt: "asc" }],

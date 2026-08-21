@@ -35,6 +35,7 @@
     "discover:figures": "tsx scripts/discover-figures.ts",
     "discover:solaris": "tsx scripts/discover-solaris.ts",
     "process:candidates": "tsx scripts/process-candidates.ts",
+    "flag:nsfw": "tsx scripts/flag-nsfw.ts",
     "check:store": "tsx scripts/check-store-page.ts",
     "review:candidates": "tsx scripts/review-candidates.ts",
     "list:franchises": "tsx scripts/list-franchises.ts",

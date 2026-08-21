@@ -158,6 +158,20 @@ model Figure {
   /// inventing precision. See lib/ingest/fx-monthly.ts.
   releaseDatePrecision String @default("MONTH") @db.VarChar(5)
 
+  /// Whether this figure may want a content warning.
+  ///
+  /// Hidden: nothing renders it and nothing filters on it yet. It exists so a
+  /// filter can be built on data already gathered rather than on a scramble
+  /// afterwards.
+  ///
+  /// `nsfwSource` records *why*, because the confidence differs enormously by
+  /// where it came from. "solaris" is a retailer's own classification of their
+  /// own product. A "keyword:" source is our inference from a name, which is
+  /// weaker and should be reviewable as such — without the source recorded,
+  /// the two are indistinguishable and the weak ones can never be revisited.
+  nsfw       Boolean @default(false)
+  nsfwSource String?
+
   /// Manufacturer's suggested retail price, as originally announced.
   msrpAmount   Decimal? @db.Decimal(12, 2)
   msrpCurrency String?  @db.VarChar(3)
@@ -855,6 +869,11 @@ model FigureCandidate {
   /// The manufacturer as the source names it. A retailer knows who made what it
   /// sells, which is worth carrying even though it still needs confirming.
   vendor String?
+
+  /// The source's own content classification, carried to the figure created
+  /// from this candidate. See lib/ingest/nsfw.ts.
+  nsfw       Boolean @default(false)
+  nsfwSource String?
 
   /// How many distinct listings named this number. Corroboration is the whole
   /// basis for believing the product exists: one seller is a typo, several
