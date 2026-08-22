@@ -107,17 +107,18 @@ describe("affiliate tagging", () => {
   });
 });
 
-describe("kana readings are not search queries", () => {
-  it("falls back to English when nameJa is only a hiragana reading", async () => {
+describe("all-kana names are names", () => {
+  it("uses an all-hiragana product name rather than falling back to English", async () => {
     const { proxySearchQuery } = await load();
-    // What the archive's /en/ import used to store, before the backfill.
+    // A real archive name. An earlier guard rejected this shape as a "reading"
+    // and fell back to English, which found less.
     assert.equal(
-      proxySearchQuery({ name: "Nendoroid Ryuko Matoi", nameJa: "ねんどろいど まといりゅうこ" }),
-      "Nendoroid Ryuko Matoi",
+      proxySearchQuery({ name: "Nendoroid Ojisan", nameJa: "ねんどろいど おじさん" }),
+      "ねんどろいど おじさん",
     );
   });
 
-  it("uses a real Japanese product name, which carries kanji or katakana", async () => {
+  it("uses a name carrying kanji", async () => {
     const { proxySearchQuery } = await load();
     assert.equal(
       proxySearchQuery({ name: "Nendoroid Rin Shima", nameJa: "ねんどろいど 志摩リン" }),

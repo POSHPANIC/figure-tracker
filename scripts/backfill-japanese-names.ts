@@ -130,17 +130,28 @@ async function main() {
   let named = 0;
   let readingsMoved = 0;
   let missing = 0;
+  let demoted = 0;
 
   for (const [i, row] of batch.entries()) {
     const html = await get(archiveProductUrlJa(row.value));
-    if (!html) {
-      missing += 1;
-      continue;
-    }
+    const parsed = html ? parseJapaneseProductName(html) : null;
 
-    const parsed = parseJapaneseProductName(html);
     if (!parsed) {
+      // No Japanese page, so whatever nameJa holds was never confirmed as a
+      // name. If it is a bare kana reading the /en/ import put there, move it
+      // out: leaving it behind is what made nameJa untrustworthy in the first
+      // place, and a null is honest where a pronunciation guide is not.
       missing += 1;
+      const stale = row.figure.nameJa;
+      if (stale && looksLikeReading(stale)) {
+        demoted += 1;
+        if (WRITE) {
+          await prisma.figure.update({
+            where: { id: row.figure.id },
+            data: { nameJa: null, nameJaReading: row.figure.nameJaReading ?? stale },
+          });
+        }
+      }
       continue;
     }
 
@@ -166,7 +177,8 @@ async function main() {
   }
 
   console.log(
-    `\n${named} named, ${readingsMoved} readings moved out of nameJa, ${missing} with no Japanese page.`,
+    `\n${named} named, ${readingsMoved} readings moved out of nameJa, ${missing} with no Japanese page ` +
+      `(${demoted} stale readings cleared).`,
   );
   console.log(`${fetched} fetched, ${fromCache} from cache.`);
   if (!WRITE) console.log("\nDry run — nothing was saved.");
