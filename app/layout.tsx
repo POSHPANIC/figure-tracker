@@ -1,8 +1,7 @@
 import type { Metadata } from "next";
-import { cookies } from "next/headers";
 import localFont from "next/font/local";
 import { AuthProvider } from "@/components/session-provider";
-import { parseTheme, THEME_COOKIE, themeAttribute } from "@/lib/theme";
+import { THEME_SCRIPT } from "@/lib/theme";
 import { SITE_DESCRIPTION, SITE_NAME, SITE_TAGLINE } from "@/lib/site";
 import { SiteFooter, SiteHeader } from "@/components/site-header";
 import "./globals.css";
@@ -56,19 +55,20 @@ export const metadata: Metadata = {
   description: SITE_DESCRIPTION,
 };
 
-export default async function RootLayout({ children }: LayoutProps<"/">) {
-  // Read here rather than corrected by a script after paint. Every route in
-  // this app is already dynamic — the header reads the session — so a cookie
-  // read in the layout costs nothing that hasn't been spent, and it buys
-  // server-rendered markup that is already the right colour.
-  const theme = parseTheme((await cookies()).get(THEME_COOKIE)?.value);
-
+export default function RootLayout({ children }: LayoutProps<"/">) {
+  // The theme is applied by a script in <head> rather than read from the cookie
+  // here. Reading it here made this layout — and therefore every route beneath
+  // it — impossible to prerender, which is what put 280,000 uncached renders a
+  // month on the meter. The script runs before the first paint, so the markup
+  // still arrives the right colour. See lib/theme.ts.
   return (
     <html
       lang="en"
-      data-theme={themeAttribute(theme)}
       className={`${display.variable} ${mono.variable} ${serif.variable} h-full antialiased`}
     >
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
+      </head>
       <body className="flex min-h-full flex-col">
         {/*
           The boot sequence is parked, not deleted. To bring it back, restore

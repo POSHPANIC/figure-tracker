@@ -20,7 +20,6 @@ import { eraseEbayUserData } from "@/lib/ebay/erase";
  * Must never be cached: a cached challenge response would fail validation, and
  * a cached POST is meaningless.
  */
-export const dynamic = "force-dynamic";
 
 /**
  * The URL eBay has registered, which is part of the challenge hash and must

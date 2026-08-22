@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 import { isAuthorizedCron } from "@/lib/cron-auth";
 import { purgeExpiredSales, runAggregation } from "@/lib/ingest/aggregate";
 
-export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 /**

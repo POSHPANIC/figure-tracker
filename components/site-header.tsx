@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Suspense } from "react";
 import { cookies } from "next/headers";
 import { auth, signOut } from "@/auth";
 import { SearchBox } from "./search-box";
@@ -10,19 +11,18 @@ import { ThemeSwitcher } from "./theme-switcher";
 import { UserMenu } from "./user-menu";
 import { TerminalMark } from "./terminal-mark";
 
-export async function SiteHeader() {
-  const [session, money, store] = await Promise.all([
-    auth(),
-    getDisplayMoney(),
-    cookies(),
-  ]);
-  const theme = parseTheme(store.get(THEME_COOKIE)?.value);
-
-  async function signOutAction() {
-    "use server";
-    await signOut({ redirectTo: "/" });
-  }
-
+/**
+ * The static frame. Prerendered, and deliberately synchronous.
+ *
+ * This lives in the root layout, so anything it awaits makes every route in the
+ * app dynamic. It used to await the session, the display currency and the theme
+ * cookie, which is why nothing on the site could be prerendered and why three
+ * of four allowed CPU-hours went on re-rendering pages for crawlers.
+ *
+ * The parts that genuinely depend on the visitor now stream in beneath a
+ * fallback of the same height, so the shell can be served from cache.
+ */
+export function SiteHeader() {
   return (
     <header className="sticky top-0 z-40 bg-background/95 backdrop-blur">
       {/*
@@ -45,19 +45,72 @@ export async function SiteHeader() {
         </div>
       </div>
 
-      <div className="mx-auto flex max-w-7xl items-center gap-3 px-4 py-3 sm:gap-4">
-        <Link
-          href="/"
-          className="term-glitch flex shrink-0 items-center gap-2.5"
-          aria-label={`${SITE_NAME} — home`}
-        >
-          <TerminalMark className="size-7" />
-          <span className="font-display hidden text-base uppercase tracking-[0.22em] sm:inline">
-            {SITE_NAME}
-          </span>
-        </Link>
+      <Suspense fallback={<HeaderBarFallback />}>
+        <HeaderBar />
+      </Suspense>
 
-        <SearchBox className="min-w-0 max-w-xl flex-1" money={money} />
+      {/* The double rule. One hairline, a gap, then a heavier one — the frame a
+          printed index draws under a running head. */}
+      <div className="border-b border-border-soft" />
+      <div className="mt-px border-b-2 border-border" />
+    </header>
+  );
+}
+
+/** The outer bar, shared by the real header and its fallback so they measure the same. */
+function HeaderBarShell({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="mx-auto flex max-w-7xl items-center gap-3 px-4 py-3 sm:gap-4">
+      <Link
+        href="/"
+        className="term-glitch flex shrink-0 items-center gap-2.5"
+        aria-label={`${SITE_NAME} — home`}
+      >
+        <TerminalMark className="size-7" />
+        <span className="font-display hidden text-base uppercase tracking-[0.22em] sm:inline">
+          {SITE_NAME}
+        </span>
+      </Link>
+      {children}
+    </div>
+  );
+}
+
+/**
+ * What stands in while the real bar streams.
+ *
+ * The logo and the nav are here rather than in the fallback alone because they
+ * do not depend on the visitor — there is no reason for them to appear late.
+ * Everything that does is a blank of the right size, so nothing moves when the
+ * real thing arrives.
+ */
+function HeaderBarFallback() {
+  return (
+    <HeaderBarShell>
+      <div className="h-9 min-w-0 max-w-xl flex-1 rounded border border-border-soft" />
+      <nav className="hidden shrink-0 items-center gap-1 lg:flex">
+        <NavLink href="/figures?sort=trending">Trending</NavLink>
+        <NavLink href="/figures">Browse</NavLink>
+      </nav>
+      <div aria-hidden className="hidden h-9 w-16 sm:block" />
+      <div aria-hidden className="h-9 w-9" />
+      <div aria-hidden className="h-9 w-20" />
+    </HeaderBarShell>
+  );
+}
+
+async function HeaderBar() {
+  const [session, money, store] = await Promise.all([auth(), getDisplayMoney(), cookies()]);
+  const theme = parseTheme(store.get(THEME_COOKIE)?.value);
+
+  async function signOutAction() {
+    "use server";
+    await signOut({ redirectTo: "/" });
+  }
+
+  return (
+    <HeaderBarShell>
+      <SearchBox className="min-w-0 max-w-xl flex-1" money={money} />
 
         <nav className="hidden shrink-0 items-center gap-1 lg:flex">
           <NavLink href="/figures?sort=trending">Trending</NavLink>
@@ -87,13 +140,7 @@ export async function SiteHeader() {
             Sign in
           </Link>
         )}
-      </div>
-
-      {/* The double rule. One hairline, a gap, then a heavier one — the frame a
-          printed index draws under a running head. */}
-      <div className="border-b border-border-soft" />
-      <div className="mt-px border-b-2 border-border" />
-    </header>
+    </HeaderBarShell>
   );
 }
 

@@ -40,3 +40,22 @@ export function themeAttribute(theme: Theme): Theme | undefined {
   // `data-theme="light"` — one source of truth for "this is the default".
   return theme === "dark" ? "dark" : undefined;
 }
+
+/**
+ * The pre-paint theme script, inlined into <head>.
+ *
+ * The palette has to be right in the first byte the browser paints, and this
+ * used to be done by reading the cookie during the server render. That worked,
+ * but a cookie read in the root layout makes *every* route in the app dynamic —
+ * which is how the site came to run 280,000 uncached function invocations in a
+ * month and spend three of its four allowed CPU-hours re-rendering pages for
+ * crawlers.
+ *
+ * A synchronous script in <head> runs before the first paint, so there is still
+ * no flash, and the layout it replaces can now be prerendered. Light is the
+ * default and carries no attribute, so this only ever has to add one.
+ *
+ * Deliberately not a module: it must execute before anything else, and it must
+ * not depend on hydration having happened.
+ */
+export const THEME_SCRIPT = `try{var m=document.cookie.match(/(?:^|; )${THEME_COOKIE}=([^;]*)/);if(m&&decodeURIComponent(m[1])==="dark"){document.documentElement.dataset.theme="dark"}}catch(e){}`;

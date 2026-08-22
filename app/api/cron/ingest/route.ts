@@ -3,7 +3,6 @@ import { isAuthorizedCron } from "@/lib/cron-auth";
 import { runIngestion } from "@/lib/ingest/run";
 
 // Ingestion talks to external APIs and must never be cached or prerendered.
-export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 /**

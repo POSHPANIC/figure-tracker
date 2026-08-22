@@ -1,4 +1,5 @@
 import type { MetadataRoute } from "next";
+import { cacheLife } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { SITE_URL } from "@/lib/site";
 
@@ -8,8 +9,10 @@ import { SITE_URL } from "@/lib/site";
  * Rebuilt daily rather than on every request. Seven thousand rows is a cheap
  * query but a pointless one to repeat for each crawler hit, and a catalogue
  * that changes when an import runs does not need minute-by-minute freshness.
+ *
+ * The lifetime is declared inside the cached scope now rather than as a route
+ * segment config, which Cache Components replaces.
  */
-export const revalidate = 86_400;
 
 /**
  * Sitemaps cap at 50,000 URLs. The catalogue is around a seventh of that, so
@@ -19,6 +22,9 @@ export const revalidate = 86_400;
 const MAX_URLS = 50_000;
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
+  "use cache";
+  cacheLife({ revalidate: 86_400, expire: 172_800 });
+
   const staticPages: MetadataRoute.Sitemap = [
     { url: SITE_URL, changeFrequency: "daily", priority: 1 },
     { url: `${SITE_URL}/figures`, changeFrequency: "daily", priority: 0.9 },
