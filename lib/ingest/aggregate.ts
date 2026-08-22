@@ -197,10 +197,53 @@ export async function recomputeAskingPrices(): Promise<number> {
  * a value rather than a dash.
  */
 export async function recomputeFigureStats(): Promise<number> {
-  const figures = await prisma.figure.findMany({ select: { id: true } });
+  const now = Date.now();
+  const d90 = new Date(now - 90 * 86400_000);
+
+  // Only a figure with a sale in the window can have a value at all, so ask for
+  // the sales rather than for the figures. This used to walk the whole
+  // catalogue one row at a time: 7,387 selects and 7,387 updates a night, and
+  // because the catalogue has no sold prices at all, every one of those updates
+  // wrote the same nulls back over the nulls already there. It cost a nightly
+  // flood of round trips to change nothing, and could not finish inside the
+  // function's sixty seconds.
+  const sales = await prisma.sale.findMany({
+    where: { condition: "NEW_SEALED", soldAt: { gte: d90 } },
+    select: { figureId: true, amountUsd: true, soldAt: true },
+  });
+
+  const byFigure = new Map<string, { amountUsd: unknown; soldAt: Date }[]>();
+  for (const sale of sales) {
+    const rows = byFigure.get(sale.figureId);
+    if (rows) rows.push(sale);
+    else byFigure.set(sale.figureId, [sale]);
+  }
+
+  const withSales = [...byFigure.keys()];
+
+  // Everyone else has no value, cleared in one statement. The OR guard means it
+  // writes only the rows that actually change, so a night where nothing sold
+  // updates nothing rather than rewriting the catalogue.
+  await prisma.figure.updateMany({
+    where: {
+      ...(withSales.length ? { id: { notIn: withSales } } : {}),
+      OR: [
+        { marketValueUsd: { not: null } },
+        { change30dPct: { not: null } },
+        { NOT: { salesVolume90d: 0 } },
+      ],
+    },
+    data: {
+      marketValueUsd: null,
+      change30dPct: null,
+      salesVolume90d: 0,
+      lastAggregatedAt: new Date(),
+    },
+  });
+
   let updated = 0;
-  for (const { id } of figures) {
-    if (await recomputeFigureStatsFor(id)) updated += 1;
+  for (const [figureId, rows] of byFigure) {
+    if (await writeFigureStats(figureId, rows, now)) updated += 1;
   }
   return updated;
 }
@@ -214,8 +257,6 @@ export async function recomputeFigureStats(): Promise<number> {
  */
 export async function recomputeFigureStatsFor(figureId: string): Promise<boolean> {
   const now = Date.now();
-  const d30 = new Date(now - 30 * 86400_000);
-  const d60 = new Date(now - 60 * 86400_000);
   const d90 = new Date(now - 90 * 86400_000);
 
   const recent = await prisma.sale.findMany({
@@ -226,6 +267,24 @@ export async function recomputeFigureStatsFor(figureId: string): Promise<boolean
     },
     select: { amountUsd: true, soldAt: true },
   });
+
+  return writeFigureStats(figureId, recent, now);
+}
+
+/**
+ * Write one figure's statistics from sales already in hand.
+ *
+ * Split out so the nightly job and the moderation path share the arithmetic
+ * while fetching differently: the nightly job reads every relevant sale in one
+ * query, and a moderator approving a single sale reads only that figure's.
+ */
+async function writeFigureStats(
+  figureId: string,
+  recent: { amountUsd: unknown; soldAt: Date }[],
+  now: number,
+): Promise<boolean> {
+  const d30 = new Date(now - 30 * 86400_000);
+  const d60 = new Date(now - 60 * 86400_000);
 
   if (recent.length === 0) {
     // Clear the price rather than leaving the last known one sitting there.
@@ -247,7 +306,7 @@ export async function recomputeFigureStatsFor(figureId: string): Promise<boolean
     return false;
   }
 
-  const asNumber = (v: { toString(): string }) => Number(v.toString());
+  const asNumber = (v: unknown) => Number(String(v));
   const current = recent.filter((s) => s.soldAt >= d30).map((s) => asNumber(s.amountUsd));
   const prior = recent
     .filter((s) => s.soldAt >= d60 && s.soldAt < d30)
