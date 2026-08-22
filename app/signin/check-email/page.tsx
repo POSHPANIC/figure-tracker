@@ -3,10 +3,6 @@ import type { Metadata } from "next";
 import { MailCheck } from "lucide-react";
 import { SITE_NAME } from "@/lib/site";
 
-// TODO: Cache Components adoption. Refactor this route so this opt-out can be removed.
-// See: https://nextjs.org/docs/app/guides/migrating-to-cache-components
-export const instant = false;
-
 export const metadata: Metadata = {
   title: "Check your email",
   robots: { index: false, follow: false },

@@ -1,4 +1,5 @@
 import "server-only";
+import { cacheLife } from "next/cache";
 import { prisma } from "./prisma";
 import { filterOptions } from "./filter-options";
 import { normalizeQuery } from "./search-text";
@@ -111,7 +112,22 @@ function buildWhere(f: FigureFilters): Prisma.FigureWhereInput {
   return where;
 }
 
+/**
+ * How long a catalogue query may be reused.
+ *
+ * The catalogue changes when ingestion runs, which is nightly, so an hour is
+ * already far fresher than the data behind it. What it buys is that a crawler
+ * walking the browse pages does not re-run the same query for every request —
+ * which is how the site came to spend three of its four allowed CPU-hours.
+ */
+function catalogueCacheLife() {
+  cacheLife({ stale: 300, revalidate: 3600, expire: 86_400 });
+}
+
 export async function searchFigures(filters: FigureFilters) {
+  "use cache";
+  catalogueCacheLife();
+
   const perPage = Math.min(filters.perPage ?? 24, 60);
   const page = Math.max(filters.page ?? 1, 1);
   const where = buildWhere(filters);
@@ -262,6 +278,9 @@ export async function getFigureStats(figureId: string, condition: ItemCondition)
 }
 
 export async function getTopMovers(direction: "up" | "down", take = 6) {
+  "use cache";
+  catalogueCacheLife();
+
   return prisma.figure.findMany({
     where: {
       change30dPct: direction === "up" ? { gt: 0 } : { lt: 0 },
@@ -274,6 +293,9 @@ export async function getTopMovers(direction: "up" | "down", take = 6) {
 }
 
 export async function getMostTracked(take = 8) {
+  "use cache";
+  catalogueCacheLife();
+
   return prisma.figure.findMany({
     select: figureCardSelect,
     orderBy: { salesVolume90d: "desc" },
@@ -282,6 +304,9 @@ export async function getMostTracked(take = 8) {
 }
 
 export async function getFacets() {
+  "use cache";
+  catalogueCacheLife();
+
   // A head of each list, ordered by how many figures it holds, so the first
   // screen is the part of the catalogue worth browsing. The rest is reached by
   // typing, which asks the database — see lib/filter-options.ts for why the
@@ -304,6 +329,9 @@ export async function getFacets() {
 }
 
 export async function getCatalogTotals() {
+  "use cache";
+  catalogueCacheLife();
+
   const [figures, sales, sources] = await Promise.all([
     prisma.figure.count(),
     prisma.sale.count(),

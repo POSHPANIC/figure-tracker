@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import type { Metadata } from "next";
@@ -6,16 +7,37 @@ import { SettingsForm } from "@/components/settings-form";
 import { prisma } from "@/lib/prisma";
 import { SITE_NAME } from "@/lib/site";
 
-// TODO: Cache Components adoption. Refactor this route so this opt-out can be removed.
-// See: https://nextjs.org/docs/app/guides/migrating-to-cache-components
-export const instant = false;
-
 export const metadata: Metadata = {
   title: "Settings",
   description: `Manage your ${SITE_NAME} profile.`,
 };
 
-export default async function SettingsPage() {
+/**
+ * A static frame, so the route prerenders and navigation into it is instant.
+ *
+ * What follows is one person's own data and cannot be shared between visitors,
+ * but the page around it is the same for everyone — there is no reason to make
+ * the reader wait on a session check before seeing it.
+ */
+export default function SettingsPage() {
+  return (
+    <Suspense fallback={<SettingsBodyFallback />}>
+      <SettingsBody />
+    </Suspense>
+  );
+}
+
+/** Holds the page's shape while the visitor's own data is fetched. */
+function SettingsBodyFallback() {
+  return (
+    <div className="mx-auto max-w-2xl px-4 py-8">
+      <h1 className="text-2xl uppercase tracking-[0.14em]">Settings</h1>
+      <div aria-hidden className="mt-6 h-64 rounded-lg border border-border-soft" />
+    </div>
+  );
+}
+
+async function SettingsBody() {
   const sessionUser = await currentUser();
   if (!sessionUser) redirect("/signin?callbackUrl=%2Fsettings");
 

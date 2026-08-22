@@ -61,7 +61,32 @@ export async function generateMetadata({
  * what they own, whether they can edit images — are passed in as slots, which
  * pass through the cache without becoming part of its key.
  */
-export default async function FigurePage({ params, searchParams }: PageProps<"/figures/[slug]">) {
+/**
+ * A static frame, so the route prerenders and navigation into it is instant.
+ *
+ * Everything below reads something request-scoped — the condition from the
+ * query string, the display currency from a cookie — and any of those above a
+ * Suspense boundary stops the whole route from being prerendered. They happen
+ * inside the boundary instead.
+ */
+export default function FigurePage(props: PageProps<"/figures/[slug]">) {
+  return (
+    <Suspense fallback={<FigurePageFallback />}>
+      <FigurePageBody {...props} />
+    </Suspense>
+  );
+}
+
+/** Holds the page's shape while the figure is resolved. */
+function FigurePageFallback() {
+  return (
+    <div className="mx-auto max-w-7xl px-4 py-8">
+      <div aria-hidden className="h-96 rounded-lg border border-border-soft" />
+    </div>
+  );
+}
+
+async function FigurePageBody({ params, searchParams }: PageProps<"/figures/[slug]">) {
   const { slug } = await params;
   const sp = await searchParams;
 
@@ -73,16 +98,6 @@ export default async function FigurePage({ params, searchParams }: PageProps<"/f
     : "NEW_SEALED";
 
   const money = await getDisplayMoney();
-
-  // Which figures people actually open decides where the marketplace polling
-  // budget goes — see lib/ingest/poll-priority.ts. Deferred with after() so a
-  // page never waits on a counter, and keyed by slug so it stays outside the
-  // cached render: a view is per request, not per cache miss.
-  //
-  // The user agent is read here, not in the callback: by the time after() runs
-  // the response is gone and the request's headers with it.
-  const userAgent = (await headers()).get("user-agent");
-  after(() => recordFigureView(slug, userAgent));
 
   return (
     <FigureView
@@ -99,8 +114,31 @@ export default async function FigurePage({ params, searchParams }: PageProps<"/f
           <FigureImagesAdminSlot slug={slug} />
         </Suspense>
       }
+      viewCounter={
+        <Suspense fallback={null}>
+          <RecordView slug={slug} />
+        </Suspense>
+      }
     />
   );
+}
+
+/**
+ * Counts one view. Renders nothing.
+ *
+ * Which figures people actually open decides where the marketplace polling
+ * budget goes — see lib/ingest/poll-priority.ts. It lives in its own boundary
+ * because reading the request's headers anywhere above one would stop the whole
+ * route from being prerendered, which is the entire point of the change that
+ * put it here.
+ *
+ * The user agent is read during the request rather than inside the callback: by
+ * the time after() runs, the response is gone and its headers with it.
+ */
+async function RecordView({ slug }: { slug: string }) {
+  const userAgent = (await headers()).get("user-agent");
+  after(() => recordFigureView(slug, userAgent));
+  return null;
 }
 
 /**
@@ -120,12 +158,14 @@ async function FigureView({
   money,
   actions,
   imagesAdmin,
+  viewCounter,
 }: {
   slug: string;
   condition: ItemCondition;
   money: DisplayMoney;
   actions: React.ReactNode;
   imagesAdmin: React.ReactNode;
+  viewCounter: React.ReactNode;
 }) {
   "use cache";
   // Prices move when ingestion runs, nightly. An hour is far fresher than the
@@ -769,6 +809,7 @@ async function FigureView({
           </section>
 
           {imagesAdmin}
+          {viewCounter}
         </div>
       </div>
     </div>

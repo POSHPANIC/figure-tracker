@@ -1,13 +1,10 @@
+import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import type { Metadata } from "next";
 import { AuthError } from "next-auth";
 import { TerminalMark } from "@/components/terminal-mark";
 import { auth, availableProviders, emailSignInAvailable, signIn } from "@/auth";
 import { SITE_NAME } from "@/lib/site";
-
-// TODO: Cache Components adoption. Refactor this route so this opt-out can be removed.
-// See: https://nextjs.org/docs/app/guides/migrating-to-cache-components
-export const instant = false;
 
 export const metadata: Metadata = {
   title: "Sign in",
@@ -26,7 +23,32 @@ const ERRORS: Record<string, string> = {
   default: "Something went wrong signing you in. Please try again.",
 };
 
-export default async function SignInPage({ searchParams }: PageProps<"/signin">) {
+/**
+ * A static frame, so the route prerenders and navigation into it is instant.
+ *
+ * The props are passed straight through: reading searchParams is what would
+ * otherwise block the whole route from being prerendered, so it happens inside
+ * the boundary rather than above it.
+ */
+export default function SignInPage(props: PageProps<"/signin">) {
+  return (
+    <Suspense fallback={<SignInBodyFallback />}>
+      <SignInBody {...props} />
+    </Suspense>
+  );
+}
+
+/** Holds the page's shape while its content is resolved. */
+function SignInBodyFallback() {
+  return (
+    <div className="mx-auto max-w-md px-4 py-16">
+      <h1 className="text-2xl uppercase tracking-[0.14em]">Sign in</h1>
+      <div aria-hidden className="mt-6 h-64 rounded-lg border border-border-soft" />
+    </div>
+  );
+}
+
+async function SignInBody({ searchParams }: PageProps<"/signin">) {
   const session = await auth();
   const sp = await searchParams;
   const callbackUrl = typeof sp.callbackUrl === "string" ? sp.callbackUrl : "/collection";

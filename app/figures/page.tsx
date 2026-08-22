@@ -9,10 +9,6 @@ import { CATEGORY_ORDER } from "@/lib/labels";
 import type { FigureCategory } from "@/lib/generated/prisma/enums";
 import { cn } from "@/lib/utils";
 
-// TODO: Cache Components adoption. Refactor this route so this opt-out can be removed.
-// See: https://nextjs.org/docs/app/guides/migrating-to-cache-components
-export const instant = false;
-
 export const metadata: Metadata = {
   title: "Browse figures",
   description: "Search and filter anime figures by series, manufacturer, type and price.",
@@ -35,7 +31,32 @@ function first(value: string | string[] | undefined): string | undefined {
   return Array.isArray(value) ? value[0] : value;
 }
 
-export default async function FiguresPage({ searchParams }: PageProps<"/figures">) {
+/**
+ * A static frame, so the route prerenders and navigation into it is instant.
+ *
+ * The props are passed straight through: reading searchParams is what would
+ * otherwise block the whole route from being prerendered, so it happens inside
+ * the boundary rather than above it.
+ */
+export default function FiguresPage(props: PageProps<"/figures">) {
+  return (
+    <Suspense fallback={<FiguresBodyFallback />}>
+      <FiguresBody {...props} />
+    </Suspense>
+  );
+}
+
+/** Holds the page's shape while its content is resolved. */
+function FiguresBodyFallback() {
+  return (
+    <div className="mx-auto max-w-7xl px-4 py-8">
+      <h1 className="text-2xl uppercase tracking-[0.14em]">Browse figures</h1>
+      <div aria-hidden className="mt-6 h-64 rounded-lg border border-border-soft" />
+    </div>
+  );
+}
+
+async function FiguresBody({ searchParams }: PageProps<"/figures">) {
   const sp = await searchParams;
 
   const filters = {

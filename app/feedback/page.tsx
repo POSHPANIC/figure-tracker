@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import type { Metadata } from "next";
 import { currentUser } from "@/auth";
 import { prisma } from "@/lib/prisma";
@@ -5,10 +6,6 @@ import { currentFieldValues } from "@/lib/figure-fields";
 import { SubmissionForm } from "@/components/submission-form";
 import { ProsePage, Section } from "@/components/prose";
 import { CONTACT_EMAIL, SITE_NAME } from "@/lib/site";
-
-// TODO: Cache Components adoption. Refactor this route so this opt-out can be removed.
-// See: https://nextjs.org/docs/app/guides/migrating-to-cache-components
-export const instant = false;
 
 export const metadata: Metadata = {
   title: "Feedback",
@@ -34,7 +31,32 @@ function parseKind(value: string | string[] | undefined): Kind {
   }
 }
 
-export default async function FeedbackPage({ searchParams }: PageProps<"/feedback">) {
+/**
+ * A static frame, so the route prerenders and navigation into it is instant.
+ *
+ * The props are passed straight through: reading searchParams is what would
+ * otherwise block the whole route from being prerendered, so it happens inside
+ * the boundary rather than above it.
+ */
+export default function FeedbackPage(props: PageProps<"/feedback">) {
+  return (
+    <Suspense fallback={<FeedbackBodyFallback />}>
+      <FeedbackBody {...props} />
+    </Suspense>
+  );
+}
+
+/** Holds the page's shape while its content is resolved. */
+function FeedbackBodyFallback() {
+  return (
+    <div className="mx-auto max-w-2xl px-4 py-8">
+      <h1 className="text-2xl uppercase tracking-[0.14em]">Feedback</h1>
+      <div aria-hidden className="mt-6 h-64 rounded-lg border border-border-soft" />
+    </div>
+  );
+}
+
+async function FeedbackBody({ searchParams }: PageProps<"/feedback">) {
   const [sp, user] = await Promise.all([searchParams, currentUser()]);
   const page = Array.isArray(sp.page) ? sp.page[0] : sp.page;
 

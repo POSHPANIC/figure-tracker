@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { FigureCard } from "@/components/figure-card";
@@ -6,10 +7,6 @@ import { formatMoney } from "@/lib/currency";
 import { getDisplayMoney } from "@/lib/currency-server";
 import { CONDITION_LABELS } from "@/lib/labels";
 import { SITE_NAME } from "@/lib/site";
-
-// TODO: Cache Components adoption. Refactor this route so this opt-out can be removed.
-// See: https://nextjs.org/docs/app/guides/migrating-to-cache-components
-export const instant = false;
 
 export async function generateMetadata({
   params,
@@ -27,7 +24,32 @@ export async function generateMetadata({
   };
 }
 
-export default async function PublicProfilePage({ params }: PageProps<"/u/[username]">) {
+/**
+ * A static frame, so the route prerenders and navigation into it is instant.
+ *
+ * The props are passed straight through: reading searchParams is what would
+ * otherwise block the whole route from being prerendered, so it happens inside
+ * the boundary rather than above it.
+ */
+export default function PublicProfilePage(props: PageProps<"/u/[username]">) {
+  return (
+    <Suspense fallback={<PublicProfileBodyFallback />}>
+      <PublicProfileBody {...props} />
+    </Suspense>
+  );
+}
+
+/** Holds the page's shape while its content is resolved. */
+function PublicProfileBodyFallback() {
+  return (
+    <div className="mx-auto max-w-5xl px-4 py-8">
+      <h1 className="text-2xl uppercase tracking-[0.14em]">Collector</h1>
+      <div aria-hidden className="mt-6 h-64 rounded-lg border border-border-soft" />
+    </div>
+  );
+}
+
+async function PublicProfileBody({ params }: PageProps<"/u/[username]">) {
   const { username } = await params;
   const [profile, money] = await Promise.all([getPublicProfile(username), getDisplayMoney()]);
 

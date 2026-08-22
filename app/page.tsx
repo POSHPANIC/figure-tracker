@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import Link from "next/link";
 import { FigureCardGrid } from "@/components/figure-card";
 import { SearchBox } from "@/components/search-box";
@@ -6,17 +7,37 @@ import { formatMoney, type DisplayMoney } from "@/lib/currency";
 import { figureValue } from "@/lib/figure-value";
 import { getDisplayMoney } from "@/lib/currency-server";
 
-// TODO: Cache Components adoption. Refactor this route so this opt-out can be removed.
-// See: https://nextjs.org/docs/app/guides/migrating-to-cache-components
-export const instant = false;
-
 // Note: this page renders dynamically, not statically. The site header reads
 // the session (and therefore cookies), which opts every route into dynamic
 // rendering. The queries below are all indexed and cheap, so this is fine at
 // current scale; if traffic makes it worth caching later, the fix is to cache
 // these three queries rather than the page.
 
-export default async function HomePage() {
+/**
+ * A static frame, so the landing page prerenders.
+ *
+ * The catalogue queries behind it are cached (see lib/queries.ts); what is left
+ * is the display currency, which comes from a cookie and therefore has to be
+ * read inside the boundary rather than above it.
+ */
+export default function HomePage() {
+  return (
+    <Suspense fallback={<HomeBodyFallback />}>
+      <HomeBody />
+    </Suspense>
+  );
+}
+
+/** Holds the page's shape while the catalogue is resolved. */
+function HomeBodyFallback() {
+  return (
+    <div className="mx-auto max-w-7xl px-4 py-8">
+      <div aria-hidden className="h-96 rounded-lg border border-border-soft" />
+    </div>
+  );
+}
+
+async function HomeBody() {
   const [gainers, losers, tracked, facets, totals, money] = await Promise.all([
     getTopMovers("up", 5),
     getTopMovers("down", 5),

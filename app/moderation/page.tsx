@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { notFound, redirect } from "next/navigation";
 import type { Metadata } from "next";
 import { Inbox, PackageSearch } from "lucide-react";
@@ -6,16 +7,37 @@ import { CandidateRow } from "@/components/candidate-row";
 import { SubmissionRow } from "@/components/submission-row";
 import { getFigureCandidates, getSubmissionQueue } from "@/lib/user-queries";
 
-// TODO: Cache Components adoption. Refactor this route so this opt-out can be removed.
-// See: https://nextjs.org/docs/app/guides/migrating-to-cache-components
-export const instant = false;
-
 export const metadata: Metadata = {
   title: "Submissions",
   robots: { index: false, follow: false },
 };
 
-export default async function ModerationPage() {
+/**
+ * A static frame, so the route prerenders and navigation into it is instant.
+ *
+ * What follows is one person's own data and cannot be shared between visitors,
+ * but the page around it is the same for everyone — there is no reason to make
+ * the reader wait on a session check before seeing it.
+ */
+export default function ModerationPage() {
+  return (
+    <Suspense fallback={<ModerationBodyFallback />}>
+      <ModerationBody />
+    </Suspense>
+  );
+}
+
+/** Holds the page's shape while the visitor's own data is fetched. */
+function ModerationBodyFallback() {
+  return (
+    <div className="mx-auto max-w-6xl px-4 py-8">
+      <h1 className="text-2xl uppercase tracking-[0.14em]">Moderation</h1>
+      <div aria-hidden className="mt-6 h-64 rounded-lg border border-border-soft" />
+    </div>
+  );
+}
+
+async function ModerationBody() {
   const user = await currentUser();
   if (!user) redirect("/signin?callbackUrl=%2Fmoderation");
 

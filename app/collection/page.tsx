@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import type { Metadata } from "next";
@@ -11,16 +12,37 @@ import { getDisplayMoney } from "@/lib/currency-server";
 import { cn } from "@/lib/utils";
 import { SITE_NAME } from "@/lib/site";
 
-// TODO: Cache Components adoption. Refactor this route so this opt-out can be removed.
-// See: https://nextjs.org/docs/app/guides/migrating-to-cache-components
-export const instant = false;
-
 export const metadata: Metadata = {
   title: "My collection",
   description: "Everything you own, what you paid, and what it's worth now.",
 };
 
-export default async function CollectionPage() {
+/**
+ * A static frame, so the route prerenders and navigation into it is instant.
+ *
+ * Nothing below can be cached — it is one person's own data — but the page
+ * around it is the same for everyone, and there is no reason to make the
+ * reader wait on a session check before seeing it.
+ */
+export default function CollectionPage() {
+  return (
+    <Suspense fallback={<CollectionBodyFallback />}>
+      <CollectionBody  />
+    </Suspense>
+  );
+}
+
+/** Holds the page's shape while the visitor's own data is fetched. */
+function CollectionBodyFallback() {
+  return (
+    <div className="mx-auto max-w-5xl px-4 py-8">
+      <h1 className="text-2xl uppercase tracking-[0.14em]">My collection</h1>
+      <div aria-hidden className="mt-6 h-64 rounded-lg border border-border-soft" />
+    </div>
+  );
+}
+
+async function CollectionBody() {
   const user = await currentUser();
   if (!user) redirect("/signin?callbackUrl=%2Fcollection");
 

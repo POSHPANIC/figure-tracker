@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import type { Metadata } from "next";
@@ -9,16 +10,37 @@ import { formatMoney } from "@/lib/currency";
 import { figureValue } from "@/lib/figure-value";
 import { getDisplayMoney } from "@/lib/currency-server";
 
-// TODO: Cache Components adoption. Refactor this route so this opt-out can be removed.
-// See: https://nextjs.org/docs/app/guides/migrating-to-cache-components
-export const instant = false;
-
 export const metadata: Metadata = {
   title: "Wishlist",
   description: "Figures you're hunting for.",
 };
 
-export default async function WishlistPage() {
+/**
+ * A static frame, so the route prerenders and navigation into it is instant.
+ *
+ * What follows is one person's own data and cannot be shared between visitors,
+ * but the page around it is the same for everyone — there is no reason to make
+ * the reader wait on a session check before seeing it.
+ */
+export default function WishlistPage() {
+  return (
+    <Suspense fallback={<WishlistBodyFallback />}>
+      <WishlistBody />
+    </Suspense>
+  );
+}
+
+/** Holds the page's shape while the visitor's own data is fetched. */
+function WishlistBodyFallback() {
+  return (
+    <div className="mx-auto max-w-5xl px-4 py-8">
+      <h1 className="text-2xl uppercase tracking-[0.14em]">Wishlist</h1>
+      <div aria-hidden className="mt-6 h-64 rounded-lg border border-border-soft" />
+    </div>
+  );
+}
+
+async function WishlistBody() {
   const user = await currentUser();
   if (!user) redirect("/signin?callbackUrl=%2Fwishlist");
 
