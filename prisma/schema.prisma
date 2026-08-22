@@ -474,14 +474,29 @@ model PriceSnapshot {
   /// Midnight UTC of the day being summarized.
   date      DateTime      @db.Date
 
-  minUsd     Decimal @db.Decimal(12, 2)
-  medianUsd  Decimal @db.Decimal(12, 2)
-  avgUsd     Decimal @db.Decimal(12, 2)
-  maxUsd     Decimal @db.Decimal(12, 2)
+  /// What the figure sold for that day. Null when nothing sold — which, so far,
+  /// is every day: there is no obtainable source of sold prices for this
+  /// category, so these columns exist for the day one arrives rather than
+  /// because one has. See docs/DATA_SOURCES.md.
+  minUsd     Decimal? @db.Decimal(12, 2)
+  medianUsd  Decimal? @db.Decimal(12, 2)
+  avgUsd     Decimal? @db.Decimal(12, 2)
+  maxUsd     Decimal? @db.Decimal(12, 2)
   /// How many sales went into this row. 1-2 means treat the point with suspicion.
-  sampleSize Int
+  sampleSize Int?
+
+  /// What sellers were asking that day, across every active listing we could
+  /// see. This is the series the site can actually draw, and the reason a
+  /// snapshot is now written for a figure that has asks but no sales.
+  askMinUsd    Decimal? @db.Decimal(12, 2)
+  askMedianUsd Decimal? @db.Decimal(12, 2)
+  askMaxUsd    Decimal? @db.Decimal(12, 2)
+  /// How many listings the ask figures came from. Shown next to them, because a
+  /// median of two listings is not the same claim as a median of forty.
+  askCount     Int?
 
   /// Lowest active asking price we saw that day, for the "buy it now" line.
+  /// Superseded by askMinUsd, which is the same number named for what it is.
   lowestAskUsd Decimal? @db.Decimal(12, 2)
 
   @@unique([figureId, condition, date])

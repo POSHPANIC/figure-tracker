@@ -114,11 +114,71 @@ export async function runAggregation(forDay?: Date): Promise<AggregateResult> {
   const asksUpdated = await recomputeAskingPrices();
   if (asksUpdated > 0) console.info(`[aggregate] refreshed asking prices for ${asksUpdated} figures`);
 
+  // The same numbers, kept rather than overwritten, so there is a series to
+  // chart tomorrow. Figure.askMedianUsd answers "what is it worth now"; these
+  // rows answer "what has it been doing".
+  const askSnapshots = await writeAskSnapshots();
+  snapshotsWritten += askSnapshots;
+  if (askSnapshots > 0) console.info(`[aggregate] wrote ${askSnapshots} asking-price snapshots`);
+
   // Keep search in step with any catalogue metadata that changed today.
   const reindexed = await rebuildAllSearchText();
   if (reindexed > 0) console.info(`[aggregate] refreshed search text for ${reindexed} figures`);
 
   return { snapshotsWritten, figuresUpdated };
+}
+
+/**
+ * Record what sellers are asking today, one row per figure.
+ *
+ * This is the series the chart draws, and until this existed there was nothing
+ * to draw. Snapshots were only written for a figure that *sold* something that
+ * day, so with no sold-price source anywhere in this category the loop never
+ * ran once: the asking prices were queried every night and thrown away, and
+ * PriceSnapshot held zero rows against 128,087 listings.
+ *
+ * Deliberately the same rules as `recomputeAskingPrices` — same match
+ * threshold, same minimum sample, same NEW_SEALED filter, same median. If they
+ * drifted apart, the last point on the chart would disagree with the figure
+ * printed above it, and both would look wrong.
+ *
+ * Dated today rather than yesterday, unlike the sales it sits beside. A sale
+ * happened on a day; an asking price is what we can see at the moment we look.
+ *
+ * One statement for the whole catalogue.
+ */
+export async function writeAskSnapshots(forDay?: Date): Promise<number> {
+  const day = startOfUtcDay(forDay ?? new Date());
+
+  return prisma.$executeRaw`
+    INSERT INTO "PriceSnapshot" (
+      id, "figureId", condition, date,
+      "askMinUsd", "askMedianUsd", "askMaxUsd", "askCount", "lowestAskUsd"
+    )
+    SELECT
+      gen_random_uuid()::text,
+      "figureId",
+      'NEW_SEALED'::"ItemCondition",
+      ${day}::date,
+      round(min("amountUsd")::numeric, 2),
+      round(percentile_cont(0.5) WITHIN GROUP (ORDER BY "amountUsd")::numeric, 2),
+      round(max("amountUsd")::numeric, 2),
+      count(*)::int,
+      round(min("amountUsd")::numeric, 2)
+    FROM "Listing"
+    WHERE "figureId" IS NOT NULL
+      AND "isActive"
+      AND condition = 'NEW_SEALED'
+      AND "matchScore" >= ${ASK_MIN_MATCH_SCORE}
+    GROUP BY "figureId"
+    HAVING count(*) >= ${ASK_MIN_LISTINGS}
+    ON CONFLICT ("figureId", condition, date) DO UPDATE SET
+      "askMinUsd"    = EXCLUDED."askMinUsd",
+      "askMedianUsd" = EXCLUDED."askMedianUsd",
+      "askMaxUsd"    = EXCLUDED."askMaxUsd",
+      "askCount"     = EXCLUDED."askCount",
+      "lowestAskUsd" = EXCLUDED."lowestAskUsd"
+  `;
 }
 
 /**

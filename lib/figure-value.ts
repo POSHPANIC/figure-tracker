@@ -115,3 +115,61 @@ export function portfolioBasis(value: PortfolioValue): ValueBasis | null {
   if (value.fromSold === 0 && value.fromAsking === 0) return null;
   return value.fromAsking > value.fromSold ? "asking" : "sold";
 }
+
+/** One day of PriceSnapshot, as much of it as the decision needs. */
+export type SnapshotRow = {
+  medianUsd: unknown;
+  minUsd: unknown;
+  maxUsd: unknown;
+  sampleSize: number | null;
+  askMedianUsd: unknown;
+  askMinUsd: unknown;
+  askMaxUsd: unknown;
+  askCount: number | null;
+};
+
+export type DayValue = {
+  median: number;
+  min: number | null;
+  max: number | null;
+  volume: number;
+  basis: ValueBasis;
+};
+
+/**
+ * What a single day of history can honestly report.
+ *
+ * The same rule as `figureValue`, applied to a day instead of to a figure: a
+ * sold price where the day has one, the asking spread otherwise. Kept beside it
+ * deliberately — if the chart and the headline number ever chose differently,
+ * the page would state two things at once and look wrong in a way that is very
+ * hard to spot.
+ *
+ * Returns null for a day with neither, so the caller drops it. A day we could
+ * not see is not a price of zero, and plotting it as one would draw a cliff.
+ */
+export function dayValue(row: SnapshotRow): DayValue | null {
+  const sold = toNumber(row.medianUsd as never);
+  if (sold !== null) {
+    return {
+      median: sold,
+      min: toNumber(row.minUsd as never),
+      max: toNumber(row.maxUsd as never),
+      volume: row.sampleSize ?? 0,
+      basis: "sold",
+    };
+  }
+
+  const asking = toNumber(row.askMedianUsd as never);
+  if (asking !== null) {
+    return {
+      median: asking,
+      min: toNumber(row.askMinUsd as never),
+      max: toNumber(row.askMaxUsd as never),
+      volume: row.askCount ?? 0,
+      basis: "asking",
+    };
+  }
+
+  return null;
+}

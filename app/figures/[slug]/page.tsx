@@ -447,7 +447,23 @@ async function FigureView({
               <ConditionTabs slug={figure.slug} active={condition} />
             </div>
 
-            <PriceChart data={history} maxDays={HISTORY_DAYS} money={money} />
+            <PriceChart
+              data={history}
+              maxDays={HISTORY_DAYS}
+              money={money}
+              /* Converted the same way the MSRP row above is — at the rate of
+                 the month it was set, not this morning's. A 2011 yen price
+                 converted at today's rate would sit at the wrong height and
+                 quietly misreport how far the figure has moved. */
+              msrp={
+                msrp !== null
+                  ? {
+                      amount: msrp.amount,
+                      label: `original price, ${formatMoney(msrp.amount, money)}`,
+                    }
+                  : null
+              }
+            />
 
             {/*
               "No sales recorded" and "we have no way of recording sales" are

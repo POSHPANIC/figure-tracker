@@ -1,6 +1,7 @@
 import "server-only";
 import { cacheLife } from "next/cache";
 import { prisma } from "./prisma";
+import { dayValue, type ValueBasis } from "./figure-value";
 import { filterOptions } from "./filter-options";
 import { normalizeQuery } from "./search-text";
 import type { Prisma } from "./generated/prisma/client";
@@ -216,7 +217,10 @@ export type PricePoint = {
   median: number | null;
   min: number | null;
   max: number | null;
+  /** Listings behind an asking point, or sales behind a sold one. */
   volume: number;
+  /** What this point is. The chart says so rather than leaving it implied. */
+  basis: ValueBasis;
 };
 
 /**
@@ -232,16 +236,30 @@ export async function getPriceHistory(
   const rows = await prisma.priceSnapshot.findMany({
     where: { figureId, condition, date: { gte: since } },
     orderBy: { date: "asc" },
-    select: { date: true, medianUsd: true, minUsd: true, maxUsd: true, sampleSize: true },
+    select: {
+      date: true,
+      medianUsd: true,
+      minUsd: true,
+      maxUsd: true,
+      sampleSize: true,
+      askMedianUsd: true,
+      askMinUsd: true,
+      askMaxUsd: true,
+      askCount: true,
+    },
   });
 
-  return rows.map((r) => ({
-    date: r.date.toISOString().slice(0, 10),
-    median: Number(r.medianUsd),
-    min: Number(r.minUsd),
-    max: Number(r.maxUsd),
-    volume: r.sampleSize,
-  }));
+  // A sold price where the day has one, the asking spread otherwise — the same
+  // decision figureValue makes for the headline number, so the chart and the
+  // figure above it never rest on different things without saying so.
+  //
+  // A day with neither is dropped rather than plotted as a gap: the series is
+  // "what we could see", and a missing day is not a price of zero.
+  return rows.flatMap((r): PricePoint[] => {
+    const day = dayValue(r);
+    if (!day) return [];
+    return [{ date: r.date.toISOString().slice(0, 10), ...day }];
+  });
 }
 
 /** Summary stats shown above the chart. */
