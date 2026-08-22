@@ -84,20 +84,63 @@ What follows from that:
 - **There is no route to eBay sold prices at this tier.** Terapeak is a Seller
   Hub interface whose programmatic access was folded into this same API, so it
   is closed for the same reason.
-- **The phrase to take seriously is "approved partners".** eBay Partner Network
-  membership is the nearest thing available to that status, and is worth having
-  in its own right. Whether it changes this answer is untested — but re-asking
-  as a member costs one form.
-- **The reply offers "alternative options that might fit your use case".** That
-  invitation is worth taking up rather than treating the ticket as final; the
-  message to send is in a reply kept outside this repository, and the ticket can be reopened until
-  2026-08-29.
-- **EPN is the nearest thing to partner status that is open to apply for**, and
-  its own pitch is "access to feeds and APIs". See `EPN_APPLICATION.md`. Whether
-  it changes this answer is untested.
+- **The invitation to ask about alternatives was taken up, and answered with
+  nothing.** The reply in a reply kept outside this repository was sent on 2026-08-19 asking three
+  questions: is there any sold-data endpoint at any tier, what are the criteria
+  for approved-partner status, and does eBay Partner Network membership count
+  toward it.
+
+  Their answer, 2026-08-22: the API needs specific OAuth scopes and approval of
+  business use cases through internal processes, and is generally reserved for
+  approved partners. Ticket closed again. **None of the three questions was
+  addressed** — no endpoint named, no criteria given, and no answer on EPN,
+  which was the one they could have settled in a sentence. The message repeated
+  the same offer of "alternative options" and pointed back at the support
+  channel the question had come through.
+
+- **So this door is shut and it is written down here so it is not tried a third
+  time.** Two direct asks, two non-answers, and no published criteria to work
+  toward. "Approved partner" appears to be something eBay confers rather than
+  something applied for.
+
+- **EPN membership does not unlock it.** FigureIndex was approved for the eBay
+  Partner Network on 2026-08-19 — campaign 5339193014, live and tagging links —
+  and the question of whether that counts was put to them directly while
+  approved. It went unanswered. EPN remains worth having for its own sake; it is
+  not a route to sold prices.
 - **Meanwhile the site has no sold prices at all**, which is why market value is
   null on every figure. Active listings are asking prices and must be labelled
   as such; see the note on that below.
+
+### What is left, after eBay
+
+Every scraping route to Japanese sold prices has been checked and each is closed
+for its own reason:
+
+| Source | Status |
+| --- | --- |
+| Yahoo! Auctions | sold data lives under `/closedsearch/`, which their robots.txt disallows |
+| aucfree | 403 to us outright |
+| Mercari | terms carry no anti-scraping clause, and the Guide they delegate prohibitions to lists ~40 items of transaction conduct and nothing about automation — but search results load from `/v1/` and `/v2/`, the only two paths their robots.txt disallows. No sitemap either, so there is no way to discover items without them |
+
+Mercari is worth understanding properly rather than remembering as "blocked":
+they did not need a scraping clause, because the data sits behind the two paths
+they ask bots to leave alone. Driving a headless browser at it would fetch those
+same paths through a renderer, which is worse rather than better.
+
+That leaves three honest routes, none of them an API:
+
+1. **Community reports.** Built, live, and holding 0 rows against 1 user. Not an
+   engineering problem.
+2. **A paid archive.** Aucfan and similar sell access to Yahoo Auction history.
+   Untried, and the only route that is a purchase rather than a permission.
+3. **Asking prices, labelled as asking prices.** Already covering 2,437 figures
+   through `askMedianUsd`, with `marketValueUsd` left null rather than guessed.
+
+For comparison: Collectr, which does graph real sold prices for trading cards,
+can do it because TCGplayer publishes market data for a marketplace that carries
+most of the category, and because grading makes cards fungible enough to compare.
+Anime figures have neither. The gap is structural, not a missing feature.
 
 ### How far back the data goes
 
