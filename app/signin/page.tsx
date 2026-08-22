@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import type { Metadata } from "next";
 import { AuthError } from "next-auth";
-import { Boxes } from "lucide-react";
+import { TerminalMark } from "@/components/terminal-mark";
 import { auth, availableProviders, emailSignInAvailable, signIn } from "@/auth";
 import { SITE_NAME } from "@/lib/site";
 
@@ -36,10 +36,8 @@ export default async function SignInPage({ searchParams }: PageProps<"/signin">)
 
   return (
     <div className="mx-auto flex max-w-md flex-col items-center px-4 py-16">
-      <span className="grid size-12 place-items-center rounded-xl bg-accent text-white">
-        <Boxes className="size-6" />
-      </span>
-      <h1 className="mt-4 text-2xl font-semibold tracking-tight">Sign in to {SITE_NAME}</h1>
+      <TerminalMark className="size-11" />
+      <h1 className="mt-4 text-2xl uppercase tracking-[0.14em]">Sign in to {SITE_NAME}</h1>
       <p className="mt-1.5 text-center text-sm text-muted">
         Track what you own, what you paid, and what it's worth now.
       </p>
@@ -61,7 +59,7 @@ export default async function SignInPage({ searchParams }: PageProps<"/signin">)
           >
             <button
               type="submit"
-              className="w-full rounded-lg border border-border bg-surface px-4 py-2.5 text-sm font-medium transition hover:border-accent/60 hover:bg-surface-2"
+              className="w-full rounded-lg border border-border bg-surface px-4 py-2.5 text-sm font-medium transition hover:border-foreground hover:bg-surface-2"
             >
               Continue with {provider.name}
             </button>
@@ -106,11 +104,11 @@ export default async function SignInPage({ searchParams }: PageProps<"/signin">)
                 required
                 autoComplete="email"
                 placeholder="you@example.com"
-                className="w-full rounded-lg border border-border bg-surface px-3 py-2.5 text-sm outline-none transition placeholder:text-muted focus:border-accent focus:ring-2 focus:ring-accent/25"
+                className="w-full rounded-lg border border-border bg-surface px-3 py-2.5 text-sm outline-none transition placeholder:text-muted focus:border-foreground focus:ring-1 focus:ring-foreground"
               />
               <button
                 type="submit"
-                className="w-full rounded-lg border border-border bg-surface px-4 py-2.5 text-sm font-medium transition hover:border-accent/60 hover:bg-surface-2"
+                className="w-full rounded-lg border border-border bg-surface px-4 py-2.5 text-sm font-medium transition hover:border-foreground hover:bg-surface-2"
               >
                 Email me a sign-in link
               </button>
@@ -158,11 +156,11 @@ export default async function SignInPage({ searchParams }: PageProps<"/signin">)
                 name="email"
                 required
                 placeholder="you@example.com"
-                className="min-w-0 flex-1 rounded-lg border border-border bg-surface px-3 py-2 text-sm outline-none focus:border-accent"
+                className="min-w-0 flex-1 rounded-lg border border-border bg-surface px-3 py-2 text-sm outline-none focus:border-foreground"
               />
               <button
                 type="submit"
-                className="shrink-0 rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white transition hover:opacity-90"
+                className="shrink-0 rounded-lg bg-foreground px-4 py-2 text-sm font-medium text-background transition hover:opacity-90"
               >
                 Sign in
               </button>

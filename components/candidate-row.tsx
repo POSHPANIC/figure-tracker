@@ -94,7 +94,7 @@ export function CandidateRow({ candidate }: { candidate: QueuedCandidate }) {
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="flex items-center gap-2 text-sm font-medium">
-            <PackageSearch className="size-4 shrink-0 text-accent" />
+            <PackageSearch className="size-4 shrink-0 text-foreground" />
             {heading}
           </p>
           {numbered ? (
@@ -117,7 +117,7 @@ export function CandidateRow({ candidate }: { candidate: QueuedCandidate }) {
             href={candidate.sourceUrl}
             target="_blank"
             rel="nofollow noreferrer noopener"
-            className="flex shrink-0 items-center gap-1 text-xs text-accent hover:underline"
+            className="flex shrink-0 items-center gap-1 text-xs term-link"
           >
             View product <ExternalLink className="size-3" />
           </a>
@@ -126,7 +126,7 @@ export function CandidateRow({ candidate }: { candidate: QueuedCandidate }) {
             href={`https://www.ebay.com/sch/i.html?_nkw=${encodeURIComponent(query)}`}
             target="_blank"
             rel="noreferrer noopener"
-            className="flex shrink-0 items-center gap-1 text-xs text-accent hover:underline"
+            className="flex shrink-0 items-center gap-1 text-xs term-link"
           >
             Search eBay <ExternalLink className="size-3" />
           </a>
@@ -162,7 +162,7 @@ export function CandidateRow({ candidate }: { candidate: QueuedCandidate }) {
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder={numbered ? `${line} …` : "Product name …"}
-              className="mt-1 w-full rounded-lg border border-border bg-surface px-2 py-1.5 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/25"
+              className="mt-1 w-full rounded-lg border border-border bg-surface px-2 py-1.5 text-sm outline-none focus:border-foreground focus:ring-1 focus:ring-foreground"
             />
           </label>
 
@@ -179,7 +179,7 @@ export function CandidateRow({ candidate }: { candidate: QueuedCandidate }) {
                       href={`/figures/${match.slug}`}
                       target="_blank"
                       rel="noreferrer noopener"
-                      className="min-w-0 truncate text-xs text-accent hover:underline"
+                      className="min-w-0 truncate text-xs term-link"
                     >
                       {match.name}
                     </a>
@@ -203,7 +203,7 @@ export function CandidateRow({ candidate }: { candidate: QueuedCandidate }) {
               <input
                 name="manufacturer"
                 placeholder="Good Smile Company"
-                className="mt-1 w-full rounded-lg border border-border bg-surface px-2 py-1.5 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/25"
+                className="mt-1 w-full rounded-lg border border-border bg-surface px-2 py-1.5 text-sm outline-none focus:border-foreground focus:ring-1 focus:ring-foreground"
               />
             </label>
             <label className="block">
@@ -211,7 +211,7 @@ export function CandidateRow({ candidate }: { candidate: QueuedCandidate }) {
               <input
                 name="series"
                 placeholder="NANA"
-                className="mt-1 w-full rounded-lg border border-border bg-surface px-2 py-1.5 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/25"
+                className="mt-1 w-full rounded-lg border border-border bg-surface px-2 py-1.5 text-sm outline-none focus:border-foreground focus:ring-1 focus:ring-foreground"
               />
             </label>
           </div>
@@ -220,7 +220,7 @@ export function CandidateRow({ candidate }: { candidate: QueuedCandidate }) {
               type="submit"
               disabled={pending}
               className={cn(
-                "rounded-lg bg-accent px-3 py-1.5 text-xs font-medium text-white transition",
+                "rounded-lg bg-foreground px-3 py-1.5 text-xs font-medium text-background transition",
                 pending ? "opacity-60" : "hover:opacity-90",
               )}
             >

@@ -29,7 +29,7 @@ export default async function CollectionPage() {
     <div className="mx-auto max-w-5xl px-4 py-8">
       <header className="mb-6 flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">My collection</h1>
+          <h1 className="text-2xl uppercase tracking-[0.14em]">My collection</h1>
           <p className="mt-1 text-sm text-muted">
             <span className="tabular">{totals.itemCount}</span>{" "}
             {totals.itemCount === 1 ? "figure" : "figures"} across{" "}
@@ -39,7 +39,7 @@ export default async function CollectionPage() {
         </div>
         <Link
           href="/figures"
-          className="flex items-center gap-1.5 rounded-lg bg-accent px-3 py-2 text-sm font-medium text-white transition hover:opacity-90"
+          className="flex items-center gap-1.5 rounded-lg bg-foreground px-3 py-2 text-sm font-medium text-background transition hover:opacity-90"
         >
           <Plus className="size-4" /> Add figures
         </Link>
@@ -131,7 +131,7 @@ function EmptyState() {
       </p>
       <Link
         href="/figures"
-        className="mt-5 inline-flex items-center gap-1.5 rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white transition hover:opacity-90"
+        className="mt-5 inline-flex items-center gap-1.5 rounded-lg bg-foreground px-4 py-2 text-sm font-medium text-background transition hover:opacity-90"
       >
         Browse figures
       </Link>

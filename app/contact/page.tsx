@@ -17,9 +17,9 @@ export default function ContactPage() {
       <Section>
         <a
           href={`mailto:${CONTACT_EMAIL}`}
-          className="inline-flex items-center gap-2 rounded-lg border border-border bg-surface px-4 py-3 text-sm font-medium transition hover:border-accent/60 hover:bg-surface-2"
+          className="inline-flex items-center gap-2 rounded-lg border border-border bg-surface px-4 py-3 text-sm font-medium transition hover:border-foreground hover:bg-surface-2"
         >
-          <Mail className="size-4 text-accent" />
+          <Mail className="size-4 text-foreground" />
           {CONTACT_EMAIL}
         </a>
       </Section>
@@ -32,7 +32,7 @@ export default function ContactPage() {
         </p>
         <p>
           A link to the page and a line about what's wrong is plenty. There's also a{" "}
-          <a href="/feedback" className="text-accent hover:underline">
+          <a href="/feedback" className="term-link">
             feedback form
           </a>{" "}
           if you'd rather not email — same queue, and it takes bug reports and missing figures
@@ -73,7 +73,7 @@ export default function ContactPage() {
         <p>
           To get a copy of what's stored about you, or to have your account deleted, email from
           the address you signed up with. See the{" "}
-          <a href="/privacy" className="text-accent hover:underline">
+          <a href="/privacy" className="term-link">
             privacy policy
           </a>{" "}
           for what's held and how long.

@@ -31,7 +31,7 @@ export default async function SettingsPage() {
   return (
     <div className="mx-auto max-w-xl px-4 py-8">
       <header className="mb-6">
-        <h1 className="text-2xl font-semibold tracking-tight">Settings</h1>
+        <h1 className="text-2xl uppercase tracking-[0.14em]">Settings</h1>
         <p className="mt-1 text-sm text-muted">
           Signed in as {user.email} · member since{" "}
           {user.createdAt.toLocaleDateString("en-US", { month: "long", year: "numeric" })}
@@ -50,7 +50,7 @@ export default async function SettingsPage() {
       {user.publicProfile && user.username && (
         <p className="mt-6 rounded-lg border border-border bg-surface px-3 py-2 text-sm">
           Your profile is live at{" "}
-          <Link href={`/u/${user.username}`} className="text-accent hover:underline">
+          <Link href={`/u/${user.username}`} className="term-link">
             /u/{user.username}
           </Link>
         </p>

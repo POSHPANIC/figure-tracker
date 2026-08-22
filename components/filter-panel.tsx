@@ -120,7 +120,7 @@ export function FilterPanel({
         <select
           value={params.get("sort") ?? "trending"}
           onChange={(e) => apply({ sort: e.target.value })}
-          className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm outline-none focus:border-accent"
+          className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm outline-none focus:border-foreground"
         >
           {Object.entries(SORT_LABELS).map(([value, label]) => (
             <option key={value} value={value}>
@@ -144,7 +144,7 @@ export function FilterPanel({
                   type="button"
                   onClick={() => apply(f.clears)}
                   title={`Remove ${f.label}`}
-                  className="flex items-center gap-1.5 rounded-md border border-accent/40 bg-accent/10 px-2 py-1 text-xs text-foreground transition hover:border-down/60 hover:text-down"
+                  className="flex items-center gap-1.5 rounded-md border border-border bg-surface-2 px-2 py-1 text-xs text-foreground transition hover:border-down/60 hover:text-down"
                 >
                   <span className="text-muted">{f.kind}</span>
                   <span className="font-medium">{f.label}</span>
@@ -178,8 +178,8 @@ export function FilterPanel({
                 className={cn(
                   "rounded-full border px-2.5 py-1 text-xs transition",
                   active
-                    ? "border-accent bg-accent text-white"
-                    : "border-border bg-surface hover:border-accent/60",
+                    ? "border-foreground bg-foreground text-background"
+                    : "border-border bg-surface hover:border-foreground",
                 )}
               >
                 {CATEGORY_LABELS[c]}
@@ -205,7 +205,7 @@ export function FilterPanel({
             value={minPrice}
             onChange={(e) => setMinPrice(e.target.value)}
             placeholder="Min"
-            className="tabular w-full rounded-lg border border-border bg-surface px-2 py-1.5 text-sm outline-none focus:border-accent"
+            className="tabular w-full rounded-lg border border-border bg-surface px-2 py-1.5 text-sm outline-none focus:border-foreground"
           />
           <span className="text-muted">–</span>
           <input
@@ -215,11 +215,11 @@ export function FilterPanel({
             value={maxPrice}
             onChange={(e) => setMaxPrice(e.target.value)}
             placeholder="Max"
-            className="tabular w-full rounded-lg border border-border bg-surface px-2 py-1.5 text-sm outline-none focus:border-accent"
+            className="tabular w-full rounded-lg border border-border bg-surface px-2 py-1.5 text-sm outline-none focus:border-foreground"
           />
           <button
             type="submit"
-            className="shrink-0 rounded-lg bg-accent px-3 py-1.5 text-sm font-medium text-white transition hover:opacity-90"
+            className="shrink-0 rounded-lg bg-foreground px-3 py-1.5 text-sm font-medium text-background transition hover:opacity-90"
           >
             Go
           </button>
@@ -340,7 +340,7 @@ function SearchableGroup({
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder={placeholder}
-          className="w-full rounded-lg border border-border bg-surface py-1.5 pl-7 pr-2 text-sm outline-none transition focus:border-accent"
+          className="w-full rounded-lg border border-border bg-surface py-1.5 pl-7 pr-2 text-sm outline-none transition focus:border-foreground"
         />
       </div>
       {shown.length === 0 ? (
@@ -367,7 +367,14 @@ function SearchableGroup({
 function FilterGroup({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div>
-      <h3 className="mb-2 text-xs font-medium uppercase tracking-wide text-muted">{label}</h3>
+      {/* Marker, label, then a rule out to the edge — the same section bar the
+          home page uses, shrunk to sidebar scale so the panel reads as part of
+          the same menu rather than as a separate widget. */}
+      <h3 className="mb-2.5 flex items-center gap-2">
+        <span aria-hidden className="size-1.5 shrink-0 bg-foreground" />
+        <span className="term-label shrink-0 text-foreground">{label}</span>
+        <span aria-hidden className="h-px flex-1 bg-border-soft" />
+      </h3>
       {children}
     </div>
   );
@@ -393,13 +400,11 @@ function FilterRow({
       <button
         type="button"
         onClick={onClick}
-        className={cn(
-          "flex w-full items-center justify-between gap-2 rounded-md px-2 py-1.5 text-left text-sm transition",
-          active ? "bg-accent-soft text-foreground" : "text-muted hover:bg-surface-2 hover:text-foreground",
-        )}
+        data-active={active}
+        className="term-item flex w-full items-center justify-between gap-2 px-2 py-1.5 text-left text-xs text-muted"
       >
         <span className="truncate">{label}</span>
-        <span className="tabular shrink-0 text-xs opacity-70">{count}</span>
+        <span className="tabular shrink-0 text-[10px] opacity-70">{count}</span>
       </button>
     </li>
   );

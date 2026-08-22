@@ -155,7 +155,7 @@ export default function PrivacyPage() {
       <Section title="Your rights">
         <p>
           Email{" "}
-          <a href={`mailto:${CONTACT_EMAIL}`} className="text-accent hover:underline">
+          <a href={`mailto:${CONTACT_EMAIL}`} className="term-link">
             {CONTACT_EMAIL}
           </a>{" "}
           from your registered address and you can:

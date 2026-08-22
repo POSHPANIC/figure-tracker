@@ -22,7 +22,7 @@ function SolarisMark({ className = "" }: { className?: string }) {
       className={`inline-flex select-none items-baseline gap-[0.25em] font-semibold leading-none tracking-tight ${className}`}
     >
       <span aria-hidden="true">Solaris</span>
-      <span aria-hidden="true" className="text-accent">
+      <span aria-hidden="true" className="text-foreground">
         Japan
       </span>
     </span>
@@ -37,7 +37,7 @@ function KotobukiyaMark({ className = "" }: { className?: string }) {
       className={`inline-flex select-none items-baseline font-semibold uppercase leading-none tracking-[0.12em] ${className}`}
     >
       <span aria-hidden="true">Koto</span>
-      <span aria-hidden="true" className="text-accent">
+      <span aria-hidden="true" className="text-foreground">
         bukiya
       </span>
     </span>

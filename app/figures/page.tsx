@@ -62,7 +62,7 @@ export default async function FiguresPage({ searchParams }: PageProps<"/figures"
   return (
     <div className="mx-auto max-w-7xl px-4 py-8">
       <div className="mb-6">
-        <h1 className="text-2xl font-semibold tracking-tight">
+        <h1 className="text-2xl uppercase tracking-[0.14em]">
           {filters.q ? `Results for “${filters.q}”` : "Browse figures"}
         </h1>
         <p className="mt-1 text-sm text-muted">
@@ -73,7 +73,7 @@ export default async function FiguresPage({ searchParams }: PageProps<"/figures"
       </div>
 
       <div className="grid gap-8 lg:grid-cols-[16rem_1fr]">
-        <Suspense fallback={<div className="h-96 animate-pulse rounded-xl bg-surface" />}>
+        <Suspense fallback={<div className="term-panel term-hatch h-96" />}>
           <FilterPanel facets={facets} activeNames={activeNames} />
         </Suspense>
 
@@ -130,7 +130,7 @@ function Pagination({
             aria-current={p === page ? "page" : undefined}
             className={cn(
               "tabular rounded-md px-3 py-1.5 text-sm transition",
-              p === page ? "bg-accent text-white" : "border border-border hover:bg-surface-2",
+              p === page ? "bg-foreground text-background" : "border border-border hover:bg-surface-2",
             )}
           >
             {p}

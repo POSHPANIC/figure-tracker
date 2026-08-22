@@ -137,7 +137,7 @@ export default async function FigurePage({ params, searchParams }: PageProps<"/f
         <div className="space-y-4">
           <div>
             <div className="aspect-[3/4] overflow-hidden rounded-xl border border-border bg-surface-2">
-              <FigureThumb name={figure.name} slug={figure.slug} src={figure.primaryImageUrl} />
+              <FigureThumb name={figure.name} src={figure.primaryImageUrl} />
             </div>
 
             {/* Attribution is normally a condition of using a press image, so
@@ -181,7 +181,7 @@ export default async function FigurePage({ params, searchParams }: PageProps<"/f
               {figure.manufacturer ? (
                 <Link
                   href={`/figures?manufacturer=${figure.manufacturer.slug}`}
-                  className="text-accent hover:underline"
+                  className="term-link"
                 >
                   {figure.manufacturer.name}
                 </Link>
@@ -204,7 +204,7 @@ export default async function FigurePage({ params, searchParams }: PageProps<"/f
               {figure.series?.franchise ? (
                 <Link
                   href={`/figures?franchise=${figure.series.franchise.slug}`}
-                  className="text-accent hover:underline"
+                  className="term-link"
                 >
                   {figure.series.franchise.name}
                 </Link>
@@ -225,7 +225,7 @@ export default async function FigurePage({ params, searchParams }: PageProps<"/f
                     <Link
                       key={c.id}
                       href={`/figures?character=${c.slug}`}
-                      className="text-accent hover:underline"
+                      className="term-link"
                     >
                       {c.name}
                     </Link>
@@ -276,7 +276,7 @@ export default async function FigurePage({ params, searchParams }: PageProps<"/f
           */}
           <Link
             href={`/feedback?kind=edit&figure=${figure.slug}`}
-            className="mt-3 flex items-center justify-center gap-1.5 rounded-lg border border-border px-3 py-2 text-xs font-medium text-muted transition hover:border-accent/60 hover:text-foreground"
+            className="mt-3 flex items-center justify-center gap-1.5 rounded-lg border border-border px-3 py-2 text-xs font-medium text-muted transition hover:border-foreground hover:text-foreground"
           >
             <PencilLine className="size-3.5" />
             Suggest an edit or add a photo
@@ -291,9 +291,11 @@ export default async function FigurePage({ params, searchParams }: PageProps<"/f
               franchise, and repeating the work here said it twice — once in a
               form nothing navigates to.
             */}
-            <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
-              {figure.name}
-            </h1>
+            {/* Not uppercased. Page titles on this site are caps because they
+                are labels; this one is a product name, often long and full of
+                model codes, and capitalising it costs more legibility than the
+                consistency is worth. */}
+            <h1 className="text-2xl tracking-[0.04em] sm:text-3xl">{figure.name}</h1>
           </header>
 
           <FigureActions
@@ -344,7 +346,7 @@ export default async function FigurePage({ params, searchParams }: PageProps<"/f
           <section className="rounded-xl border border-border bg-surface p-4">
             <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
               <div>
-                <h2 className="text-sm font-semibold tracking-tight">Price history</h2>
+                <h2 className="text-sm uppercase tracking-[0.14em]">Price history</h2>
                 <p className="mt-0.5 text-xs text-muted">
                   Median realized sale price. Shaded band is the daily low–high range.
                 </p>
@@ -388,7 +390,7 @@ export default async function FigurePage({ params, searchParams }: PageProps<"/f
             {/* Headed by what the link actually is. "From the manufacturer"
                 over a retailer's link would present a shop's marked-up asking
                 price as the maker's own, which is a different claim. */}
-            <h2 className="text-sm font-semibold tracking-tight">
+            <h2 className="text-sm uppercase tracking-[0.14em]">
               {fromManufacturer ? "From the manufacturer" : "Where to buy"}
             </h2>
             <p className="mt-1 text-xs text-muted">
@@ -407,7 +409,7 @@ export default async function FigurePage({ params, searchParams }: PageProps<"/f
                 href={withSolarisAffiliate(figure.storeUrl)}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="mt-3 flex items-center gap-3 rounded-lg border border-border p-3 transition hover:border-accent/60"
+                className="mt-3 flex items-center gap-3 rounded-lg border border-border p-3 transition hover:border-foreground"
               >
                 <StoreMark url={figure.storeUrl} className="shrink-0 text-sm" />
                 <span className="min-w-0 flex-1">
@@ -456,7 +458,7 @@ export default async function FigurePage({ params, searchParams }: PageProps<"/f
                 href={goodsmileSearchUrl(figure)}
                 target="_blank"
                 rel="nofollow noopener noreferrer"
-                className="mt-3 inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs font-medium transition hover:border-accent/60"
+                className="mt-3 inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs font-medium transition hover:border-foreground"
               >
                 Search Good Smile Company <ExternalLink className="size-3 text-muted" />
               </a>
@@ -471,7 +473,7 @@ export default async function FigurePage({ params, searchParams }: PageProps<"/f
                   href={archiveProductUrl(archiveId.value)}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-accent hover:underline"
+                  className="term-link"
                 >
                   Good Smile&rsquo;s product archive
                 </a>
@@ -482,7 +484,7 @@ export default async function FigurePage({ params, searchParams }: PageProps<"/f
 
           <section className="rounded-xl border border-border bg-surface p-4">
             <div className="mb-3 flex items-baseline justify-between gap-3">
-              <h2 className="flex items-baseline gap-1.5 text-sm font-semibold tracking-tight">
+              <h2 className="flex items-baseline gap-1.5 text-sm uppercase tracking-[0.14em]">
                 {CONDITION_LABELS[condition]} listings
                 {figure.listings.some((l) => l.source.key === "ebay") && (
                   <span className="text-muted">
@@ -513,7 +515,7 @@ export default async function FigurePage({ params, searchParams }: PageProps<"/f
               // Set at the same size as a listing title. It is an alternative
               // to the list below it, not a footnote on it, and at text-xs it
               // read as small print next to the thing it competes with.
-              className="mb-3 inline-flex items-baseline gap-1.5 text-sm text-accent hover:underline"
+              className="mb-3 inline-flex items-baseline gap-1.5 text-sm term-link"
             >
               Search <EbayMark className="text-[0.95em]" /> for this figure
             </a>
@@ -554,7 +556,7 @@ export default async function FigurePage({ params, searchParams }: PageProps<"/f
                             target="_blank"
                             rel="noopener noreferrer nofollow"
                             title={l.title}
-                            className="block truncate text-sm hover:text-accent hover:underline"
+                            className="block truncate text-sm hover:underline"
                           >
                             {l.title}
                           </a>
@@ -606,7 +608,7 @@ export default async function FigurePage({ params, searchParams }: PageProps<"/f
           <section className="rounded-xl border border-border bg-surface p-4">
             <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
               <div>
-                <h2 className="flex items-baseline gap-1.5 text-sm font-semibold tracking-tight">
+                <h2 className="flex items-baseline gap-1.5 text-sm uppercase tracking-[0.14em]">
                   Recent sales
                   {figure.sales.some((s) => s.source.key === "ebay") && (
                     <span className="text-muted">
@@ -620,7 +622,7 @@ export default async function FigurePage({ params, searchParams }: PageProps<"/f
               </div>
               <Link
                 href={`/feedback?kind=bug&page=${encodeURIComponent(`/figures/${figure.slug}`)}`}
-                className="flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs font-medium transition hover:border-accent/60"
+                className="flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs font-medium transition hover:border-foreground"
               >
                 <Flag className="size-3.5" />
                 Report a problem
@@ -640,7 +642,7 @@ export default async function FigurePage({ params, searchParams }: PageProps<"/f
                 */}
                 <Link
                   href={`/feedback?kind=sale&figure=${figure.slug}`}
-                  className="mt-3 inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs font-medium transition hover:border-accent/60"
+                  className="mt-3 inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs font-medium transition hover:border-foreground"
                 >
                   <Receipt className="size-3.5" />
                   Report a sale you made or saw
@@ -717,7 +719,7 @@ function ConditionTabs({ slug, active }: { slug: string; active: ItemCondition }
           replace
           className={cn(
             "rounded-md px-2.5 py-1 text-xs font-medium transition",
-            c === active ? "bg-accent text-white" : "text-muted hover:text-foreground",
+            c === active ? "bg-foreground text-background" : "text-muted hover:text-foreground",
           )}
         >
           {CONDITION_LABELS[c]}

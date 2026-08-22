@@ -55,7 +55,7 @@ export function UserMenu({
         aria-haspopup="menu"
         aria-expanded={open}
         onClick={() => setOpen((v) => !v)}
-        className="flex items-center gap-2 rounded-lg border border-border bg-surface px-2 py-1.5 text-sm transition hover:border-accent/60"
+        className="flex items-center gap-2 rounded-lg border border-border bg-surface px-2 py-1.5 text-sm transition hover:border-foreground"
       >
         <Avatar user={user} />
         <span className="hidden max-w-24 truncate sm:inline">{label}</span>
@@ -64,7 +64,7 @@ export function UserMenu({
       {open && (
         <div
           role="menu"
-          className="absolute right-0 z-50 mt-1.5 w-56 overflow-hidden rounded-lg border border-border bg-surface shadow-2xl"
+          className="term-panel absolute right-0 z-50 mt-1 w-56 overflow-hidden"
         >
           <div className="border-b border-border px-3 py-2.5">
             <p className="truncate text-sm font-medium">{label}</p>
@@ -100,7 +100,7 @@ export function UserMenu({
             {user.isModerator && (
               <MenuLink
                 href="/moderation"
-                icon={<ShieldCheck className="size-4 text-accent" />}
+                icon={<ShieldCheck className="size-4" />}
                 onNavigate={() => setOpen(false)}
               >
                 Submissions
@@ -111,7 +111,7 @@ export function UserMenu({
           <form action={signOutAction} className="border-t border-border">
             <button
               type="submit"
-              className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-sm text-muted transition hover:bg-surface-2 hover:text-down"
+              className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-xs text-muted transition-colors hover:bg-alert hover:text-white"
             >
               <LogOut className="size-4" />
               Sign out
@@ -139,7 +139,7 @@ function MenuLink({
       href={href}
       role="menuitem"
       onClick={onNavigate}
-      className="flex items-center gap-2.5 px-3 py-2 text-sm transition hover:bg-surface-2"
+      className="term-item flex items-center gap-2.5 px-3 py-2 text-xs"
     >
       {icon}
       {children}
@@ -165,7 +165,7 @@ function Avatar({ user, className }: { user: MenuUser; className?: string }) {
     <span
       aria-hidden
       className={cn(
-        "grid size-6 shrink-0 place-items-center rounded-full bg-accent text-[11px] font-semibold text-white",
+        "grid size-6 shrink-0 place-items-center rounded-full bg-foreground text-[11px] font-semibold text-background",
         className,
       )}
     >

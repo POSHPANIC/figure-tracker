@@ -83,7 +83,7 @@ export default async function AboutPage() {
           What you can do is tell us when something is wrong — a figure filed under the wrong
           character, a variant treated as one product, a price that can't be right, or a figure
           missing entirely. That goes through the{" "}
-          <a href="/feedback" className="text-accent hover:underline">
+          <a href="/feedback" className="term-link">
             feedback form
           </a>
           , and a person reads it. Nothing sent that way changes the site by itself.
@@ -113,7 +113,7 @@ export default async function AboutPage() {
           from AniList; figure details are maintained by hand.
         </p>
         <p>
-          Spotted something wrong? <Link href="/contact" className="text-accent hover:underline">Tell us</Link> —
+          Spotted something wrong? <Link href="/contact" className="term-link">Tell us</Link> —
           corrections are welcome and usually quick to make.
         </p>
       </Section>
@@ -125,7 +125,7 @@ export default async function AboutPage() {
         </p>
         <p>
           Questions, corrections or press enquiries:{" "}
-          <a href={`mailto:${CONTACT_EMAIL}`} className="text-accent hover:underline">
+          <a href={`mailto:${CONTACT_EMAIL}`} className="term-link">
             {CONTACT_EMAIL}
           </a>
         </p>

@@ -27,8 +27,8 @@ export default async function ModerationPage() {
   return (
     <div className="mx-auto max-w-3xl px-4 py-8">
       <header className="mb-6">
-        <h1 className="flex items-center gap-2 text-2xl font-semibold tracking-tight">
-          <Inbox className="size-5 text-accent" />
+        <h1 className="flex items-center gap-2 text-2xl uppercase tracking-[0.14em]">
+          <Inbox className="size-5 text-foreground" />
           Submissions
         </h1>
         <p className="mt-1 text-sm text-muted">
@@ -56,7 +56,7 @@ export default async function ModerationPage() {
           <p className="font-medium">Inbox is clear</p>
           <p className="mt-1 text-sm text-muted">
             Bug reports, figure requests, suggested edits and feedback from the{" "}
-            <a href="/feedback" className="text-accent hover:underline">
+            <a href="/feedback" className="term-link">
               feedback form
             </a>{" "}
             land here.
@@ -72,8 +72,8 @@ export default async function ModerationPage() {
 
       {candidates.openCount > 0 && (
         <section className="mt-10">
-          <h2 className="flex items-center gap-2 text-lg font-semibold tracking-tight">
-            <PackageSearch className="size-4 text-accent" />
+          <h2 className="flex items-center gap-2 text-lg uppercase tracking-[0.14em]">
+            <PackageSearch className="size-4 text-foreground" />
             Possibly missing
           </h2>
           <p className="mt-1 text-sm text-muted">

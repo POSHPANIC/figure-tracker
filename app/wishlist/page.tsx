@@ -26,7 +26,7 @@ export default async function WishlistPage() {
   return (
     <div className="mx-auto max-w-7xl px-4 py-8">
       <header className="mb-6">
-        <h1 className="text-2xl font-semibold tracking-tight">Wishlist</h1>
+        <h1 className="text-2xl uppercase tracking-[0.14em]">Wishlist</h1>
         <p className="mt-1 text-sm text-muted">
           {items.length === 0 ? (
             "Nothing here yet."
@@ -52,7 +52,7 @@ export default async function WishlistPage() {
           </p>
           <Link
             href="/figures"
-            className="mt-5 inline-flex items-center gap-1.5 rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white transition hover:opacity-90"
+            className="mt-5 inline-flex items-center gap-1.5 rounded-lg bg-foreground px-4 py-2 text-sm font-medium text-background transition hover:opacity-90"
           >
             Browse figures
           </Link>

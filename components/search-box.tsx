@@ -2,7 +2,7 @@
 
 import { useEffect, useId, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Loader2, Search } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { formatMoney, USD_MONEY, type DisplayMoney } from "@/lib/currency";
 import { cn } from "@/lib/utils";
 
@@ -165,7 +165,14 @@ export function SearchBox({
   return (
     <div ref={rootRef} className={cn("relative", className)}>
       <div className="relative">
-        <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted" />
+        {/* A prompt rather than a magnifier. The box is a command line here,
+            and the glyph is what tells you so before you click into it. */}
+        <span
+          aria-hidden
+          className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-muted"
+        >
+          &gt;
+        </span>
         <input
           type="search"
           role="combobox"
@@ -181,7 +188,7 @@ export function SearchBox({
           }}
           onFocus={() => setOpen(true)}
           onKeyDown={onKeyDown}
-          className="w-full rounded-lg border border-border bg-surface py-2 pl-9 pr-9 text-sm outline-none transition placeholder:text-muted focus:border-accent focus:ring-2 focus:ring-accent/25"
+          className="w-full border border-border bg-surface py-2 pl-8 pr-9 text-xs tracking-wide shadow-[inset_0_0_0_1px_var(--background)] outline-none transition-colors placeholder:uppercase placeholder:tracking-[0.12em] placeholder:text-muted focus:border-foreground"
         />
         {loading && (
           <Loader2 className="absolute right-3 top-1/2 size-4 -translate-y-1/2 animate-spin text-muted" />
@@ -195,18 +202,18 @@ export function SearchBox({
           // Filters made this list half again as long, and on a phone it now
           // runs past the bottom of the screen. Scrolls rather than clips, so
           // the last rows stay reachable.
-          className="absolute z-50 mt-1.5 max-h-[70vh] w-full overflow-y-auto overscroll-contain rounded-lg border border-border bg-surface shadow-2xl"
+          className="term-panel absolute z-50 mt-1 max-h-[70vh] w-full overflow-y-auto overscroll-contain"
         >
           {options.length === 0 && !loading && (
             // A dead end otherwise, and the wrong conclusion to leave someone
             // with: the catalogue is hand-built and stops at early 2024, so
             // "no matches" usually means not added yet rather than no such
             // figure. The search text carries over so it isn't typed twice.
-            <li className="px-3 py-3 text-sm text-muted">
-              No matches for “{q}”.{" "}
+            <li className="term-hatch px-3 py-3 text-xs text-muted">
+              No records for “{q}”.{" "}
               <a
                 href={`/feedback?kind=figure&name=${encodeURIComponent(q)}`}
-                className="text-accent hover:underline"
+                className="border-b border-foreground text-foreground"
               >
                 Tell us it&rsquo;s missing
               </a>
@@ -223,31 +230,34 @@ export function SearchBox({
                 type="button"
                 onMouseEnter={() => setHighlight(i)}
                 onClick={() => go(option)}
+                data-active={i === highlight}
                 className={cn(
-                  "flex w-full items-center justify-between gap-3 px-3 py-2 text-left transition",
+                  "term-item flex w-full items-center justify-between gap-3 px-3 py-2 text-left",
                   // The seam between the filters and the figures, drawn only
                   // when there is something on both sides of it.
                   option.type === "figure" &&
                     i === entities.length &&
                     i > 0 &&
-                    "border-t border-border",
-                  i === highlight ? "bg-accent-soft" : "hover:bg-surface-2",
+                    "border-t !border-t-border-soft",
                 )}
               >
                 <span className="min-w-0">
-                  <span className="block truncate text-sm">{option.hit.name}</span>
-                  <span className="block truncate text-xs text-muted">
+                  <span className="block truncate text-xs">{option.hit.name}</span>
+                  {/* Colour is inherited here rather than set: the row inverts
+                      on hover, and a hard-coded muted tone would go unreadable
+                      against the ink. */}
+                  <span className="term-label block truncate text-current opacity-70">
                     {option.type === "entity"
                       ? KIND_LABELS[option.hit.kind]
                       : (option.hit.series?.franchise?.name ?? "Unknown franchise")}
                   </span>
                 </span>
                 {option.type === "entity" ? (
-                  <span className="tabular shrink-0 text-xs text-muted">
+                  <span className="tabular shrink-0 text-[10px] opacity-70">
                     {option.hit.count.toLocaleString()} figure{option.hit.count === 1 ? "" : "s"}
                   </span>
                 ) : (
-                  <span className="tabular shrink-0 text-sm font-medium">
+                  <span className="tabular shrink-0 text-xs font-medium">
                     {formatMoney(option.hit.marketValueUsd, money)}
                   </span>
                 )}
@@ -263,9 +273,9 @@ export function SearchBox({
                   setOpen(false);
                   router.push(`/figures?q=${encodeURIComponent(q)}`);
                 }}
-                className="w-full border-t border-border px-3 py-2 text-left text-xs text-muted transition hover:bg-surface-2 hover:text-foreground"
+                className="term-item w-full border-t !border-t-border-soft px-3 py-2 text-left text-[10px] uppercase tracking-[0.14em] text-muted"
               >
-                See all results for “{q}”
+                See all results for “{q}” ▸
               </button>
             </li>
           )}

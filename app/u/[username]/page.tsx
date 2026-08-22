@@ -41,13 +41,14 @@ export default async function PublicProfilePage({ params }: PageProps<"/u/[usern
           // eslint-disable-next-line @next/next/no-img-element -- avatar hosts vary by provider
           <img src={user.image} alt="" className="size-16 rounded-full object-cover" />
         ) : (
-          <span className="grid size-16 place-items-center rounded-full bg-accent text-xl font-semibold text-white">
+          <span className="grid size-16 place-items-center rounded-full bg-foreground text-xl font-semibold text-background">
             {displayName?.[0]?.toUpperCase() ?? "?"}
           </span>
         )}
 
         <div className="min-w-0 flex-1">
-          <h1 className="text-2xl font-semibold tracking-tight">{displayName}</h1>
+          {/* A person's chosen name, so it keeps the case they chose. */}
+          <h1 className="text-2xl tracking-[0.04em]">{displayName}</h1>
           <p className="text-sm text-muted">@{user.username}</p>
           {user.bio && <p className="mt-2 max-w-prose text-sm">{user.bio}</p>}
         </div>

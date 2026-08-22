@@ -78,7 +78,7 @@ export function FigureActions({ figureId, signedIn, owned, onWishlist }: Props) 
         <button
           type="button"
           onClick={() => (signedIn ? setOpen((v) => !v) : requireSignIn())}
-          className="flex items-center gap-1.5 rounded-lg bg-accent px-3 py-2 text-sm font-medium text-white transition hover:opacity-90"
+          className="flex items-center gap-1.5 rounded-lg bg-foreground px-3 py-2 text-sm font-medium text-background transition hover:opacity-90"
         >
           {open ? <X className="size-4" /> : <Plus className="size-4" />}
           {open ? "Cancel" : owned.length > 0 ? "Add another" : "Add to collection"}
@@ -92,14 +92,14 @@ export function FigureActions({ figureId, signedIn, owned, onWishlist }: Props) 
           className={cn(
             "flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium transition disabled:opacity-60",
             onWishlist
-              ? "border-accent bg-accent-soft text-foreground"
-              : "border-border bg-surface hover:border-accent/60",
+              ? "border-foreground bg-foreground text-background"
+              : "border-border bg-surface hover:border-foreground",
           )}
         >
           {wishPending ? (
             <Loader2 className="size-4 animate-spin" />
           ) : (
-            <Heart className={cn("size-4", onWishlist && "fill-current text-accent")} />
+            <Heart className={cn("size-4", onWishlist && "fill-current")} />
           )}
           {onWishlist ? "On wishlist" : "Wishlist"}
         </button>
@@ -142,7 +142,7 @@ export function FigureActions({ figureId, signedIn, owned, onWishlist }: Props) 
               <select
                 name="condition"
                 defaultValue="NEW_SEALED"
-                className="w-full rounded-lg border border-border bg-surface-2 px-2 py-1.5 text-sm outline-none focus:border-accent"
+                className="w-full rounded-lg border border-border bg-surface-2 px-2 py-1.5 text-sm outline-none focus:border-foreground"
               >
                 {CONDITION_OPTIONS.map((c) => (
                   <option key={c} value={c}>
@@ -159,7 +159,7 @@ export function FigureActions({ figureId, signedIn, owned, onWishlist }: Props) 
                 min={1}
                 max={999}
                 defaultValue={1}
-                className="tabular w-full rounded-lg border border-border bg-surface-2 px-2 py-1.5 text-sm outline-none focus:border-accent"
+                className="tabular w-full rounded-lg border border-border bg-surface-2 px-2 py-1.5 text-sm outline-none focus:border-foreground"
               />
             </Field>
           </div>
@@ -172,14 +172,14 @@ export function FigureActions({ figureId, signedIn, owned, onWishlist }: Props) 
                 min={0}
                 step="0.01"
                 placeholder="—"
-                className="tabular w-full rounded-lg border border-border bg-surface-2 px-2 py-1.5 text-sm outline-none focus:border-accent"
+                className="tabular w-full rounded-lg border border-border bg-surface-2 px-2 py-1.5 text-sm outline-none focus:border-foreground"
               />
             </Field>
             <Field label="Currency">
               <select
                 name="paidCurrency"
                 defaultValue="USD"
-                className="rounded-lg border border-border bg-surface-2 px-2 py-1.5 text-sm outline-none focus:border-accent"
+                className="rounded-lg border border-border bg-surface-2 px-2 py-1.5 text-sm outline-none focus:border-foreground"
               >
                 {CURRENCIES.map((c) => (
                   <option key={c} value={c}>
@@ -194,14 +194,14 @@ export function FigureActions({ figureId, signedIn, owned, onWishlist }: Props) 
             <input
               type="date"
               name="purchasedAt"
-              className="w-full rounded-lg border border-border bg-surface-2 px-2 py-1.5 text-sm outline-none focus:border-accent"
+              className="w-full rounded-lg border border-border bg-surface-2 px-2 py-1.5 text-sm outline-none focus:border-foreground"
             />
           </Field>
 
           <button
             type="submit"
             disabled={pending}
-            className="flex w-full items-center justify-center gap-1.5 rounded-lg bg-accent px-3 py-2 text-sm font-medium text-white transition hover:opacity-90 disabled:opacity-60"
+            className="flex w-full items-center justify-center gap-1.5 rounded-lg bg-foreground px-3 py-2 text-sm font-medium text-background transition hover:opacity-90 disabled:opacity-60"
           >
             {pending && <Loader2 className="size-4 animate-spin" />}
             Save to collection

@@ -50,7 +50,7 @@ export function SettingsForm({ initial }: Props) {
           defaultValue={initial.name}
           maxLength={60}
           placeholder="Your name"
-          className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm outline-none focus:border-accent"
+          className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm outline-none focus:border-foreground"
         />
       </Field>
 
@@ -70,7 +70,7 @@ export function SettingsForm({ initial }: Props) {
           maxLength={20}
           pattern="[a-z0-9_]{3,20}"
           placeholder="yourname"
-          className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm outline-none focus:border-accent"
+          className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm outline-none focus:border-foreground"
         />
       </Field>
 
@@ -81,7 +81,7 @@ export function SettingsForm({ initial }: Props) {
           maxLength={300}
           rows={3}
           placeholder="Scale figures, mostly Fate and Chainsaw Man."
-          className="w-full resize-y rounded-lg border border-border bg-surface px-3 py-2 text-sm outline-none focus:border-accent"
+          className="w-full resize-y rounded-lg border border-border bg-surface px-3 py-2 text-sm outline-none focus:border-foreground"
         />
       </Field>
 
@@ -116,7 +116,7 @@ export function SettingsForm({ initial }: Props) {
       <button
         type="submit"
         disabled={pending}
-        className="flex items-center gap-1.5 rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white transition hover:opacity-90 disabled:opacity-60"
+        className="flex items-center gap-1.5 rounded-lg bg-foreground px-4 py-2 text-sm font-medium text-background transition hover:opacity-90 disabled:opacity-60"
       >
         {pending && <Loader2 className="size-4 animate-spin" />}
         Save changes

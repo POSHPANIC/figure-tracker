@@ -95,7 +95,7 @@ export default async function FeedbackPage({ searchParams }: PageProps<"/feedbac
           data, and a person decides what to do with a report.
         </p>
         <p>
-          Prefer email? <a href={`mailto:${CONTACT_EMAIL}`} className="text-accent hover:underline">{CONTACT_EMAIL}</a>{" "}
+          Prefer email? <a href={`mailto:${CONTACT_EMAIL}`} className="term-link">{CONTACT_EMAIL}</a>{" "}
           reaches the same place. Rights holders and takedown requests should use email — those
           are handled first.
         </p>

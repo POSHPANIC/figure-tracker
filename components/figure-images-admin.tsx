@@ -51,10 +51,10 @@ export function FigureImagesAdmin({
   }
 
   return (
-    <section className="rounded-xl border border-dashed border-accent/50 bg-surface p-4">
+    <section className="rounded-xl border border-dashed border-border bg-surface p-4">
       <div className="mb-3 flex items-start justify-between gap-3">
         <div>
-          <h2 className="text-sm font-semibold tracking-tight">Catalog images</h2>
+          <h2 className="text-sm uppercase tracking-[0.14em]">Catalog images</h2>
           <p className="mt-0.5 text-xs text-muted">
             Moderators only. Manufacturer press photos used with permission — record the credit
             and what was agreed.
@@ -63,7 +63,7 @@ export function FigureImagesAdmin({
         <button
           type="button"
           onClick={() => setOpen((v) => !v)}
-          className="flex shrink-0 items-center gap-1.5 rounded-lg border border-border px-2.5 py-1.5 text-xs font-medium transition hover:border-accent/60"
+          className="flex shrink-0 items-center gap-1.5 rounded-lg border border-border px-2.5 py-1.5 text-xs font-medium transition hover:border-foreground"
         >
           {open ? <X className="size-3.5" /> : <ImagePlus className="size-3.5" />}
           {open ? "Cancel" : "Add image"}
@@ -83,7 +83,7 @@ export function FigureImagesAdmin({
               key={img.id}
               className={cn(
                 "overflow-hidden rounded-lg border",
-                img.isPrimary ? "border-accent" : "border-border",
+                img.isPrimary ? "border-foreground" : "border-border",
               )}
             >
               <div className="aspect-square bg-surface-2">
@@ -111,11 +111,11 @@ export function FigureImagesAdmin({
                     className={cn(
                       "flex flex-1 items-center justify-center gap-1 rounded-md border px-1.5 py-1 text-[11px] transition",
                       img.isPrimary
-                        ? "border-accent bg-accent-soft text-foreground"
+                        ? "border-foreground bg-foreground text-background"
                         : "border-border text-muted hover:text-foreground",
                     )}
                   >
-                    <Star className={cn("size-3", img.isPrimary && "fill-current text-accent")} />
+                    <Star className={cn("size-3", img.isPrimary && "fill-current")} />
                     {img.isPrimary ? "Primary" : "Make primary"}
                   </button>
                   <button
@@ -152,7 +152,7 @@ export function FigureImagesAdmin({
               name="url"
               required
               placeholder="https://…/marin_swimsuit_01.jpg"
-              className="w-full rounded-lg border border-border bg-surface px-2 py-1.5 text-sm outline-none focus:border-accent"
+              className="w-full rounded-lg border border-border bg-surface px-2 py-1.5 text-sm outline-none focus:border-foreground"
             />
           </Field>
 
@@ -162,7 +162,7 @@ export function FigureImagesAdmin({
               name="credit"
               required
               placeholder="© Good Smile Company"
-              className="w-full rounded-lg border border-border bg-surface px-2 py-1.5 text-sm outline-none focus:border-accent"
+              className="w-full rounded-lg border border-border bg-surface px-2 py-1.5 text-sm outline-none focus:border-foreground"
             />
           </Field>
 
@@ -171,7 +171,7 @@ export function FigureImagesAdmin({
               type="url"
               name="sourceUrl"
               placeholder="https://www.goodsmile.com/…"
-              className="w-full rounded-lg border border-border bg-surface px-2 py-1.5 text-sm outline-none focus:border-accent"
+              className="w-full rounded-lg border border-border bg-surface px-2 py-1.5 text-sm outline-none focus:border-foreground"
             />
           </Field>
 
@@ -184,7 +184,7 @@ export function FigureImagesAdmin({
               rows={2}
               maxLength={500}
               placeholder="Email from GSC press office, 12 Aug 2026 — press images OK with credit and link back."
-              className="w-full resize-y rounded-lg border border-border bg-surface px-2 py-1.5 text-sm outline-none focus:border-accent"
+              className="w-full resize-y rounded-lg border border-border bg-surface px-2 py-1.5 text-sm outline-none focus:border-foreground"
             />
           </Field>
 
@@ -196,7 +196,7 @@ export function FigureImagesAdmin({
           <button
             type="submit"
             disabled={pending}
-            className="flex w-full items-center justify-center gap-1.5 rounded-lg bg-accent px-3 py-2 text-sm font-medium text-white transition hover:opacity-90 disabled:opacity-60"
+            className="flex w-full items-center justify-center gap-1.5 rounded-lg bg-foreground px-3 py-2 text-sm font-medium text-background transition hover:opacity-90 disabled:opacity-60"
           >
             {pending && <Loader2 className="size-4 animate-spin" />}
             Add image

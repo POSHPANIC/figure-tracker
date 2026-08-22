@@ -71,7 +71,6 @@ export function CollectionRow({
         >
           <FigureThumb
             name={item.figure.name}
-            slug={item.figure.slug}
             src={item.figure.primaryImageUrl}
           />
         </Link>
@@ -79,7 +78,7 @@ export function CollectionRow({
         <div className="min-w-0 flex-1">
           <Link
             href={`/figures/${item.figure.slug}`}
-            className="block truncate text-sm font-medium hover:text-accent"
+            className="block truncate text-sm font-medium hover:text-foreground"
           >
             {item.figure.name}
           </Link>

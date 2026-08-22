@@ -18,11 +18,11 @@ export const metadata: Metadata = {
 export default function CheckEmailPage() {
   return (
     <div className="mx-auto flex max-w-md flex-col items-center px-4 py-20 text-center">
-      <span className="grid size-12 place-items-center rounded-xl bg-accent-soft text-accent">
+      <span className="grid size-12 place-items-center border border-foreground bg-surface text-foreground">
         <MailCheck className="size-6" />
       </span>
 
-      <h1 className="mt-4 text-2xl font-semibold tracking-tight">Check your email</h1>
+      <h1 className="mt-4 text-2xl uppercase tracking-[0.14em]">Check your email</h1>
 
       <p className="mt-2 text-sm text-muted">
         If that address has an account with {SITE_NAME} — or is ready to make one — a sign-in
@@ -36,7 +36,7 @@ export default function CheckEmailPage() {
 
       <p className="mt-6 text-xs text-muted">
         Nothing arrived? Check spam, then{" "}
-        <Link href="/signin" className="text-accent hover:underline">
+        <Link href="/signin" className="term-link">
           try again
         </Link>
         .

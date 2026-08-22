@@ -1,31 +1,19 @@
 import { cn } from "@/lib/utils";
 
 /**
- * Figure artwork, or a generated placeholder when we have no image.
+ * Figure artwork, or a placeholder when we have no image.
  *
  * We deliberately don't ship stock product photos with the seed data — real
  * images arrive from marketplace APIs, which license them for display alongside
- * the listing. Until then this draws a stable gradient derived from the slug so
- * the grid still looks intentional rather than broken.
+ * the listing. Until then this draws an empty slot so the grid still looks
+ * intentional rather than broken.
+ *
+ * The slot carries no colour of its own: it is the page's own recessed-panel
+ * tone, with the initials and frame in the same muted ink as any other
+ * secondary text. Tinting it was a mistake — a wall of coloured rectangles is
+ * the loudest thing on a page otherwise made of four browns, so the figures we
+ * know least about were dominating the ones we know most about.
  */
-
-const PALETTES = [
-  ["#7c5cff", "#3b2a7a"],
-  ["#ff6b9d", "#7a2a4a"],
-  ["#26c281", "#0f5c3d"],
-  ["#ffa726", "#7a4a10"],
-  ["#4fc3f7", "#0f4a6b"],
-  ["#f2555a", "#7a1f22"],
-];
-
-function hash(s: string): number {
-  let h = 2166136261;
-  for (let i = 0; i < s.length; i++) {
-    h ^= s.charCodeAt(i);
-    h = Math.imul(h, 16777619);
-  }
-  return h >>> 0;
-}
 
 /** "Nendoroid Marin Kitagawa" -> "NM" */
 function initials(name: string): string {
@@ -35,12 +23,10 @@ function initials(name: string): string {
 
 export function FigureThumb({
   name,
-  slug,
   src,
   className,
 }: {
   name: string;
-  slug: string;
   src?: string | null;
   className?: string;
 }) {
@@ -57,16 +43,23 @@ export function FigureThumb({
     );
   }
 
-  const [from, to] = PALETTES[hash(slug) % PALETTES.length];
   return (
     <div
       aria-label={name}
       role="img"
-      className={cn("flex h-full w-full items-center justify-center", className)}
-      style={{ background: `linear-gradient(135deg, ${from}, ${to})` }}
+      className={cn(
+        "relative flex h-full w-full items-center justify-center bg-surface-2 text-muted",
+        className,
+      )}
     >
-      <span className="text-2xl font-semibold tracking-tight text-white/85">
+      {/* An inset frame, so an empty slot still reads as a slot rather than as
+          a gap in the layout. */}
+      <span aria-hidden className="absolute inset-2 border border-border-soft" />
+      <span className="font-display text-2xl uppercase tracking-[0.2em]">
         {initials(name)}
+      </span>
+      <span className="absolute bottom-2 text-[8px] uppercase tracking-[0.25em] opacity-80">
+        No image
       </span>
     </div>
   );

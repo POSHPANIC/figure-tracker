@@ -76,12 +76,8 @@ export function PriceChart({ data, maxDays, money }: Props) {
             key={r.days}
             type="button"
             onClick={() => setRange(r.days)}
-            className={cn(
-              "rounded-md px-2.5 py-1 text-xs font-medium transition",
-              range === r.days
-                ? "bg-accent text-white"
-                : "text-muted hover:bg-surface-2 hover:text-foreground",
-            )}
+            data-active={range === r.days}
+            className="term-item border border-border px-2.5 py-1 text-[11px] uppercase tracking-[0.12em] text-muted"
           >
             {r.label}
           </button>
@@ -120,7 +116,7 @@ export function PriceChart({ data, maxDays, money }: Props) {
             <Tooltip content={<PriceTooltip money={money} />} />
 
             <Area
-              type="monotone"
+              type="linear"
               dataKey="band"
               stroke="none"
               fill="url(#bandFill)"
@@ -128,18 +124,38 @@ export function PriceChart({ data, maxDays, money }: Props) {
               connectNulls
             />
             <Line
-              type="monotone"
+              type="linear"
               dataKey="median"
               stroke="var(--accent)"
               strokeWidth={2}
               dot={false}
-              activeDot={{ r: 4 }}
+              activeDot={<SquareDot />}
               isAnimationActive={false}
             />
           </AreaChart>
         </ResponsiveContainer>
       </div>
     </div>
+  );
+}
+
+/**
+ * The marker under the cursor. Recharts draws a circle by default, which would
+ * be the only round thing left on the site — this is the same filled square the
+ * section bars and list markers use, centred on the point.
+ */
+function SquareDot({ cx, cy }: { cx?: number; cy?: number }) {
+  if (cx === undefined || cy === undefined) return null;
+  return (
+    <rect
+      x={cx - 3.5}
+      y={cy - 3.5}
+      width={7}
+      height={7}
+      fill="var(--accent)"
+      stroke="var(--background)"
+      strokeWidth={1.5}
+    />
   );
 }
 
@@ -160,7 +176,7 @@ function PriceTooltip({
   const p = payload[0].payload;
 
   return (
-    <div className="rounded-lg border border-border bg-surface px-3 py-2 text-xs shadow-xl">
+    <div className="term-panel px-3 py-2 text-xs">
       <p className="mb-1 font-medium">
         {new Date(p.date).toLocaleDateString("en-US", {
           month: "short",

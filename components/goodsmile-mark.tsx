@@ -22,7 +22,7 @@ export function GoodSmileMark({ className = "" }: { className?: string }) {
       className={`inline-flex select-none items-baseline gap-[0.2em] font-semibold uppercase leading-none tracking-tight ${className}`}
     >
       <span aria-hidden="true">Good</span>
-      <span aria-hidden="true" className="text-accent">
+      <span aria-hidden="true" className="text-foreground">
         Smile
       </span>
     </span>

@@ -154,8 +154,8 @@ export function SubmissionForm({
               className={cn(
                 "flex items-center gap-2 rounded-lg border px-3 py-2.5 text-sm font-medium transition",
                 kind === k.value
-                  ? "border-accent bg-accent/10 text-foreground"
-                  : "border-border bg-surface text-muted hover:border-accent/60 hover:text-foreground",
+                  ? "border-foreground bg-surface-2 text-foreground"
+                  : "border-border bg-surface text-muted hover:border-foreground hover:text-foreground",
               )}
             >
               {k.icon}
@@ -380,7 +380,7 @@ export function SubmissionForm({
       <button
         type="submit"
         disabled={pending}
-        className="flex items-center justify-center gap-2 rounded-lg bg-accent px-5 py-2.5 text-sm font-medium text-white transition hover:opacity-90 disabled:opacity-60"
+        className="flex items-center justify-center gap-2 rounded-lg bg-foreground px-5 py-2.5 text-sm font-medium text-background transition hover:opacity-90 disabled:opacity-60"
       >
         {pending && <Loader2 className="size-4 animate-spin" />}
         Send
@@ -390,7 +390,7 @@ export function SubmissionForm({
 }
 
 const inputClass =
-  "w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm outline-none transition focus:border-accent";
+  "w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm outline-none transition focus:border-foreground";
 
 function Field({
   label,

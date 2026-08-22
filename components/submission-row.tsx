@@ -61,17 +61,17 @@ const KIND_META: Record<SubmissionKind, { label: string; icon: React.ReactNode; 
   FIGURE: {
     label: "Missing figure",
     icon: <PackagePlus className="size-3.5" />,
-    tone: "border-accent/40 bg-accent/10 text-accent",
+    tone: "border-border bg-surface-2 text-foreground",
   },
   SALE: {
     label: "Reported sale",
     icon: <Receipt className="size-3.5" />,
-    tone: "border-accent/40 bg-accent/10 text-accent",
+    tone: "border-border bg-surface-2 text-foreground",
   },
   EDIT: {
     label: "Suggested edit",
     icon: <PencilLine className="size-3.5" />,
-    tone: "border-accent/40 bg-accent/10 text-accent",
+    tone: "border-border bg-surface-2 text-foreground",
   },
 };
 
@@ -168,7 +168,7 @@ export function SubmissionRow({ submission }: { submission: QueuedSubmission }) 
                     href={submission.referenceUrl}
                     target="_blank"
                     rel="noopener noreferrer nofollow"
-                    className="inline-flex items-center gap-1 break-all text-accent hover:underline"
+                    className="inline-flex items-center gap-1 break-all term-link"
                   >
                     {submission.referenceUrl}
                     <ExternalLink className="size-3 shrink-0" />
@@ -188,7 +188,7 @@ export function SubmissionRow({ submission }: { submission: QueuedSubmission }) 
                 href={`/figures/${submission.figure.slug}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-1 text-accent hover:underline"
+                className="inline-flex items-center gap-1 term-link"
               >
                 {submission.figure.name}
                 <ExternalLink className="size-3 shrink-0" />
@@ -216,7 +216,7 @@ export function SubmissionRow({ submission }: { submission: QueuedSubmission }) 
                 href={submission.saleUrl}
                 target="_blank"
                 rel="noopener noreferrer nofollow"
-                className="inline-flex items-center gap-1 break-all text-accent hover:underline"
+                className="inline-flex items-center gap-1 break-all term-link"
               >
                 {submission.saleUrl}
                 <ExternalLink className="size-3 shrink-0" />
@@ -242,7 +242,7 @@ export function SubmissionRow({ submission }: { submission: QueuedSubmission }) 
                 href={`/figures/${submission.figure.slug}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-1 text-accent hover:underline"
+                className="inline-flex items-center gap-1 term-link"
               >
                 {submission.figure.name}
                 <ExternalLink className="size-3 shrink-0" />
@@ -271,7 +271,7 @@ export function SubmissionRow({ submission }: { submission: QueuedSubmission }) 
                 href={submission.imageUrl}
                 target="_blank"
                 rel="noopener noreferrer nofollow"
-                className="inline-flex items-center gap-1 break-all text-accent hover:underline"
+                className="inline-flex items-center gap-1 break-all term-link"
               >
                 {submission.imageUrl}
                 <ExternalLink className="size-3 shrink-0" />
@@ -316,14 +316,14 @@ export function SubmissionRow({ submission }: { submission: QueuedSubmission }) 
           name="note"
           maxLength={500}
           placeholder="Note for the record (optional)"
-          className="min-w-0 flex-1 rounded-lg border border-border bg-surface-2 px-3 py-1.5 text-xs outline-none focus:border-accent"
+          className="min-w-0 flex-1 rounded-lg border border-border bg-surface-2 px-3 py-1.5 text-xs outline-none focus:border-foreground"
         />
         <button
           type="submit"
           name="decision"
           value="RESOLVED"
           disabled={pending}
-          className="flex items-center gap-1.5 rounded-lg bg-accent px-3 py-1.5 text-xs font-medium text-white transition hover:opacity-90 disabled:opacity-60"
+          className="flex items-center gap-1.5 rounded-lg bg-foreground px-3 py-1.5 text-xs font-medium text-background transition hover:opacity-90 disabled:opacity-60"
         >
           <Check className="size-3.5" />
           Done
@@ -370,7 +370,7 @@ function ProposedFields({
                   href={String(value)}
                   target="_blank"
                   rel="noopener noreferrer nofollow"
-                  className="break-all font-medium text-accent hover:underline"
+                  className="break-all font-medium term-link"
                 >
                   {String(value)}
                 </a>
@@ -458,7 +458,7 @@ function FieldLockButton({
           ? "border-down/40 text-down"
           : locked
             ? "border-up/40 bg-up/10 text-up"
-            : "border-border text-muted hover:border-accent/60 hover:text-foreground",
+            : "border-border text-muted hover:border-foreground hover:text-foreground",
       )}
     >
       {locked ? <Lock className="size-3" /> : <LockOpen className="size-3" />}

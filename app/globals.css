@@ -1,36 +1,138 @@
 @import "tailwindcss";
 
 /*
- * Design tokens. Dark-first — this is a market/trading style product and the
- * charts read better on dark. Light mode is a full override, not an
- * afterthought, so `prefers-color-scheme: light` users get a real theme.
+ * ============================================================================
+ * Terminal skin
+ * ============================================================================
+ *
+ * The look is an archive readout on paper — pale stock, dark type,
+ * hairline rules, hard corners, and selection that inverts rather than tints —
+ * crossed with the furniture of an early-2000s enthusiast site: boxes inside
+ * boxes, uppercase monospace labels, a status strip reporting what the page is
+ * doing.
+ *
+ * Two rules make the rest of it hang together:
+ *
+ *   1. Nothing is round. The radius scale below is zeroed, so every existing
+ *      `rounded-*` in the codebase resolves to a square corner. That is one
+ *      declaration instead of a find-and-replace across forty components.
+ *   2. Emphasis is inversion, not colour. There is no highlight hue — the
+ *      active thing is ink-on-ground flipped to ground-on-ink. It's why a palette
+ *      of four near-neutrals still has an unmistakable loudest element.
+ *
+ * Light is the default because it is the identity, and it is the default
+ * unconditionally: the OS setting is deliberately not consulted. A visitor with
+ * dark mode switched on still lands on the light theme and has to ask for the
+ * dark one, which is what the toggle in the header is for. Dark is the same
+ * design inverted — the readout backlit rather than printed — rather than a
+ * second design.
+ *
+ * The choice rides in a cookie, so the server renders the right palette on the
+ * first byte and there is no flash to correct. `[data-theme="dark"]` on <html>
+ * is set from that cookie in the root layout; nothing else switches it.
+ */
+
+/*
+ * Light palette — neutral white, no warm cast.
+ *
+ * The bone/tan original, to paste back if this isn't it:
+ *   background #c5c0aa  surface #cfcab4  surface-2 #bab5a0
+ *   border #8c8877  border-soft #a9a493  foreground #454138  muted #6f6a5b
+ *   accent #454138  accent-soft #b5b09b  accent-ink #cfcab4
+ *   alert/down #a33f35  up #4a6741
+ *   scanline rgba(69,65,56,.16)  grain .05  glow rgba(69,65,56,.14)
+ *
+ * Every value here is a pure grey — R, G and B are equal — so there is no tint
+ * to see at any level. The page is off-white rather than #fff so that panels
+ * have somewhere lighter to sit: pure white ground would flatten the raised and
+ * recessed levels the layout is built on, and those three levels are what make
+ * a panel read as a panel without a shadow.
+ *
+ * A neutral ground is also what finally makes the type hierarchy and the
+ * contrast floor compatible. On the tan palette they fought — `--muted` could
+ * be readable or it could be lighter than the ink, not both — because the
+ * ground was already dark enough to eat the headroom. Here `--muted` clears
+ * 4.5:1 on all three levels while still sitting well clear of `--foreground`.
  */
 :root {
-  --background: #0b0d12;
-  --surface: #131722;
-  --surface-2: #1a1f2e;
-  --border: #262c3d;
-  --foreground: #e8eaf0;
-  --muted: #8b93a7;
-  --accent: #7c5cff;
-  --accent-soft: #2a2145;
-  --up: #26c281;
-  --down: #f2555a;
+  color-scheme: light;
+  --background: #f4f4f4;
+  --surface: #ffffff;
+  --surface-2: #e8e8e8;
+  /* 3.22:1 on the page — clears the 3:1 that WCAG asks for the boundary of a
+     control, which no earlier palette managed. */
+  --border: #888888;
+  --border-soft: #d0d0d0;
+  --foreground: #242424;
+  /* 4.76:1 at worst (on the recessed level), and still six steps lighter than
+     the ink, so labels recede without becoming unreadable. */
+  --muted: #656565;
+  /* "Accent" is the ink itself. Anything accented is inverted, so this reads as
+     the fill of a selected row rather than as a hue. */
+  --accent: #242424;
+  --accent-soft: #e0e0e0;
+  --accent-ink: #ffffff;
+  /* Reserved for genuine alarm — moderation flags, destructive actions, the
+     content warning. Used rarely enough that it still means something. */
+  --alert: #b3261e;
+  /* A second red, for the terminal's own status ornament rather than for
+     alarm. It has to be a separate token: the status line is on every page, and
+     if it wore --alert then --alert would be permanently on screen and would
+     stop meaning "look at this" anywhere it actually matters. Deeper and
+     duller than the alarm red, which is what makes it read as a pilot light. */
+  --signal: #a02b22;
+  --up: #2f6b3f;
+  --down: #b3261e;
+  /* The overlay is a dark scrim, and this is the palest ground it has ever sat
+     on, so it shows more of itself for the same alpha. Held very low; on pure
+     neutral it reads as dirt on glass long before it reads as a CRT. */
+  --scanline: rgba(0, 0, 0, 0.055);
+  --grain: 0.022;
+  --glow: rgba(0, 0, 0, 0.07);
 }
 
-@media (prefers-color-scheme: light) {
-  :root {
-    --background: #f7f8fb;
-    --surface: #ffffff;
-    --surface-2: #f1f3f8;
-    --border: #e2e5ee;
-    --foreground: #12141c;
-    --muted: #646c80;
-    --accent: #5b3df5;
-    --accent-soft: #eeeaff;
-    --up: #0f9d63;
-    --down: #d92d36;
-  }
+/*
+ * Dark palette — the same neutral, inverted.
+ *
+ * The warm original, to paste back alongside the bone light palette:
+ *   background #21201c  surface #2b2a25  surface-2 #35342d
+ *   border #6b6759  border-soft #4a4840  foreground #ccc8b1  muted #8c8878
+ *   accent #ccc8b1  accent-soft #45433a  accent-ink #21201c
+ *   alert/down #c8564a  up #8ba86f  glow rgba(204,200,177,.1)
+ *
+ * Deliberately mirrored rather than independently chosen: `--foreground` sits
+ * at 13.9:1 here against the light palette's 14.1:1, and `--border` at 3.4:1
+ * against 3.2:1. Toggling should change which end of the scale you are on, not
+ * how much contrast the design has.
+ *
+ * Note that "recessed" inverts with the theme. In light, `--surface-2` is
+ * darker than the page; here it is lighter. Both read as a well rather than a
+ * raised panel, which is why the empty image slots still look like empty slots
+ * in either mode.
+ */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --background: #1c1c1c;
+  --surface: #262626;
+  --surface-2: #303030;
+  --border: #707070;
+  --border-soft: #3d3d3d;
+  --foreground: #e8e8e8;
+  /* 4.81:1 on the lightest ground it ever sits on, which here is the recessed
+     level rather than the raised one. */
+  --muted: #9c9c9c;
+  --accent: #e8e8e8;
+  --accent-soft: #383838;
+  --accent-ink: #1c1c1c;
+  /* Lifted off the light palette's reds and greens — the same hues would go
+     muddy against a dark ground. */
+  --alert: #ef5f55;
+  --signal: #e8695f;
+  --up: #6fbf73;
+  --down: #ef5f55;
+  --scanline: rgba(0, 0, 0, 0.32);
+  --grain: 0.07;
+  --glow: rgba(232, 232, 232, 0.1);
 }
 
 @theme inline {
@@ -38,29 +140,447 @@
   --color-surface: var(--surface);
   --color-surface-2: var(--surface-2);
   --color-border: var(--border);
+  --color-border-soft: var(--border-soft);
   --color-foreground: var(--foreground);
   --color-muted: var(--muted);
   --color-accent: var(--accent);
   --color-accent-soft: var(--accent-soft);
+  --color-accent-ink: var(--accent-ink);
+  --color-alert: var(--alert);
+  --color-signal: var(--signal);
   --color-up: var(--up);
   --color-down: var(--down);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+
+  --font-display: var(--font-display-face), "Times New Roman", serif;
+  --font-serif: var(--font-serif-face), Georgia, serif;
+  --font-mono: var(--font-mono-face), ui-monospace, "Courier New", monospace;
+  /* Default body type is the monospace. This is a terminal. */
+  --font-sans: var(--font-mono-face), ui-monospace, "Courier New", monospace;
+
+  /* Hard corners, everywhere, without touching a single component. */
+  --radius-xs: 0px;
+  --radius-sm: 0px;
+  --radius-md: 0px;
+  --radius-lg: 0px;
+  --radius-xl: 0px;
+  --radius-2xl: 0px;
+  --radius-3xl: 0px;
+  --radius-4xl: 0px;
+  --radius-full: 0px;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  font-family: var(--font-mono);
+  font-size: 0.875rem;
+  line-height: 1.6;
+  /* Panel edges are hairlines; without this they shimmer during scroll. */
+  text-rendering: optimizeLegibility;
 }
 
-/* Numbers in tables/stat blocks should line up column-wise. */
+/* ---------------------------------------------------------------------------
+ * Screen furniture
+ *
+ * Scanlines and grain sit above the page and below the pointer. They are the
+ * largest single contributor to the CRT read, and the cheapest — two fixed
+ * elements, no per-component cost.
+ * ------------------------------------------------------------------------ */
+
+.crt-scanlines,
+.crt-grain,
+.crt-vignette {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  pointer-events: none;
+}
+
+.crt-scanlines {
+  background: repeating-linear-gradient(
+    to bottom,
+    transparent 0 2px,
+    var(--scanline) 2px 3px
+  );
+  /* Drifts one line-pair per cycle — slow enough to register as texture rather
+     than as movement. */
+  animation: scanline-drift 8s linear infinite;
+}
+
+@keyframes scanline-drift {
+  from { background-position-y: 0; }
+  to { background-position-y: 3px; }
+}
+
+.crt-grain {
+  opacity: var(--grain);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E");
+  animation: grain-shift 900ms steps(3) infinite;
+}
+
+@keyframes grain-shift {
+  0% { transform: translate(0, 0); }
+  33% { transform: translate(-3px, 2px); }
+  66% { transform: translate(2px, -3px); }
+  100% { transform: translate(0, 0); }
+}
+
+.crt-vignette {
+  background: radial-gradient(ellipse at center, transparent 55%, var(--glow) 100%);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .crt-scanlines,
+  .crt-grain {
+    animation: none;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+ * Type
+ * ------------------------------------------------------------------------ */
+
+h1, h2, h3, h4 {
+  font-family: var(--font-display);
+  font-weight: 400;
+  letter-spacing: 0.06em;
+}
+
+h1 { letter-spacing: 0.1em; }
+
+/* Small uppercase monospace labels — the workhorse of the whole UI. Every field
+   name, column head and section tag is one of these. */
+.term-label {
+  font-family: var(--font-mono);
+  font-size: 0.625rem;
+  font-weight: 500;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+/*
+ * Colour variants of the label above.
+ *
+ * These exist as classes rather than as Tailwind `text-*` utilities on the call
+ * site because everything in this file is unlayered, and unlayered rules beat
+ * `@layer utilities` no matter the specificity — `.term-label` would silently
+ * win against a `text-signal` sitting right next to it on the same element.
+ * Declared after `.term-label`, so equal specificity resolves by source order.
+ */
+.term-signal {
+  color: var(--signal);
+}
+
+.term-ink {
+  color: var(--foreground);
+}
+
+/* Numbers in tables and stat blocks line up column-wise. */
 .tabular {
   font-variant-numeric: tabular-nums;
-  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-family: var(--font-mono);
+  letter-spacing: 0.02em;
+}
+
+.font-display {
+  font-family: var(--font-display);
 }
 
 ::selection {
-  background: var(--accent);
-  color: white;
+  background: var(--foreground);
+  color: var(--background);
+}
+
+/* ---------------------------------------------------------------------------
+ * Panels
+ *
+ * A panel is a filled rectangle with a hairline border and a second
+ * hairline held one pixel inside it. The inner line is an inset shadow rather
+ * than a wrapper element, so any existing `border border-border` component
+ * becomes a panel by gaining one class.
+ * ------------------------------------------------------------------------ */
+
+.term-panel {
+  position: relative;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  box-shadow: inset 0 0 0 1px var(--background);
+}
+
+/* The filled corner tab. Opt-in, because on every panel at once it becomes
+   wallpaper — it should mark the two or three things that lead a page. */
+.term-tag::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 0.5rem;
+  height: 0.5rem;
+  background: var(--foreground);
+}
+
+/* Bracketed corners, the menu-frame treatment. Four L-shaped gradients, so it
+   costs no pseudo-elements and can sit on a link. */
+.term-brackets {
+  background-image:
+    linear-gradient(var(--foreground), var(--foreground)),
+    linear-gradient(var(--foreground), var(--foreground)),
+    linear-gradient(var(--foreground), var(--foreground)),
+    linear-gradient(var(--foreground), var(--foreground));
+  background-repeat: no-repeat;
+  background-size: 0.75rem 1px, 1px 0.75rem, 0.75rem 1px, 1px 0.75rem;
+  background-position: left top, left top, right bottom, right bottom;
+}
+
+/* Hairline divider carrying a small square at its left end, the way a printed
+   index marks the start of a run of entries. */
+.term-rule {
+  position: relative;
+  border-top: 1px solid var(--border-soft);
+}
+
+.term-rule::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: -3px;
+  width: 5px;
+  height: 5px;
+  background: var(--foreground);
+}
+
+/* ---------------------------------------------------------------------------
+ * Controls
+ *
+ * One interaction model throughout: hovering or selecting inverts the element,
+ * and a marker slides in at the left edge, which is the plainest way to say
+ * "this is the row your cursor is on".
+ * ------------------------------------------------------------------------ */
+
+/*
+ * Note on the cascade: these rules are unlayered, and Tailwind's utilities live
+ * in `@layer utilities`, so anything declared here beats a utility class no
+ * matter the specificity. That is deliberate for `color` — it is what lets the
+ * inversion win over whatever `text-*` the call site set — but it means this
+ * block must not declare properties a call site still needs to control. Border
+ * is one of those, so it is left to the caller.
+ */
+.term-item {
+  position: relative;
+  transition: background-color 120ms steps(2), color 120ms steps(2);
+}
+
+.term-item::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: var(--foreground);
+  transform: scaleY(0);
+  transition: transform 120ms steps(3);
+}
+
+.term-item:hover,
+.term-item[data-active="true"] {
+  background: var(--foreground);
+  color: var(--background);
+}
+
+.term-item:hover::before,
+.term-item[data-active="true"]::before {
+  transform: scaleY(1);
+  background: var(--background);
+}
+
+/* A bordered command button. Inverts on hover like everything else. */
+.term-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--foreground);
+  padding: 0.5rem 1rem;
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  font-weight: 500;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  box-shadow: inset 0 0 0 1px var(--background);
+  transition: background-color 120ms steps(2), color 120ms steps(2);
+}
+
+.term-btn:hover {
+  background: var(--foreground);
+  color: var(--background);
+  box-shadow: inset 0 0 0 1px var(--foreground);
+}
+
+/* The filled variant, for the single primary action on a screen. It starts
+   inverted, so it un-inverts on hover. */
+.term-btn-primary {
+  background: var(--foreground);
+  color: var(--background);
+  border-color: var(--foreground);
+  box-shadow: inset 0 0 0 1px var(--foreground);
+}
+
+.term-btn-primary:hover {
+  background: var(--surface);
+  color: var(--foreground);
+  border-color: var(--border);
+  box-shadow: inset 0 0 0 1px var(--background);
+}
+
+/*
+ * Inline link.
+ *
+ * The old design distinguished links by hue. This palette has no spare hue, so
+ * they are marked by a rule underneath instead — which is both the early-web
+ * convention and, on a bone page, the more legible of the two. Hovering fills
+ * the rule up into the text, so a link inverts like everything else.
+ */
+.term-link {
+  color: var(--foreground);
+  box-shadow: inset 0 -1px 0 var(--foreground);
+  transition: background-color 120ms steps(2), color 120ms steps(2);
+}
+
+.term-link:hover {
+  background: var(--foreground);
+  color: var(--background);
+}
+
+/* Square focus ring, offset outward — the browser default's rounded halo is the
+   one thing that gives the zeroed corner radius away. */
+:where(a, button, input, select, textarea, [tabindex]):focus-visible {
+  outline: 2px solid var(--foreground);
+  outline-offset: 2px;
+}
+
+/* Native form controls carry the paper texture rather than the OS's. */
+input,
+select,
+textarea {
+  font-family: var(--font-mono);
+  letter-spacing: 0.02em;
+}
+
+/* ---------------------------------------------------------------------------
+ * Ornament
+ * ------------------------------------------------------------------------ */
+
+/* Terminal caret, for status strips and headings that should look live. */
+.term-caret::after {
+  content: "▮";
+  margin-left: 0.25em;
+  animation: caret-blink 1.1s steps(1) infinite;
+}
+
+@keyframes caret-blink {
+  0%, 49% { opacity: 1; }
+  50%, 100% { opacity: 0; }
+}
+
+/* Bulleted list, squared off. A disc is the one round thing the radius override
+   can't reach, so the marker is drawn rather than listed. */
+.term-list > li {
+  position: relative;
+  padding-left: 1.25rem;
+  list-style: none;
+}
+
+.term-list > li::before {
+  content: "";
+  position: absolute;
+  left: 0.125rem;
+  top: 0.6em;
+  width: 5px;
+  height: 5px;
+  background: var(--border);
+}
+
+/* Hatched fill, for empty states and inert regions — the draughtsman's "no
+   data here" texture. */
+.term-hatch {
+  background-image: repeating-linear-gradient(
+    45deg,
+    var(--border-soft) 0 1px,
+    transparent 1px 7px
+  );
+}
+
+/* A brief horizontal tear on hover. Short and small enough to read as signal
+   loss rather than as a layout bug. */
+.term-glitch:hover {
+  animation: glitch-tear 260ms steps(2) 1;
+}
+
+@keyframes glitch-tear {
+  0% { transform: translateX(0); }
+  25% { transform: translateX(-2px); }
+  50% { transform: translateX(2px); }
+  75% { transform: translateX(-1px); }
+  100% { transform: translateX(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .term-caret::after,
+  .term-glitch:hover {
+    animation: none;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+ * Boot sequence
+ *
+ * The overlay is server-rendered, so it has to be opaque from CSS alone — a
+ * canvas that has not been drawn to yet is transparent, and without a painted
+ * background here the page would show through for the frame or two before the
+ * script runs.
+ *
+ * Sits above the CRT layers (z-index 100): the scanlines and grain belong to
+ * the terminal, and the boot sequence is what happens before there is one.
+ * ------------------------------------------------------------------------ */
+
+.boot-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 300;
+  background: #0d0d0b;
+  cursor: pointer;
+}
+
+.boot-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* ---------------------------------------------------------------------------
+ * Scrollbar
+ * ------------------------------------------------------------------------ */
+
+* {
+  scrollbar-color: var(--foreground) var(--surface-2);
+  scrollbar-width: thin;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--surface-2);
+  border-left: 1px solid var(--border-soft);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--foreground);
+  border: 2px solid var(--surface-2);
 }
