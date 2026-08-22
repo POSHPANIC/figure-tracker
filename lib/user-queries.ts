@@ -1,5 +1,6 @@
 import "server-only";
 import { prisma } from "./prisma";
+import { figureValue, portfolioBasis, type ValueBasis } from "./figure-value";
 import { toNumber } from "./money";
 import { figureCardSelect } from "./queries";
 
@@ -24,8 +25,20 @@ const collectionItemSelect = {
 export type PortfolioTotals = {
   itemCount: number;
   uniqueFigures: number;
-  /** Sum of market value × quantity. Null-valued figures count as 0. */
+  /**
+   * Sum of each figure's best available value × quantity.
+   *
+   * "Best available" means a sold price where one exists and the asking median
+   * otherwise — and today that is always the asking median, because the
+   * catalogue has no sold prices and no route to any. Before this the total
+   * summed marketValueUsd alone, which is null on every figure, so every
+   * collection on the site was worth exactly nothing.
+   */
   marketValueUsd: number;
+  /** What the total rests on, so the page can say. Null when it is empty. */
+  valueBasis: ValueBasis | null;
+  /** Items with no value at all, so a page can say the total understates. */
+  itemsWithoutValue: number;
   /** Sum of what was paid, for items where a price was recorded. */
   paidUsd: number;
   /** Only counts items that have BOTH a paid price and a market value. */
@@ -48,15 +61,19 @@ export async function getCollection(userId: string) {
 type CollectionRow = {
   quantity: number;
   paidAmountUsd: unknown;
-  figure: { marketValueUsd: unknown };
+  figure: { marketValueUsd: unknown; askMedianUsd?: unknown; askListings?: number | null };
 };
 
 /**
  * Portfolio maths.
  *
- * Gain is computed only across items that have both a cost and a market value —
+ * Gain is computed only across items that have both a cost and a value —
  * otherwise an item with no recorded purchase price would look like 100% profit
  * and quietly inflate the headline number.
+ *
+ * That value is an asking median today, so a gain shown here is "against what
+ * sellers are currently asking", not against what anything sold for. The page
+ * carries the basis so it can say so.
  */
 export function computeTotals(items: CollectionRow[]): PortfolioTotals {
   let marketValueUsd = 0;
@@ -66,10 +83,19 @@ export function computeTotals(items: CollectionRow[]): PortfolioTotals {
   let itemsWithoutCost = 0;
   let itemCount = 0;
 
+  let fromSold = 0;
+  let fromAsking = 0;
+  let itemsWithoutValue = 0;
+
   for (const item of items) {
     const qty = item.quantity;
-    const value = toNumber(item.figure.marketValueUsd as never);
+    const best = figureValue(item.figure);
+    const value = best?.amountUsd ?? null;
     const paid = toNumber(item.paidAmountUsd as never);
+
+    if (!best) itemsWithoutValue += qty;
+    else if (best.basis === "sold") fromSold += qty;
+    else fromAsking += qty;
 
     itemCount += qty;
     if (value !== null) marketValueUsd += value * qty;
@@ -88,6 +114,13 @@ export function computeTotals(items: CollectionRow[]): PortfolioTotals {
     itemCount,
     uniqueFigures: items.length,
     marketValueUsd: round2(marketValueUsd),
+    valueBasis: portfolioBasis({
+      totalUsd: marketValueUsd,
+      fromSold,
+      fromAsking,
+      unvalued: itemsWithoutValue,
+    }),
+    itemsWithoutValue,
     paidUsd: round2(paidUsd),
     gainUsd: round2(gainUsd),
     gainPct: comparablePaid > 0 ? round2((gainUsd / comparablePaid) * 100) : null,
@@ -233,6 +266,9 @@ export async function getPublicProfile(username: string) {
       itemCount: totals.itemCount,
       uniqueFigures: totals.uniqueFigures,
       marketValueUsd: totals.marketValueUsd,
+      // So a public profile labels the number the same way the owner's own
+      // page does, rather than calling an estimate a valuation to strangers.
+      valueBasis: totals.valueBasis,
     },
   };
 }

@@ -3,6 +3,7 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2 } from "lucide-react";
+import { figureValue } from "@/lib/figure-value";
 import { formatMoney, USD_MONEY, type DisplayMoney } from "@/lib/currency";
 import { cn } from "@/lib/utils";
 
@@ -10,6 +11,8 @@ type FigureHit = {
   slug: string;
   name: string;
   marketValueUsd: string | null;
+  askMedianUsd?: string | null;
+  askListings?: number | null;
   series: { franchise: { name: string } | null } | null;
 };
 
@@ -258,7 +261,7 @@ export function SearchBox({
                   </span>
                 ) : (
                   <span className="tabular shrink-0 text-xs font-medium">
-                    {formatMoney(option.hit.marketValueUsd, money)}
+                    {formatMoney(figureValue(option.hit)?.amountUsd ?? null, money)}
                   </span>
                 )}
               </button>

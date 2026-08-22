@@ -11,6 +11,7 @@ import { FigureImagesAdmin } from "@/components/figure-images-admin";
 import { FigureThumb } from "@/components/figure-thumb";
 import { PriceChart } from "@/components/price-chart";
 import { StoreMark, isManufacturerStore } from "@/components/store-mark";
+import { figureValue, valueLabel, valueNote } from "@/lib/figure-value";
 import { withSolarisAffiliate } from "@/lib/solaris-affiliate";
 import { describeAvailability } from "@/lib/ingest/goodsmile-store";
 import { archiveProductUrl } from "@/lib/ingest/gsc";
@@ -103,6 +104,9 @@ export default async function FigurePage({ params, searchParams }: PageProps<"/f
 
   // Whether the store link is the maker's own shop or a retailer's.
   const fromManufacturer = figure.storeUrl ? isManufacturerStore(figure.storeUrl) : true;
+
+  // The one number this page can honestly state, and what it rests on.
+  const value = figureValue(figure);
 
   const trend = trendOf(figure.change30dPct);
   const isModerator = user?.role === "MODERATOR" || user?.role === "ADMIN";
@@ -320,20 +324,12 @@ export default async function FigurePage({ params, searchParams }: PageProps<"/f
               sold-price source at all, is a dash on every figure in the
               catalogue.
             */}
-            {figure.marketValueUsd !== null || figure.askMedianUsd === null ? (
-              <StatCard
-                label="Market value"
-                value={formatMoney(figure.marketValueUsd, money)}
-                emphasis
-              />
-            ) : (
-              <StatCard
-                label="Typical asking price"
-                value={formatMoney(figure.askMedianUsd, money)}
-                note={`median of ${figure.askListings} listings`}
-                emphasis
-              />
-            )}
+            <StatCard
+              label={value ? valueLabel(value.basis) : "Market value"}
+              value={formatMoney(value?.amountUsd ?? null, money)}
+              note={(value ? valueNote(value) : null) ?? undefined}
+              emphasis
+            />
             <StatCard
               label="30-day change"
               value={formatPercent(figure.change30dPct)}

@@ -6,6 +6,7 @@ import { currentUser } from "@/auth";
 import { FigureCard } from "@/components/figure-card";
 import { getWishlist } from "@/lib/user-queries";
 import { formatMoney } from "@/lib/currency";
+import { figureValue } from "@/lib/figure-value";
 import { getDisplayMoney } from "@/lib/currency-server";
 
 export const metadata: Metadata = {
@@ -19,7 +20,7 @@ export default async function WishlistPage() {
 
   const [items, money] = await Promise.all([getWishlist(user.id), getDisplayMoney()]);
   const total = items.reduce(
-    (sum, item) => sum + Number(item.figure.marketValueUsd ?? 0),
+    (sum, item) => sum + (figureValue(item.figure)?.amountUsd ?? 0),
     0,
   );
 

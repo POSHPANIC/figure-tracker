@@ -3,6 +3,7 @@ import { FigureCardGrid } from "@/components/figure-card";
 import { SearchBox } from "@/components/search-box";
 import { getCatalogTotals, getFacets, getMostTracked, getTopMovers } from "@/lib/queries";
 import { formatMoney, type DisplayMoney } from "@/lib/currency";
+import { figureValue } from "@/lib/figure-value";
 import { getDisplayMoney } from "@/lib/currency-server";
 
 // Note: this page renders dynamically, not statically. The site header reads
@@ -232,7 +233,7 @@ function MoverPrice({
   return (
     <span className="shrink-0 text-right">
       <span className="tabular block text-xs font-medium">
-        {formatMoney(figure.marketValueUsd, money)}
+        {formatMoney(figureValue(figure)?.amountUsd ?? null, money)}
       </span>
       {change !== null && (
         <span className="tabular block text-[10px] opacity-70">

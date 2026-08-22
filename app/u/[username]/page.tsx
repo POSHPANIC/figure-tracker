@@ -59,7 +59,9 @@ export default async function PublicProfilePage({ params }: PageProps<"/u/[usern
             <dd className="tabular text-lg font-semibold">{publicTotals.itemCount}</dd>
           </div>
           <div>
-            <dt className="text-[10px] uppercase tracking-wide text-muted">Collection value</dt>
+            <dt className="text-[10px] uppercase tracking-wide text-muted">
+              {publicTotals.valueBasis === "asking" ? "Estimated value" : "Collection value"}
+            </dt>
             <dd className="tabular text-lg font-semibold">
               {formatMoney(publicTotals.marketValueUsd, money)}
             </dd>

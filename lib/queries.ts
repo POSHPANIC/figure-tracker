@@ -139,6 +139,10 @@ export async function quickSearch(q: string, limit = 8) {
       slug: true,
       name: true,
       marketValueUsd: true,
+      // Selected because market value is null on every figure, so the asking
+      // median is the number a suggestion actually shows.
+      askMedianUsd: true,
+      askListings: true,
       // The franchise, because that is what browsing is by now — a result
       // labelled "Evangelion: 2.0" points at a filter the site no longer
       // offers.

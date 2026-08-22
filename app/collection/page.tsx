@@ -50,7 +50,11 @@ export default async function CollectionPage() {
       ) : (
         <>
           <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
-            <Stat label="Market value" value={formatMoney(totals.marketValueUsd, money)} emphasis />
+            <Stat
+              label={totals.valueBasis === "asking" ? "Estimated value" : "Market value"}
+              value={formatMoney(totals.marketValueUsd, money)}
+              emphasis
+            />
             <Stat label="Total paid" value={formatMoney(totals.paidUsd, money)} />
             <Stat
               label="Gain / loss"
@@ -114,6 +118,10 @@ function serialize(item: Awaited<ReturnType<typeof getCollection>>["items"][numb
       seriesName: item.figure.series?.name ?? null,
       manufacturerName: item.figure.manufacturer?.name ?? null,
       marketValueUsd: item.figure.marketValueUsd?.toString() ?? null,
+      // Carried too, or the row falls back to nothing: market value is null on
+      // every figure and the asking median is the number it actually shows.
+      askMedianUsd: item.figure.askMedianUsd?.toString() ?? null,
+      askListings: item.figure.askListings,
     },
   };
 }

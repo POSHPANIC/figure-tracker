@@ -8,6 +8,7 @@ import { removeFromCollection } from "@/lib/actions/collection";
 import { CONDITION_LABELS } from "@/lib/labels";
 import type { ItemCondition } from "@/lib/generated/prisma/enums";
 import { formatCurrency, toNumber } from "@/lib/money";
+import { figureValue } from "@/lib/figure-value";
 import { formatMoney, type DisplayMoney } from "@/lib/currency";
 import { cn } from "@/lib/utils";
 import { FigureThumb } from "./figure-thumb";
@@ -27,6 +28,8 @@ export type CollectionRowData = {
     seriesName: string | null;
     manufacturerName: string | null;
     marketValueUsd: string | null;
+    askMedianUsd?: string | null;
+    askListings?: number | null;
   };
 };
 
@@ -42,7 +45,9 @@ export function CollectionRow({
   const [confirming, setConfirming] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const value = toNumber(item.figure.marketValueUsd);
+  // Whatever this figure can honestly be valued at — a sold price where one
+  // exists, the asking median otherwise. See lib/figure-value.ts.
+  const value = figureValue(item.figure)?.amountUsd ?? null;
   const paid = toNumber(item.paidAmountUsd);
   const lineValue = value === null ? null : value * item.quantity;
   const linePaid = paid === null ? null : paid * item.quantity;

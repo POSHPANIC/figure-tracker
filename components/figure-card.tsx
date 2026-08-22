@@ -5,9 +5,11 @@ import { formatMoney } from "@/lib/currency";
 import { getDisplayMoney } from "@/lib/currency-server";
 import { CATEGORY_LABELS } from "@/lib/labels";
 import { cn } from "@/lib/utils";
+import { figureValue, valueLabel } from "@/lib/figure-value";
 import { FigureThumb } from "./figure-thumb";
 
 export async function FigureCard({ figure }: { figure: FigureCardData }) {
+  const value = figureValue(figure);
   const trend = trendOf(figure.change30dPct);
   // Server component, so it reads the preference itself rather than having it
   // threaded down through every grid and page that renders a card.
@@ -81,21 +83,17 @@ export async function FigureCard({ figure }: { figure: FigureCardData }) {
             site.
           */}
           <div>
-            {figure.marketValueUsd !== null || figure.askMedianUsd === null ? (
-              <>
-                <p className="term-label">Market value</p>
-                <p className="tabular text-sm font-semibold">
-                  {formatMoney(figure.marketValueUsd, money)}
-                </p>
-              </>
-            ) : (
-              <>
-                <p className="term-label">Asking price</p>
-                <p className="tabular text-sm font-semibold text-muted">
-                  {formatMoney(figure.askMedianUsd, money)}
-                </p>
-              </>
-            )}
+            <p className="term-label">{value ? valueLabel(value.basis, true) : "Market value"}</p>
+            <p
+              className={cn(
+                "tabular text-sm font-semibold",
+                // An asking price is set in the muted tone so a wall of cards
+                // reads as estimates rather than as appraisals.
+                value?.basis === "asking" && "text-muted",
+              )}
+            >
+              {formatMoney(value?.amountUsd ?? null, money)}
+            </p>
           </div>
           {figure.change30dPct !== null && (
             <span

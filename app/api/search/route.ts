@@ -49,6 +49,8 @@ export async function GET(request: Request) {
         slug: r.slug,
         name: r.name,
         marketValueUsd: r.marketValueUsd?.toString() ?? null,
+        askMedianUsd: r.askMedianUsd?.toString() ?? null,
+        askListings: r.askListings,
         series: r.series,
       })),
     },
