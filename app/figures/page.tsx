@@ -9,6 +9,10 @@ import { CATEGORY_ORDER } from "@/lib/labels";
 import type { FigureCategory } from "@/lib/generated/prisma/enums";
 import { cn } from "@/lib/utils";
 
+// TODO: Cache Components adoption. Refactor this route so this opt-out can be removed.
+// See: https://nextjs.org/docs/app/guides/migrating-to-cache-components
+export const instant = false;
+
 export const metadata: Metadata = {
   title: "Browse figures",
   description: "Search and filter anime figures by series, manufacturer, type and price.",

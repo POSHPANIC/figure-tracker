@@ -5,6 +5,10 @@ import { TerminalMark } from "@/components/terminal-mark";
 import { auth, availableProviders, emailSignInAvailable, signIn } from "@/auth";
 import { SITE_NAME } from "@/lib/site";
 
+// TODO: Cache Components adoption. Refactor this route so this opt-out can be removed.
+// See: https://nextjs.org/docs/app/guides/migrating-to-cache-components
+export const instant = false;
+
 export const metadata: Metadata = {
   title: "Sign in",
   description: "Sign in to track your anime figure collection.",

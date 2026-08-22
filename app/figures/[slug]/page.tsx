@@ -1,6 +1,9 @@
 import Link from "next/link";
+import { Suspense } from "react";
+import { cacheLife, cacheTag } from "next/cache";
 import { notFound } from "next/navigation";
 import { after } from "next/server";
+import { headers } from "next/headers";
 import type { Metadata } from "next";
 import { ExternalLink, Flag, PencilLine, Receipt } from "lucide-react";
 import { currentUser } from "@/auth";
@@ -21,8 +24,9 @@ import { ebaySearchUrl } from "@/lib/ebay-search";
 import { goodsmileSearchUrl } from "@/lib/goodsmile-search";
 import { getFigureBySlug, getFigureStats, getPriceHistory } from "@/lib/queries";
 import { getFigureUserState } from "@/lib/user-queries";
+import { getFigureIdBySlug, getFigureImagesBySlug, figureCacheTag } from "@/lib/queries";
 import { formatCurrency, formatPercent, formatUsd, trendOf } from "@/lib/money";
-import { approxAt, formatMoney } from "@/lib/currency";
+import { approxAt, formatMoney, type DisplayMoney } from "@/lib/currency";
 import { getDisplayMoney, historicalMoney } from "@/lib/currency-server";
 import {
   CATEGORY_LABELS,
@@ -33,8 +37,6 @@ import {
 import type { ItemCondition } from "@/lib/generated/prisma/enums";
 import { cn } from "@/lib/utils";
 
-// Renders per-user (collection state, wishlist), so it can't be cached across
-// visitors. The underlying price queries are indexed and cheap.
 const HISTORY_DAYS = 3650;
 
 export async function generateMetadata({
@@ -51,6 +53,14 @@ export async function generateMetadata({
   };
 }
 
+/**
+ * The request-scoped half: everything a cached render is not allowed to see.
+ *
+ * Cookies and the session are read here and handed down, because a cached
+ * component may not touch them. The parts that genuinely differ per visitor —
+ * what they own, whether they can edit images — are passed in as slots, which
+ * pass through the cache without becoming part of its key.
+ */
 export default async function FigurePage({ params, searchParams }: PageProps<"/figures/[slug]">) {
   const { slug } = await params;
   const sp = await searchParams;
@@ -62,24 +72,77 @@ export default async function FigurePage({ params, searchParams }: PageProps<"/f
     ? (requested as ItemCondition)
     : "NEW_SEALED";
 
-  const figure = await getFigureBySlug(slug, condition);
-  if (!figure) notFound();
+  const money = await getDisplayMoney();
 
   // Which figures people actually open decides where the marketplace polling
   // budget goes — see lib/ingest/poll-priority.ts. Deferred with after() so a
-  // page never waits on a counter.
-  after(() => recordFigureView(figure.id));
+  // page never waits on a counter, and keyed by slug so it stays outside the
+  // cached render: a view is per request, not per cache miss.
+  //
+  // The user agent is read here, not in the callback: by the time after() runs
+  // the response is gone and the request's headers with it.
+  const userAgent = (await headers()).get("user-agent");
+  after(() => recordFigureView(slug, userAgent));
+
+  return (
+    <FigureView
+      slug={slug}
+      condition={condition}
+      money={money}
+      actions={
+        <Suspense fallback={<FigureActionsFallback />}>
+          <FigureActionsSlot slug={slug} />
+        </Suspense>
+      }
+      imagesAdmin={
+        <Suspense fallback={null}>
+          <FigureImagesAdminSlot slug={slug} />
+        </Suspense>
+      }
+    />
+  );
+}
+
+/**
+ * The figure itself, cached.
+ *
+ * Everything here is the same for every visitor asking about the same figure in
+ * the same currency, so it is rendered once and reused. That is the entire
+ * point: this route has 7,387 URLs, and re-rendering each of them for every
+ * crawler is what spent three of the four CPU-hours the free tier allows.
+ *
+ * The cache key is the arguments — slug, condition and currency. Anything that
+ * varies per person arrives as a slot instead and is never introspected here.
+ */
+async function FigureView({
+  slug,
+  condition,
+  money,
+  actions,
+  imagesAdmin,
+}: {
+  slug: string;
+  condition: ItemCondition;
+  money: DisplayMoney;
+  actions: React.ReactNode;
+  imagesAdmin: React.ReactNode;
+}) {
+  "use cache";
+  // Prices move when ingestion runs, nightly. An hour is far fresher than the
+  // data behind it and still collapses a crawl into a single render.
+  cacheLife({ stale: 300, revalidate: 3600, expire: 86_400 });
+  cacheTag(figureCacheTag(slug));
+
+  const figure = await getFigureBySlug(slug, condition);
+  if (!figure) notFound();
 
   // The identifiers now carry release numbers as well, so the archive id has to
   // be picked out by kind rather than taken as the first one.
   const archiveId = figure.identifiers.find((i) => i.kind === "GSC_PRODUCT");
 
-  const user = await currentUser();
-  const [history, stats, userState, money] = await Promise.all([
+  const [history, stats] = await Promise.all([
     getPriceHistory(figure.id, condition, HISTORY_DAYS),
     getFigureStats(figure.id, condition),
-    user ? getFigureUserState(user.id, figure.id) : null,
-    getDisplayMoney(),
   ]);
 
   // MSRP is the one price we always show in the currency the manufacturer
@@ -115,7 +178,6 @@ export default async function FigurePage({ params, searchParams }: PageProps<"/f
   const value = figureValue(figure);
 
   const trend = trendOf(figure.change30dPct);
-  const isModerator = user?.role === "MODERATOR" || user?.role === "ADMIN";
   const primaryImage =
     figure.images.find((img) => img.url === figure.primaryImageUrl) ?? null;
 
@@ -308,18 +370,7 @@ export default async function FigurePage({ params, searchParams }: PageProps<"/f
             <h1 className="text-2xl tracking-[0.04em] sm:text-3xl">{figure.name}</h1>
           </header>
 
-          <FigureActions
-            figureId={figure.id}
-            signedIn={user !== null}
-            owned={(userState?.collectionItems ?? []).map((item) => ({
-              id: item.id,
-              quantity: item.quantity,
-              condition: item.condition,
-              paidAmount: item.paidAmount?.toString() ?? null,
-              paidCurrency: item.paidCurrency,
-            }))}
-            onWishlist={Boolean(userState?.wishlistItem)}
-          />
+          {actions}
 
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             {/*
@@ -717,22 +768,73 @@ export default async function FigurePage({ params, searchParams }: PageProps<"/f
             )}
           </section>
 
-          {isModerator && (
-            <FigureImagesAdmin
-              figureId={figure.id}
-              images={figure.images.map((img) => ({
-                id: img.id,
-                url: img.url,
-                credit: img.credit,
-                sourceUrl: img.sourceUrl,
-                licenseNote: img.licenseNote,
-                isPrimary: img.url === figure.primaryImageUrl,
-              }))}
-            />
-          )}
+          {imagesAdmin}
         </div>
       </div>
     </div>
+  );
+}
+
+/**
+ * What this visitor owns, and whether they are signed in.
+ *
+ * Its own component so the rest of the page can be cached across everyone.
+ * Streams in behind a fallback of the same height, so the layout does not move
+ * when it arrives.
+ */
+async function FigureActionsSlot({ slug }: { slug: string }) {
+  const user = await currentUser();
+  const figure = await getFigureIdBySlug(slug);
+  if (!figure) return null;
+
+  const userState = user ? await getFigureUserState(user.id, figure.id) : null;
+
+  return (
+    <FigureActions
+      figureId={figure.id}
+      signedIn={user !== null}
+      owned={(userState?.collectionItems ?? []).map((item) => ({
+        id: item.id,
+        quantity: item.quantity,
+        condition: item.condition,
+        paidAmount: item.paidAmount?.toString() ?? null,
+        paidCurrency: item.paidCurrency,
+      }))}
+      onWishlist={Boolean(userState?.wishlistItem)}
+    />
+  );
+}
+
+/** Reserves the space the actions will occupy, so nothing jumps. */
+function FigureActionsFallback() {
+  return <div aria-hidden className="h-10 rounded-lg border border-border-soft" />;
+}
+
+/**
+ * The image editor, for moderators.
+ *
+ * Checks the session before it reads any images, so the overwhelming majority
+ * of requests — nobody is signed in — cost one session check and no query.
+ */
+async function FigureImagesAdminSlot({ slug }: { slug: string }) {
+  const user = await currentUser();
+  if (user?.role !== "MODERATOR" && user?.role !== "ADMIN") return null;
+
+  const figure = await getFigureImagesBySlug(slug);
+  if (!figure) return null;
+
+  return (
+    <FigureImagesAdmin
+      figureId={figure.id}
+      images={figure.images.map((img) => ({
+        id: img.id,
+        url: img.url,
+        credit: img.credit,
+        sourceUrl: img.sourceUrl,
+        licenseNote: img.licenseNote,
+        isPrimary: img.url === figure.primaryImageUrl,
+      }))}
+    />
   );
 }
 

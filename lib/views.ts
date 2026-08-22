@@ -1,5 +1,4 @@
 import "server-only";
-import { headers } from "next/headers";
 import { prisma } from "./prisma";
 
 /**
@@ -41,14 +40,23 @@ export function looksAutomated(userAgent: string | null): boolean {
  * never wait on bookkeeping. Failures are swallowed for the same reason: a
  * figure page that 500s because a counter could not be written would be a
  * remarkably poor trade.
+ *
+ * Takes the slug rather than the id so it can be called without loading the
+ * figure. The figure page's render is cached; this is not, because a view is
+ * one visit rather than one cache miss, and looking the id up first would put
+ * a query back on every request to avoid a write that mostly does not happen.
+ *
+ * The user agent is passed in rather than read here, because `after()` runs
+ * once the response is gone and the request's headers are no longer available.
+ * Reading them inside the callback throws, and because failures here are
+ * swallowed by design, it threw silently — no views were being counted at all.
  */
-export async function recordFigureView(figureId: string): Promise<void> {
+export async function recordFigureView(slug: string, userAgent: string | null): Promise<void> {
   try {
-    const userAgent = (await headers()).get("user-agent");
     if (looksAutomated(userAgent)) return;
 
     await prisma.figure.update({
-      where: { id: figureId },
+      where: { slug },
       data: { viewCount: { increment: 1 }, lastViewedAt: new Date() },
     });
   } catch (err) {

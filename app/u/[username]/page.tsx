@@ -7,6 +7,10 @@ import { getDisplayMoney } from "@/lib/currency-server";
 import { CONDITION_LABELS } from "@/lib/labels";
 import { SITE_NAME } from "@/lib/site";
 
+// TODO: Cache Components adoption. Refactor this route so this opt-out can be removed.
+// See: https://nextjs.org/docs/app/guides/migrating-to-cache-components
+export const instant = false;
+
 export async function generateMetadata({
   params,
 }: PageProps<"/u/[username]">): Promise<Metadata> {

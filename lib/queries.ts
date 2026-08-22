@@ -311,3 +311,39 @@ export async function getCatalogTotals() {
   ]);
   return { figures, sales, sources };
 }
+
+/**
+ * The cache tag for one figure's page.
+ *
+ * Anything that changes a figure — an import, a moderator edit, an image
+ * change — should revalidate this tag so the cached render is rebuilt rather
+ * than waiting out its hour.
+ */
+export function figureCacheTag(slug: string): string {
+  return `figure:${slug}`;
+}
+
+/**
+ * Just the id, for the parts of a figure page that render per visitor.
+ *
+ * Those run outside the cached render and therefore cannot reuse the figure it
+ * already loaded. This is a single indexed lookup returning one column, which
+ * is much cheaper than either loading the figure twice or giving up caching.
+ */
+export async function getFigureIdBySlug(slug: string): Promise<{ id: string } | null> {
+  return prisma.figure.findUnique({ where: { slug }, select: { id: true } });
+}
+
+/** The images, for the moderator-only editor. Read only once a moderator is known. */
+export async function getFigureImagesBySlug(slug: string) {
+  return prisma.figure.findUnique({
+    where: { slug },
+    select: {
+      id: true,
+      primaryImageUrl: true,
+      images: {
+        select: { id: true, url: true, credit: true, sourceUrl: true, licenseNote: true },
+      },
+    },
+  });
+}

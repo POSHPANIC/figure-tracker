@@ -2,6 +2,10 @@ import type { Metadata } from "next";
 import { Callout, List, ProsePage, Section } from "@/components/prose";
 import { CONTACT_EMAIL, SITE_NAME } from "@/lib/site";
 
+// TODO: Cache Components adoption. Refactor this route so this opt-out can be removed.
+// See: https://nextjs.org/docs/app/guides/migrating-to-cache-components
+export const instant = false;
+
 export const metadata: Metadata = {
   title: "Privacy",
   description: `What ${SITE_NAME} stores, why, and for how long.`,
