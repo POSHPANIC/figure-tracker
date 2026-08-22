@@ -9,6 +9,8 @@
 export type SearchTextParts = {
   name: string;
   nameJa?: string | null;
+  /** The kana reading, so someone typing kana still finds the figure. */
+  nameJaReading?: string | null;
   scale?: string | null;
   manufacturerName?: string | null;
   seriesName?: string | null;
@@ -44,6 +46,7 @@ export function buildSearchText(parts: SearchTextParts): string {
   const terms: (string | null | undefined)[] = [
     parts.name,
     parts.nameJa,
+    parts.nameJaReading,
     parts.scale,
     parts.manufacturerName,
     parts.seriesName,

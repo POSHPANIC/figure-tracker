@@ -58,6 +58,100 @@ export function productUrl(path: string): string {
   return `${GSC_ARCHIVE_ORIGIN}${path}`;
 }
 
+/**
+ * The same product, on the archive's Japanese side.
+ *
+ * The archive is bilingual off one product id, and the Japanese page carries
+ * the name the box actually has: /en/ gives "Nendoroid Endeavor" where /ja/
+ * gives "ねんどろいど エンデヴァー". That distinction matters because a Japanese
+ * seller titles a listing with the latter, so it is what a search against the
+ * secondhand market has to be built from.
+ */
+export function archiveProductUrlJa(productId: string): string {
+  return `${GSC_ARCHIVE_ORIGIN}/ja/product/${productId}/`;
+}
+
+/**
+ * The Japanese product name, and its kana reading, from a /ja/ product page.
+ *
+ * Japanese pages label the row 商品名 rather than "Product Name", and append the
+ * reading in brackets exactly as the English ones do — "ねんどろいど エンデヴァー
+ * (ねんどろいど えんでゔぁー)". The two are separated because they are answers to
+ * different questions: the name is what a listing is titled, the reading is how
+ * it is pronounced, and only the first is worth searching on.
+ *
+ * Returns null when the page has no such row — a 404, or one of the archive's
+ * many non-figure entries — rather than guessing from the title tag, which is
+ * decorated on some pages and not others.
+ */
+/**
+ * Split a Japanese archive name from its kana reading.
+ *
+ * Not the same rule as `splitJapaneseReading`, which handles the English side
+ * and refuses to split when the brackets contain any Latin. That guard is right
+ * there — it protects "(Reissue)" — but wrong here, because these readings
+ * routinely carry a Latin qualifier: "(ねんどろいど しまりん つーりんぐVer.)".
+ *
+ * The archive writes every reading in **hiragana**, even for katakana words —
+ * "ツーリング" becomes "つーりんぐ", "チアキ" becomes "ちあき". So a trailing
+ * bracket is a reading when it has hiragana in it and neither kanji nor
+ * katakana. That distinguishes a reading from a genuine part of the name:
+ * "figma 水着女性body（チアキ）" keeps its katakana suffix, and an English
+ * "(Reissue)" has no hiragana at all.
+ */
+export function splitArchiveReading(raw: string): { name: string; reading: string | null } {
+  const value = raw.trim();
+  // Half-width and full-width outer brackets, each excluding only its own kind
+  // so a nested "（ちあき）" inside a half-width group survives.
+  const m = value.match(/^(.*?)\s*\(([^()]+)\)$/) ?? value.match(/^(.*?)\s*（([^（）]+)）$/);
+  if (!m) return { name: value, reading: null };
+
+  const [, head, inside] = m;
+  if (!head.trim()) return { name: value, reading: null };
+
+  const hasHiragana = /[ぁ-ゟ]/.test(inside);
+  const hasKanji = /[一-鿿]/.test(inside);
+  // U+30FC (ー) is the long-vowel mark and appears in hiragana readings, so it
+  // is deliberately outside this range.
+  const hasKatakana = /[ァ-ヺヽヾ]/.test(inside);
+
+  if (!hasHiragana || hasKanji || hasKatakana) return { name: value, reading: null };
+  return { name: head.trim(), reading: inside.trim() };
+}
+
+/**
+ * The Japanese product name, and its kana reading, from a /ja/ product page.
+ *
+ * Japanese pages label the row 商品名 rather than "Product Name". The name and
+ * the reading are separated because they answer different questions: the name
+ * is what a listing is titled, the reading is how it is pronounced, and only
+ * the first is worth searching on.
+ *
+ * Returns null when the page has no such row — a 404, or one of the archive's
+ * many non-figure entries — rather than guessing from the title tag, which is
+ * decorated on some pages and not others.
+ */
+export function parseJapaneseProductName(
+  html: string,
+): { name: string; reading: string | null } | null {
+  let table: string | null = null;
+  for (const dl of html.matchAll(/<dl[^>]*>([\s\S]*?)<\/dl>/g)) {
+    if (dl[1].includes("商品名")) {
+      table = dl[1];
+      break;
+    }
+  }
+  if (!table) return null;
+
+  for (const row of table.matchAll(/<dt[^>]*>([\s\S]*?)<\/dt>\s*<dd[^>]*>([\s\S]*?)<\/dd>/g)) {
+    if (stripTags(row[1]) !== "商品名") continue;
+    const value = stripTags(row[2]);
+    if (!value) return null;
+    return splitArchiveReading(value);
+  }
+  return null;
+}
+
 // ---------------------------------------------------------------------------
 // What counts as a figure
 // ---------------------------------------------------------------------------

@@ -136,8 +136,17 @@ model Figure {
   id          String         @id @default(cuid())
   slug        String         @unique
   name        String
-  /// Original Japanese name, when we have it — helps match AmiAmi/Mandarake listings.
+  /// The Japanese product name, as the box has it: "ねんどろいど エンデヴァー".
+  /// This is what a Japanese seller titles a listing with, so it is what any
+  /// search against the secondhand market has to be built from.
   nameJa      String?
+  /// The kana reading of that name — "ねんどろいど えんで㔲ぁー".
+  ///
+  /// A pronunciation guide, not a title: nobody writes a listing this way, so
+  /// it must never be used as a search query. It is kept because it feeds
+  /// search — someone typing kana should still find the figure — and because
+  /// early archive imports put it in nameJa, where it looked like a name.
+  nameJaReading String?
   description String?
   category    FigureCategory @default(OTHER)
   status      ReleaseStatus  @default(RELEASED)

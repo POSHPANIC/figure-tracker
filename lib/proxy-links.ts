@@ -64,16 +64,30 @@ type Searchable = {
 };
 
 /**
+ * Is this a kana reading rather than a product name?
+ *
+ * The archive writes readings in hiragana — "ねんどろいど まといりゅうこ" — and
+ * an early import put them in `nameJa`, where they looked like names. They are
+ * pronunciation guides: no seller titles a listing that way, so searching on
+ * one finds close to nothing. `scripts/backfill-japanese-names.ts` moves them
+ * to `nameJaReading`, but this guard means a row it has not reached yet falls
+ * back to the English name instead of producing a link that finds nothing.
+ */
+function isKanaReading(value: string): boolean {
+  return /^[ぁ-ゟー\s・☆★.]+$/.test(value);
+}
+
+/**
  * What to type into a Japanese marketplace's search box.
  *
- * The Japanese name wins whenever we have one, because that is what a Japanese
- * seller writes in a listing title. Searching Yahoo! Auctions for "Nendoroid
- * Usada Pekora" finds a fraction of what "ねんどろいど 兎田ぺこら" finds, and the
- * difference is not marginal.
+ * The Japanese name wins whenever we have a real one, because that is what a
+ * Japanese seller writes in a listing title. Searching Yahoo! Auctions for
+ * "Nendoroid Rin Shima" finds a fraction of what "ねんどろいど 志摩リン" finds,
+ * and the difference is not marginal.
  */
 export function proxySearchQuery(figure: Searchable): string {
   const ja = figure.nameJa?.trim();
-  if (ja) return ja;
+  if (ja && !isKanaReading(ja)) return ja;
   return figure.name.trim();
 }
 

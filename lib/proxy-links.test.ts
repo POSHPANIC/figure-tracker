@@ -106,3 +106,30 @@ describe("affiliate tagging", () => {
     assert.equal(parsed.searchParams.get("ref"), "zen-123");
   });
 });
+
+describe("kana readings are not search queries", () => {
+  it("falls back to English when nameJa is only a hiragana reading", async () => {
+    const { proxySearchQuery } = await load();
+    // What the archive's /en/ import used to store, before the backfill.
+    assert.equal(
+      proxySearchQuery({ name: "Nendoroid Ryuko Matoi", nameJa: "ねんどろいど まといりゅうこ" }),
+      "Nendoroid Ryuko Matoi",
+    );
+  });
+
+  it("uses a real Japanese product name, which carries kanji or katakana", async () => {
+    const { proxySearchQuery } = await load();
+    assert.equal(
+      proxySearchQuery({ name: "Nendoroid Rin Shima", nameJa: "ねんどろいど 志摩リン" }),
+      "ねんどろいど 志摩リン",
+    );
+  });
+
+  it("uses a katakana-only product name", async () => {
+    const { proxySearchQuery } = await load();
+    assert.equal(
+      proxySearchQuery({ name: "Shea Haulia", nameJa: "シア・ハウリア バニーVer." }),
+      "シア・ハウリア バニーVer.",
+    );
+  });
+});

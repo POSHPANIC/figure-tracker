@@ -4,12 +4,14 @@ import {
   classify,
   listingUrl,
   parseHeightMm,
+  parseJapaneseProductName,
   parseListing,
   parsePriceJpy,
   parseProduct,
   parseReleaseDate,
   parseScale,
   rejectedByCategory,
+  splitArchiveReading,
   splitJapaneseReading,
   type GscListItem,
 } from "./gsc";
@@ -404,3 +406,106 @@ describe("a spec field holding an advertisement", () => {
   });
 });
 
+
+describe("splitArchiveReading", () => {
+  // Every string here was served by the archive, not invented.
+  it("splits a plain hiragana reading", () => {
+    assert.deepEqual(splitArchiveReading("ねんどろいど 宇崎花 (ねんどろいど うざきはな)"), {
+      name: "ねんどろいど 宇崎花",
+      reading: "ねんどろいど うざきはな",
+    });
+  });
+
+  it("splits a reading that carries a Latin qualifier", () => {
+    // The English-side splitter refuses this one, which is why there are two.
+    assert.deepEqual(
+      splitArchiveReading("ねんどろいど 志摩リン ツーリングVer. (ねんどろいど しまりん つーりんぐVer.)"),
+      { name: "ねんどろいど 志摩リン ツーリングVer.", reading: "ねんどろいど しまりん つーりんぐVer." },
+    );
+  });
+
+  it("splits a reading containing nested full-width brackets", () => {
+    assert.deepEqual(
+      splitArchiveReading("figma 水着女性body（チアキ） (ふぃぐま みずぎじょせいぼでぃ（ちあき）)"),
+      { name: "figma 水着女性body（チアキ）", reading: "ふぃぐま みずぎじょせいぼでぃ（ちあき）" },
+    );
+  });
+
+  it("keeps a katakana suffix that is part of the name", () => {
+    // No hiragana inside, so it is not a reading — it is what the thing is called.
+    assert.deepEqual(splitArchiveReading("figma 水着女性body（チアキ）"), {
+      name: "figma 水着女性body（チアキ）",
+      reading: null,
+    });
+  });
+
+  it("keeps an English qualifier", () => {
+    assert.deepEqual(splitArchiveReading("ねんどろいど マルス (Reissue)"), {
+      name: "ねんどろいど マルス (Reissue)",
+      reading: null,
+    });
+  });
+
+  it("refuses to split a name that is only a bracketed group", () => {
+    assert.deepEqual(splitArchiveReading("(ねんどろいど うざきはな)"), {
+      name: "(ねんどろいど うざきはな)",
+      reading: null,
+    });
+  });
+
+  it("leaves a name with no brackets alone", () => {
+    assert.deepEqual(splitArchiveReading("ねんどろいど 初音ミク"), {
+      name: "ねんどろいど 初音ミク",
+      reading: null,
+    });
+  });
+
+  it("does not treat a kanji parenthetical as a reading", () => {
+    assert.deepEqual(splitArchiveReading("ねんどろいど 初音ミク (桜ミク)"), {
+      name: "ねんどろいど 初音ミク (桜ミク)",
+      reading: null,
+    });
+  });
+});
+
+describe("parseJapaneseProductName", () => {
+  const page = (rows: string) =>
+    `<dl class="footer"><dt>LINKS</dt><dd>Gift</dd></dl><dl class="spec">${rows}</dl>`;
+
+  it("reads the Japanese name and splits the reading off", () => {
+    const html = page("<dt>商品名</dt><dd>ねんどろいど エンデヴァー (ねんどろいど えんでゔぁー)</dd>");
+    assert.deepEqual(parseJapaneseProductName(html), {
+      name: "ねんどろいど エンデヴァー",
+      reading: "ねんどろいど えんでゔぁー",
+    });
+  });
+
+  it("keeps a name that carries no reading", () => {
+    const html = page("<dt>商品名</dt><dd>ねんどろいど 初音ミク</dd>");
+    assert.deepEqual(parseJapaneseProductName(html), {
+      name: "ねんどろいど 初音ミク",
+      reading: null,
+    });
+  });
+
+  it("does not mistake an English suffix for a reading", () => {
+    const html = page("<dt>商品名</dt><dd>ねんどろいど マルス (Reissue)</dd>");
+    assert.deepEqual(parseJapaneseProductName(html), {
+      name: "ねんどろいど マルス (Reissue)",
+      reading: null,
+    });
+  });
+
+  it("skips the footer list and finds the spec table", () => {
+    const html = page("<dt>発売時期</dt><dd>2019/12</dd><dt>商品名</dt><dd>figma リンク</dd>");
+    assert.deepEqual(parseJapaneseProductName(html), { name: "figma リンク", reading: null });
+  });
+
+  it("returns null on a page with no product table at all", () => {
+    assert.equal(parseJapaneseProductName("<html><body>Not Found</body></html>"), null);
+  });
+
+  it("returns null rather than an empty name when the row is blank", () => {
+    assert.equal(parseJapaneseProductName(page("<dt>商品名</dt><dd>   </dd>")), null);
+  });
+});
