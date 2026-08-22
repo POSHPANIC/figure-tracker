@@ -11,9 +11,11 @@ import {
   XAxis,
   YAxis,
   ReferenceLine,
+  ErrorBar,
 } from "recharts";
 import type { PricePoint } from "@/lib/queries";
 import { formatMoney, type DisplayMoney } from "@/lib/currency";
+import { formatCurrency } from "@/lib/money";
 import { RANGE_OPTIONS } from "@/lib/labels";
 import { cn } from "@/lib/utils";
 
@@ -35,8 +37,16 @@ import { cn } from "@/lib/utils";
 type Props = {
   data: PricePoint[];
   /**
-   * What the manufacturer charged at release, converted for display, or null
-   * where it is unknown.
+   * What the manufacturer charged at release, already converted into the
+   * currency being displayed at the rate of the month it was set. Null where
+   * unknown.
+   *
+   * Converted by the caller rather than here, because it is the one number on
+   * this chart that must not use today's rate. A ¥3,900 figure shown to a
+   * Japanese reader is ¥3,900 — sending it through USD and back at today's
+   * rate returned ¥5,482, a price nobody ever charged. The axis is in dollars,
+   * so the plotted position divides this back out; the label never does, and
+   * the label is the part that makes a claim.
    *
    * Drawn as a flat reference line rather than as the first point of the
    * series. It is not an observation of this market: it is a different price,
@@ -45,7 +55,7 @@ type Props = {
    * measured, and the slope of that invented path is the part a reader would
    * remember.
    */
-  msrp?: { amount: number; label: string } | null;
+  msrpDisplay?: number | null;
   /** Days of history available; used to hide range buttons we can't fill. */
   maxDays: number;
   /**
@@ -67,7 +77,7 @@ function parseDay(date: string): Date {
   return new Date(`${date}T00:00:00`);
 }
 
-export function PriceChart({ data, maxDays, money, msrp }: Props) {
+export function PriceChart({ data, maxDays, money, msrpDisplay }: Props) {
   const [range, setRange] = useState<number>(90);
 
   const visible = useMemo(() => {
@@ -78,6 +88,11 @@ export function PriceChart({ data, maxDays, money, msrp }: Props) {
         ...d,
         // Recharts draws a band when the value is a [low, high] tuple.
         band: d.min !== null && d.max !== null ? ([d.min, d.max] as [number, number]) : null,
+        // ErrorBar wants distances from the point, not absolute bounds.
+        spread:
+          d.median !== null && d.min !== null && d.max !== null
+            ? ([d.median - d.min, d.max - d.median] as [number, number])
+            : null,
       }));
   }, [data, range]);
 
@@ -97,10 +112,14 @@ export function PriceChart({ data, maxDays, money, msrp }: Props) {
     );
   }
 
+  // Where the original price falls on an axis drawn in dollars.
+  const msrpAxis =
+    msrpDisplay != null && money.usdToDisplay > 0 ? msrpDisplay / money.usdToDisplay : null;
+
   const prices = visible.flatMap((d) => [d.min, d.max]).filter((n): n is number => n !== null);
   // The reference line is inside the axis range or it silently vanishes off the
   // top or bottom, which is worse than not drawing it.
-  if (msrp) prices.push(msrp.amount);
+  if (msrpAxis != null) prices.push(msrpAxis);
   const lo = Math.min(...prices);
   const hi = Math.max(...prices);
   const pad = Math.max((hi - lo) * 0.12, 2);
@@ -108,6 +127,10 @@ export function PriceChart({ data, maxDays, money, msrp }: Props) {
   // What the line means, said once above the chart rather than left to the
   // tooltip — most readers never hover.
   const basis = visible.length > 0 ? visible[visible.length - 1].basis : "asking";
+
+  // Too few points for a line or a band to have any extent. History starts the
+  // day a figure is first listed, so this is every figure for the first while.
+  const sparse = visible.length < 3;
 
   return (
     <div>
@@ -132,7 +155,9 @@ export function PriceChart({ data, maxDays, money, msrp }: Props) {
         {basis === "sold"
           ? "Median sold price, with the daily range behind it."
           : "Median asking price across active listings, with the daily range behind it. Nobody has to accept an asking price, so read it as what sellers want rather than what the figure is worth."}
-        {msrp ? ` The dashed line is ${msrp.label}.` : ""}
+        {msrpDisplay != null
+          ? ` The dashed line is the original price, ${formatCurrency(msrpDisplay, money.currency)}.`
+          : ""}
       </p>
 
       <div className="h-72 w-full">
@@ -184,22 +209,38 @@ export function PriceChart({ data, maxDays, money, msrp }: Props) {
                  exactly one — and an empty chart reads as "no data" when the
                  truth is "one day so far". Dots until there are enough points
                  to make a line. */
-              dot={visible.length < 3 ? { fill: "var(--accent)", r: 3 } : false}
+              dot={sparse ? { fill: "var(--accent)", r: 3 } : false}
               activeDot={<SquareDot />}
               isAnimationActive={false}
-            />
-            {msrp && (
+            >
+              {sparse && (
+                /* The shaded band needs two points to have any width, so with
+                   one day of history the range is invisible — and the range is
+                   the more important half of an asking price. A whisker shows
+                   it at a single point: what the cheapest and dearest listing
+                   wanted, not just the middle. */
+                <ErrorBar
+                  dataKey="spread"
+                  stroke="var(--accent)"
+                  strokeWidth={1.5}
+                  width={7}
+                  direction="y"
+                  isAnimationActive={false}
+                />
+              )}
+            </Line>
+            {msrpAxis != null && msrpDisplay != null && (
               /* Flat, dashed, and unconnected to the series on purpose. It is
                  the price the manufacturer set at release — a different market,
                  in a different decade — and it earns its place as context for
                  the level, never as the first point of a trend. */
               <ReferenceLine
-                y={msrp.amount}
+                y={msrpAxis}
                 stroke="var(--muted)"
                 strokeDasharray="4 4"
                 strokeWidth={1}
                 label={{
-                  value: msrp.label,
+                  value: `original price, ${formatCurrency(msrpDisplay, money.currency)}`,
                   position: "insideTopLeft",
                   fill: "var(--muted)",
                   fontSize: 10,

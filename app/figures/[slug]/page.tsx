@@ -451,18 +451,10 @@ async function FigureView({
               data={history}
               maxDays={HISTORY_DAYS}
               money={money}
-              /* Converted the same way the MSRP row above is — at the rate of
-                 the month it was set, not this morning's. A 2011 yen price
-                 converted at today's rate would sit at the wrong height and
-                 quietly misreport how far the figure has moved. */
-              msrp={
-                msrp !== null
-                  ? {
-                      amount: msrp.amount,
-                      label: `original price, ${formatMoney(msrp.amount, money)}`,
-                    }
-                  : null
-              }
+              /* Already converted, at the rate of the month it was set rather
+                 than this morning's — the same number the MSRP row above
+                 shows, so the chart and the specification cannot disagree. */
+              msrpDisplay={msrp?.amount ?? null}
             />
 
             {/*
