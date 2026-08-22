@@ -11,6 +11,7 @@ import { FigureImagesAdmin } from "@/components/figure-images-admin";
 import { FigureThumb } from "@/components/figure-thumb";
 import { PriceChart } from "@/components/price-chart";
 import { StoreMark, isManufacturerStore } from "@/components/store-mark";
+import { proxyLinks, proxyLinkDisclaimer } from "@/lib/proxy-links";
 import { figureValue, valueLabel, valueNote } from "@/lib/figure-value";
 import { withSolarisAffiliate } from "@/lib/solaris-affiliate";
 import { describeAvailability } from "@/lib/ingest/goodsmile-store";
@@ -104,6 +105,11 @@ export default async function FigurePage({ params, searchParams }: PageProps<"/f
 
   // Whether the store link is the maker's own shop or a retailer's.
   const fromManufacturer = figure.storeUrl ? isManufacturerStore(figure.storeUrl) : true;
+
+  // Only where there is no live way to buy it. A figure still on sale should
+  // send the reader to the shop, not to the used market.
+  const secondhand =
+    !figure.storeUrl || figure.storeAvailable === false ? proxyLinks(figure) : [];
 
   // The one number this page can honestly state, and what it rests on.
   const value = figureValue(figure);
@@ -475,6 +481,37 @@ export default async function FigurePage({ params, searchParams }: PageProps<"/f
                 </a>
                 .
               </p>
+            )}
+            {secondhand.length > 0 && (
+              /* For the 96% of the catalogue no shop sells any more. A proxy
+                 service is the only route an overseas collector has to the
+                 Japanese secondhand market, and until now these pages sent them
+                 nowhere at all.
+
+                 Deliberately not shown next to a figure that can still be
+                 ordered: sending someone to the used market for something in
+                 production is worse advice than showing nothing.
+
+                 Labelled as a search, and said out loud, because a link sitting
+                 under a price reads as "for sale, at that price" unless it is
+                 told not to. We have not checked either half. */
+              <div className="mt-4 border-t border-border pt-3">
+                <p className="term-label">Buy secondhand</p>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {secondhand.map((link) => (
+                    <a
+                      key={link.service}
+                      href={link.url}
+                      target="_blank"
+                      rel="nofollow noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs font-medium transition hover:border-foreground"
+                    >
+                      Search {link.label} <ExternalLink className="size-3 text-muted" />
+                    </a>
+                  ))}
+                </div>
+                <p className="mt-2 text-xs text-muted">{proxyLinkDisclaimer}</p>
+              </div>
             )}
           </section>
 
