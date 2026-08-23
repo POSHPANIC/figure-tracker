@@ -198,7 +198,7 @@ export async function getFigureBySlug(slug: string, condition?: ItemCondition) {
         // rather than open so a retailer SKU never leaks onto a public page —
         // KOTOBUKIYA_SKU and the rest are our plumbing, not the product's
         // identity.
-        where: { kind: { in: ["GSC_PRODUCT", "NENDOROID_NO", "FIGMA_NO", "JAN"] } },
+        where: { kind: { in: ["GSC_PRODUCT", "NENDOROID_NO", "FIGMA_NO", "JAN", "UPC"] } },
         select: { kind: true, value: true },
       },
       listings: {

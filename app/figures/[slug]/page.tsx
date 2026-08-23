@@ -210,10 +210,15 @@ async function FigureView({
     return `${id.kind === "FIGMA_NO" ? "figma" : "Nendoroid"} ${id.value}`;
   })();
 
-  // The barcode. Shown where we have it, which is rarely — it comes from
-  // retailer feeds that publish gtin13, and most of the catalogue was imported
-  // from an archive that never carried one.
+  // The barcode, and which one it is.
+  //
+  // A JAN is the Japanese release's barcode; a UPC is the American one. They
+  // are different numbers for what a collector thinks of as the same figure,
+  // and searching a Japanese marketplace for a UPC finds nothing. So they get
+  // separate rows rather than a shared "Barcode" label that would quietly
+  // invite the reader to use the wrong one.
   const jan = figure.identifiers.find((i) => i.kind === "JAN")?.value ?? null;
+  const upc = figure.identifiers.find((i) => i.kind === "UPC")?.value ?? null;
 
   const [history, stats] = await Promise.all([
     getPriceHistory(figure.id, condition, HISTORY_DAYS),
@@ -419,6 +424,11 @@ async function FigureView({
             {jan && (
               <Spec label="JAN">
                 <span className="tabular">{jan}</span>
+              </Spec>
+            )}
+            {upc && (
+              <Spec label="UPC">
+                <span className="tabular">{upc}</span>
               </Spec>
             )}
           </dl>
