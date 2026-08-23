@@ -145,10 +145,34 @@ export async function runAggregation(forDay?: Date): Promise<AggregateResult> {
  * Dated today rather than yesterday, unlike the sales it sits beside. A sale
  * happened on a day; an asking price is what we can see at the moment we look.
  *
- * One statement for the whole catalogue.
+ * Idempotent for the day: the day's asking figures are cleared first, so
+ * re-running never leaves a figure holding numbers it no longer earns.
+ *
+ * Three statements for the whole catalogue.
  */
 export async function writeAskSnapshots(forDay?: Date): Promise<number> {
   const day = startOfUtcDay(forDay ?? new Date());
+
+  // Clear the day's asking figures before writing them.
+  //
+  // INSERT ... ON CONFLICT only touches rows the query produces, so a figure
+  // that stops qualifying — its listings sold, or were found not to be its
+  // listings at all — kept whichever numbers it had when it last did. Nendoroid
+  // Racing Miku 2019 sat at a median of $15 from two keychain bundles for a
+  // whole day after those were taken off it, because nothing ever went back to
+  // remove the row.
+  //
+  // Two statements rather than one because a row can also carry sales: those
+  // are deleted only when the asking figures were all it held.
+  await prisma.$executeRaw`
+    UPDATE "PriceSnapshot"
+    SET "askMinUsd" = NULL, "askMedianUsd" = NULL, "askMaxUsd" = NULL,
+        "askCount" = NULL, "lowestAskUsd" = NULL
+    WHERE date = ${day}::date AND "medianUsd" IS NOT NULL
+  `;
+  await prisma.$executeRaw`
+    DELETE FROM "PriceSnapshot" WHERE date = ${day}::date AND "medianUsd" IS NULL
+  `;
 
   return prisma.$executeRaw`
     INSERT INTO "PriceSnapshot" (
