@@ -175,6 +175,26 @@ export function SiteFooter() {
               <FooterLink href="/figures">Browse figures</FooterLink>
               <Sep />
               <FooterLink href="/feedback">Feedback</FooterLink>
+              <Sep />
+              {/*
+                Sovrn verification. They confirm a publisher owns a site by
+                requiring one of their links on it, clicked once from a real
+                browser — so this is a real affiliate link and is marked as
+                one: rel="sponsored" is what Google asks for a paid link, and
+                nofollow keeps it out of the ranking it would otherwise pass.
+
+                Delete this once the account is verified. It is scaffolding,
+                not a feature, and a single product link in a footer is not
+                something a reader has any use for.
+              */}
+              <a
+                href="https://sovrn.co/1h4rco7"
+                target="_blank"
+                rel="nofollow sponsored noopener noreferrer"
+                className="term-item px-2 py-1 text-[11px] uppercase tracking-[0.14em] text-muted hover:text-background"
+              >
+                AmiAmi
+              </a>
             </nav>
 
             <div className="term-rule mt-5 pt-4">
@@ -183,8 +203,21 @@ export function SiteFooter() {
                   Public marketplace listings, aggregated. Values are estimates,
                   not appraisals.
                 </Readout>
+                {/*
+                  This used to say "None. Not connected to any manufacturer or
+                  retailer." That was true when it was written and stopped being
+                  true the moment a link on this site started earning a
+                  commission — which is a thing a reader is entitled to be told,
+                  and in the US a thing the FTC requires be told.
+
+                  The second sentence is the part that matters. A price guide
+                  that ranked by commission would be worthless, and saying so
+                  plainly is cheaper than being asked.
+                */}
                 <Readout term="Affiliation">
-                  None. Not connected to any manufacturer or retailer.
+                  Some outbound links earn a commission. It costs you nothing,
+                  and it never affects which figures are listed or how they are
+                  ranked.
                 </Readout>
                 <Readout term="Contact">{CONTACT_EMAIL}</Readout>
                 <Readout term="Build">
