@@ -10,6 +10,7 @@ trouble, so read it before flipping anything on in production.
 | **eBay Browse API** | Active listings (lowest ask, live inventory) | Implemented | None — official, free |
 | **eBay Marketplace Insights** | Real *sold* prices, last 90 days | **Refused, 2026-08-19** — partners only | — |
 | **AmiAmi** | Retail + preorder prices, MSRP, JPY | **Blocked by Cloudflare** — affiliate route only | — |
+| **HobbySearch (1999.co.jp)** | MSRP *separate from* shop price, JAN | **Blocked by Cloudflare** — robots.txt permits us, their edge does not | — |
 | **Community reports** | User-submitted sale prices | **Removed** — see below | — |
 | **MyFigureCollection** | Best catalog data anywhere | Not implemented | **Their ToS forbids scraping** |
 | **Mandarake / Suruga-ya / Yahoo Auctions** | Deep Japanese secondary market | Ruled out — see below | Blocked or disallowed, and asking prices rather than sales |
@@ -660,3 +661,45 @@ once a month, with nothing in the logs to show for it.
 - Don't reproduce manufacturer product photography without permission.
 - If you add affiliate links (eBay Partner Network is the obvious one), you must
   disclose it.
+
+## HobbySearch (1999.co.jp)
+
+The best-shaped source this project found, and the one it cannot read.
+
+They publish the manufacturer's list price *separately from their own* —
+
+```
+List Price   3,960 JPY     <- the maker's price
+Sales Price  3,600 JPY     <- what the shop charges
+```
+
+— which no other retailer does, and their `gtin13` is a JAN, so it joins to
+everything else. It is the source that could undo the Kotobukiya compromise of
+US retail dollars sitting in `msrpAmount` where every other row holds yen.
+
+**Their robots.txt permits it.** Nothing is disallowed, and the only
+`Crawl-Delay` entries name search engines; `User-agent: *` carries none.
+
+**Their edge refuses it anyway.** Every request from this codebase gets a
+Cloudflare challenge — `server: cloudflare`, a `cf-ray` header, "Just a
+moment..." in the body. It arrives on the first request of the day as readily as
+the tenth, which is not what a rate limiter does.
+
+This was misdiagnosed for weeks as rate limiting, because the 403s moved between
+categories in a way that looked like an allowance being tripped, and because
+robots.txt has 60-second delays in it for other crawlers. The nightly job was
+set to wait sixty seconds and reported "they asked us to slow down". They had
+not. It read nothing on any night it ever ran.
+
+What settled it: curl fetches the same URL from the same machine, seconds apart
+from a failing run, and gets 200 with 411KB of HTML. The refusal is of the
+client, not the address and not the pace.
+
+**There is nothing legitimate left to try in code.** Making the client look like
+a browser to pass a challenge is circumventing bot protection, and the fact that
+an honest user agent is what draws the challenge does not change that.
+
+The only route is to ask. robots.txt says we are welcome, so their Cloudflare
+setting is far more likely a blanket default than a decision about us — which is
+a reasonable thing to raise with them, and a reasonable thing for them to
+change. Until then the step is a nightly no-op and should be treated as one.

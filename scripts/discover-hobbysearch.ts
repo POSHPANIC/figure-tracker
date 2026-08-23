@@ -37,17 +37,23 @@ const APPLY = process.argv.includes("--yes");
 /**
  * How long to wait between requests.
  *
- * Their robots.txt asks several named crawlers for 60 seconds. An earlier
- * version of this treated that as a rule aimed at search engines and used two
- * and a half seconds — and they answered 403. Not for one category but for
- * whichever request came too soon: a category that had just returned 200
- * started refusing, and the one that had refused returned 200 after a wait.
- * They enforce it, and the polite reading was the correct one.
+ * This number no longer decides anything, and the reasoning that produced it
+ * was wrong. It was set to sixty seconds on the theory that the 403s were rate
+ * limiting — their robots.txt asks several named crawlers to wait that long,
+ * and the refusals moved around in a way that looked like an allowance being
+ * tripped.
  *
- * So this waits the sixty seconds they ask for. Twenty was tried and still
- * tripped it — the allowance is tight and the cooldown is long. Ten products a
- * night at a minute apart is ten minutes of somebody else's server, and a
- * rotation does not need to be quick: it needs to still be welcome in a month.
+ * They are not rate limiting. The response is a Cloudflare challenge page:
+ * `server: cloudflare`, a cf-ray header, and "Just a moment..." in the body.
+ * It arrives on the first request of the night, twenty-four hours after the
+ * last one, which no rate limiter would do.
+ *
+ * Proof it is the client rather than the address: curl fetches the same URL
+ * from the same machine, seconds apart, and gets 200 with 411KB of HTML. What
+ * Cloudflare refuses is this process — its TLS handshake, not its manners.
+ *
+ * Left at sixty because if access is ever restored it is the right neighbourly
+ * default for a rotation that has weeks to finish.
  */
 const REQUEST_DELAY_MS = Number(process.env.HOBBYSEARCH_DELAY_MS ?? "60000");
 
@@ -84,7 +90,9 @@ async function fetchPage(url: string): Promise<Fetched> {
   const timer = setTimeout(() => controller.abort(), 30_000);
   try {
     const res = await fetch(url, { headers: { "user-agent": USER_AGENT }, signal: controller.signal });
-    // 403 is them asking us to slow down, not a missing page. Backing off and
+    // 403 here is a Cloudflare challenge, not a missing page and not a rate
+    // limit. Stopping is still the right response: there is nothing to retry
+    // into and nothing this process can honestly do about it.
     // stopping is the only correct answer; retrying harder is how a source
     // stops being available at all.
     if (res.status === 403 || res.status === 429) return { refused: true };

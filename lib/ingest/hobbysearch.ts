@@ -13,11 +13,21 @@
  * this is the source that can undo it. Their gtin13 is a JAN, so it joins to
  * everything else.
  *
- * robots.txt disallows nothing. It does ask several named crawlers to wait 60
- * seconds between requests, which is a search engine being asked not to spider
- * the whole site; this reads a few dozen pages a night and waits a few seconds
- * between them, which is proportionate to that signal rather than to the letter
- * of a rule that does not apply to us.
+ * robots.txt disallows nothing, and the only Crawl-Delay entries are for named
+ * search engines — `User-agent: *` carries no delay at all. By their stated
+ * policy we are welcome.
+ *
+ * Their edge disagrees. Every request from this codebase is answered with a
+ * Cloudflare challenge page, on the first attempt of the day as readily as the
+ * tenth. curl fetches the same URL from the same machine and gets 200, so what
+ * is refused is the client, not the address or the pace.
+ *
+ * Which leaves nothing legitimate to do here. Making the client look like a
+ * browser to get past a challenge is circumventing bot protection, and the fact
+ * that the honest user agent is what draws the challenge does not change that.
+ * The parser stays because the source is worth having if access is ever agreed
+ * — they publish the manufacturer's list price separately from their own, which
+ * nobody else does — but it is not reading anything today.
  */
 
 export const ORIGIN = "https://www.1999.co.jp";
