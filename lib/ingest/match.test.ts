@@ -523,6 +523,59 @@ describe("normalizeCondition", () => {
   });
 });
 
+describe("a maker named in the title", () => {
+  const scaleFigure = (maker: string): MatchCandidate => ({
+    id: "rem",
+    name: "Rem",
+    nameJa: null,
+    category: "SCALE",
+    lineNumber: null,
+    scale: "1/7",
+    manufacturerName: maker,
+    seriesName: "Re:Zero",
+    characterNames: ["Rem"],
+    characterNamesJa: [],
+  });
+
+  it("rejects a prize maker's figure of the same character", () => {
+    // The reported bug: 27 FuRyu prize figures at ~$25 were attached to a $390
+    // PRISMA WING statue, which made its asking price $29.
+    const rem = scaleFigure("WING");
+    assert.equal(
+      scoreMatch("Re:Zero BiCute Pure Rem Figure Little Wings Ver. FuRyu *US SELLER*", rem),
+      0,
+    );
+  });
+
+  it("keeps the figure's own listings", () => {
+    const rem = scaleFigure("WING");
+    assert.ok(scoreMatch("PRISMA WING Re:Zero Rem Glass Edition 1/7 Scale Figure", rem) >= 0.8);
+  });
+
+  it("does not match a maker's name inside a longer word", () => {
+    // "wing" is a substring of "wings", and that alone was worth +0.15 — the
+    // bonus that carried those prize figures over the asking-price threshold.
+    const rem = scaleFigure("WING");
+    const withoutMaker = scoreMatch("Re:Zero Rem Figure Little Wings Ver. Anime", rem);
+    const withMaker = scoreMatch("Re:Zero Rem PRISMA WING 1/7 Figure", rem);
+    assert.ok(withMaker > withoutMaker, `${withMaker} should beat ${withoutMaker}`);
+  });
+
+  it("still matches a Max Factory figure credited to Good Smile", () => {
+    // They are one house and sellers credit whichever name they noticed.
+    // A rule that broke this would cost far more than it saved.
+    const figma: MatchCandidate = {
+      id: "f350", name: "figma Saber/Altria Pendragon [Lily]", nameJa: null,
+      category: "FIGMA", lineNumber: "350", scale: null,
+      manufacturerName: "Max Factory", seriesName: "Fate/Grand Order",
+      characterNames: ["Altria Pendragon"], characterNamesJa: [],
+    };
+    assert.ok(
+      scoreMatch("Good Smile Company figma 350 Saber Altria Pendragon Lily", figma) >= 0.72,
+    );
+  });
+});
+
 describe("bundles priced by their cheapest item", () => {
   it("rejects a keychain bundle sold as set or singles", () => {
     // The reported bug. Two of these, at $15, were the published asking price
@@ -796,5 +849,35 @@ describe("isNotAFigure, books and volumes", () => {
     // "Nendoroid", which is the whole reason the second rule exists.
     assert.equal(isNotAFigure("Nendoroid More: Face Swap Vol.1"), false);
     assert.equal(isNotAFigure("figma Styles Vol. 2 Bicycle"), false);
+  });
+});
+
+describe("maker names that are also something else", () => {
+  const nendo = (name: string, character: string): MatchCandidate => ({
+    id: name, name, nameJa: null, category: "NENDOROID", lineNumber: null,
+    scale: null, manufacturerName: "Good Smile Company", seriesName: null,
+    characterNames: [character], characterNamesJa: [],
+  });
+
+  it("does not reject a character whose name is a maker's", () => {
+    // Alter makes figures. Saber Alter is a character, and a first version of
+    // the rival-maker rule threw away every listing naming her.
+    const saber = nendo("Nendoroid Saber Alter: Super Movable Edition", "Saber");
+    assert.ok(
+      scoreMatch("Saber Alter Super Movable Edition Nendoroid 363 Fate Good Smile", saber) > 0,
+    );
+  });
+
+  it("does not reject a franchise whose name is a maker's", () => {
+    // Apex is a maker; Apex Legends is the game.
+    const wraith = nendo("Nendoroid Wraith", "Wraith");
+    assert.ok(scoreMatch("Nendoroid Wraith Apex Legends PVC Figure GoodSmile", wraith) > 0);
+  });
+
+  it("recognises the figure's own maker under a nickname", () => {
+    // "GoodSmile" is one token where "good smile company" is three. Without the
+    // aliases this reads as a title naming no maker at all.
+    const wraith = nendo("Nendoroid Wraith", "Wraith");
+    assert.ok(scoreMatch("Nendoroid Wraith GoodSmile Game Series FuRyu shop", wraith) > 0);
   });
 });

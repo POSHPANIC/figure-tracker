@@ -214,6 +214,92 @@ const NON_FIGURE_PHRASES = [
   "choose one",
 ];
 
+/**
+ * Makers that appear on each other's boxes.
+ *
+ * Good Smile distributes Max Factory, Phat!, FREEing and ORANGE ROUGE, and
+ * sellers credit whichever name they noticed — "Good Smile Company figma
+ * Saber" is routine for a Max Factory product. Treating those as one house is
+ * what lets a title naming the wrong one of them still match.
+ */
+const MAKER_HOUSES: string[][] = [
+  [
+    "good smile company",
+    "max factory",
+    "freeing",
+    "orange rouge",
+    "phat!",
+    "good smile arts shanghai",
+    "goodsmile racing",
+  ],
+];
+
+/**
+ * Makers whose name in a title means the product is theirs.
+ *
+ * Mostly prize and gashapon makers, which is the point: they produce cheap
+ * figures of the same characters, and their listings were landing on scale
+ * figures worth twenty times as much. Twenty-seven FuRyu "BiCute Pure" prize
+ * figures at $25 were attached to a $390 PRISMA WING statue of Rem.
+ *
+ * Includes makers this catalogue does not stock, because that is exactly when
+ * the signal is most useful — nothing else in the title says the product is
+ * somebody else's.
+ */
+const RIVAL_MAKERS = [
+  "furyu", "banpresto", "taito", "megahouse", "kaiyodo", "aniplex",
+  "union creative", "quesq", "emontoys", "pulchra", "estream", "hobby max",
+];
+
+/**
+ * Names deliberately left out of that list, because they are also something
+ * else and rejecting on them costs far more than it saves.
+ *
+ * A first version included them, and a dry run over 130,602 listings put the
+ * price of that at 1,059 discarded matches — among them "Saber Alter ...
+ * Nendoroid 363" and "Nendoroid Wraith Apex Legends", both real figures.
+ *
+ *   alter    — Alter makes figures, and Saber Alter, Jeanne Alter and Altria
+ *              Alter are characters this catalogue is full of.
+ *   apex     — Apex is a maker; Apex Legends is the game a Nendoroid is of.
+ *   sega     — appears as often crediting the licensor of a game as the maker.
+ *   bandai   — same, through Bandai Namco.
+ *   revolve, f:nex, fots, reverse studio — too rare to be worth the ambiguity.
+ *
+ * The rule is only worth having while it is nearly always right. A maker name
+ * that is also a character name is not that.
+ */
+
+/**
+ * A maker named in the title that could not have made this figure.
+ *
+ * Only fires when the title names one of the makers above *and* does not name
+ * this figure's own house. A title crediting both is a seller covering their
+ * bases, not a different product.
+ */
+function namesARivalMaker(titleTokens: Set<string>, normalizedTitle: string, own: string | null): boolean {
+  const canonical = own?.toLowerCase() ?? null;
+  const ownHouse = canonical
+    ? (MAKER_HOUSES.find((h) => h.includes(canonical)) ?? [canonical])
+    : [];
+
+  // Under any spelling a seller uses. "GoodSmile" is one token and "good smile
+  // company" is three, so without the aliases a Good Smile figure looks to this
+  // check like one with no maker named at all.
+  const ownForms = ownHouse.flatMap((m) => [m, ...(MAKER_ALIASES[m] ?? [])]);
+  if (ownForms.some((m) => tokensPresent(titleTokens, m))) return false;
+
+  return RIVAL_MAKERS.some(
+    (m) => !ownHouse.includes(m) && (m.includes(" ") ? normalizedTitle.includes(m) : titleTokens.has(m)),
+  );
+}
+
+/** Every token of `phrase` present in the title. */
+function tokensPresent(titleTokens: Set<string>, phrase: string): boolean {
+  const parts = tokenize(phrase);
+  return parts.size > 0 && [...parts].every((t) => titleTokens.has(t));
+}
+
 /** Manufacturer nicknames sellers actually type. */
 const MAKER_ALIASES: Record<string, string[]> = {
   "good smile company": ["gsc", "goodsmile", "good smile"],
@@ -576,6 +662,12 @@ export function scoreMatch(title: string, figure: MatchCandidate): number {
   const titleLineNumber = canonicalLineNumber(extractLineNumber(title));
   const numberIdentifies = figureLineNumber !== null && titleLineNumber === figureLineNumber;
 
+  // --- Gate 3b: a maker named in the title has to be a plausible one. ---
+  // The manufacturer equivalent of the line gate above. A title saying FuRyu
+  // is a FuRyu product, and no amount of the character and series agreeing
+  // makes it this one.
+  if (namesARivalMaker(titleTokens, normalize(title), figure.manufacturerName)) return 0;
+
   // --- Gate 4: every distinguishing word must be present. ---
   // This is what stops "Marin Kitagawa Race Queen Ver." matching "Marin
   // Kitagawa Swimsuit Ver." — same character, series, scale and maker, but the
@@ -638,11 +730,22 @@ export function scoreMatch(title: string, figure: MatchCandidate): number {
   }
 
   // Manufacturer, including the nicknames sellers use.
+  //
+  // Matched on whole tokens rather than as a substring. A maker called WING was
+  // finding itself inside "Little Wings Ver." and collecting this bonus on
+  // every FuRyu prize figure of the same character — which put twenty-seven $25
+  // listings on a $390 statue and made its asking price $29.
+  //
+  // Every token of the form has to be present, so "good smile" still matches a
+  // title saying "Good Smile Company" while "wing" no longer matches "wings".
   if (figure.manufacturerName) {
     const canonical = figure.manufacturerName.toLowerCase();
     const forms = [canonical, ...(MAKER_ALIASES[canonical] ?? [])];
-    const normalizedTitle = normalize(title);
-    if (forms.some((f) => normalizedTitle.includes(f))) score += 0.15;
+    const named = forms.some((form) => {
+      const formTokens = tokenize(form);
+      return formTokens.size > 0 && [...formTokens].every((t) => titleTokens.has(t));
+    });
+    if (named) score += 0.15;
   }
 
   // Series name, under any of its titles. A listing saying "Sono Bisque Doll"
