@@ -7,6 +7,7 @@ import {
   descriptorTokens,
   extractLineNumber,
   isNotAFigure,
+  isNotASingleFigure,
   normalizeCondition,
   scoreMatch,
   tokenize,
@@ -519,6 +520,38 @@ describe("normalizeCondition", () => {
     assert.equal(normalizeCondition("Pre-owned"), "USED_COMPLETE");
     assert.equal(normalizeCondition("For parts or not working"), "DAMAGED");
     assert.equal(normalizeCondition(null), "UNKNOWN");
+  });
+});
+
+describe("bundles priced by their cheapest item", () => {
+  it("rejects a keychain bundle sold as set or singles", () => {
+    // The reported bug. Two of these, at $15, were the published asking price
+    // of a Nendoroid — the $15 buys one keychain, and the listing says so.
+    assert.equal(
+      isNotASingleFigure("Hatsune Miku Goodsmile Racing 2019 Nendoroid + Rubber Keychains *Set or Singles*"),
+      true,
+    );
+  });
+
+  it("recognises a plural accessory", () => {
+    // The markers were written in the singular, so every plural walked past
+    // them. Sellers write "Keychains".
+    assert.equal(isNotASingleFigure("Marin Kitagawa Rubber Keychains"), true);
+    assert.equal(isNotASingleFigure("Marin Kitagawa Posters"), true);
+    assert.equal(isNotASingleFigure("Marin Kitagawa Badges"), true);
+  });
+
+  it("rejects a listing that lets the buyer pick which item", () => {
+    assert.equal(isNotASingleFigure("Nendoroid 1935 Marin Kitagawa Your Choice"), true);
+    assert.equal(isNotASingleFigure("Racing Miku Nendoroid Singles or Set"), true);
+  });
+
+  it("still accepts a figure that merely comes with something", () => {
+    // The whole risk of widening this: "with Poster" is a figure, "Poster" is
+    // a poster, and the plural must not blur that.
+    assert.equal(isNotASingleFigure("Nendoroid Marin Kitagawa with Poster"), false);
+    assert.equal(isNotASingleFigure("Nendoroid Marin Kitagawa includes posters"), false);
+    assert.equal(isNotASingleFigure("Nendoroid 1100 Racing Miku 2019 Ver."), false);
   });
 });
 

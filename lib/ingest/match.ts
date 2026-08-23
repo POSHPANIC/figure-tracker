@@ -202,6 +202,16 @@ const NON_FIGURE_PHRASES = [
   "for parts",
   "display case",
   "acrylic stand",
+  // A seller offering "Set or Singles" is quoting the cheapest thing in the
+  // photograph, and it is not the figure. The listing is real and the price is
+  // real; what is not real is the connection between them.
+  "set or single",
+  "or singles",
+  "singles or set",
+  // Same idea, said the other way round.
+  "your choice",
+  "pick one",
+  "choose one",
 ];
 
 /** Manufacturer nicknames sellers actually type. */
@@ -275,7 +285,12 @@ export function namesSomethingOtherThanAFigure(normalizedTitle: string): boolean
   const words = normalizedTitle.split(/[\s/.-]+/).filter(Boolean);
 
   return words.some((word, i) => {
-    if (!NON_FIGURE_MARKERS.has(word)) return false;
+    // Sellers list "Rubber Keychains", not "Rubber Keychain". The set is
+    // written in the singular, so every plural walked straight past it — which
+    // is how a $15 keychain bundle came to be the published asking price of a
+    // Nendoroid.
+    const singular = word.endsWith("s") ? word.slice(0, -1) : word;
+    if (!NON_FIGURE_MARKERS.has(word) && !NON_FIGURE_MARKERS.has(singular)) return false;
     // Look back two words: "with poster", "comes with poster".
     const before = [words[i - 1], words[i - 2]].filter(Boolean) as string[];
     return !before.some((w) => BONUS_PREFIXES.has(w));
