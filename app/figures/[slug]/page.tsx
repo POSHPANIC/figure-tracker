@@ -726,50 +726,6 @@ async function FigureView({
                     const isEbay = l.source.key === "ebay";
                     return (
                       <li key={l.id} className="flex items-center gap-3 py-2.5">
-                        {/*
-                          The seller's own photograph, hotlinked from the
-                          marketplace and wrapped in a link to the listing it
-                          belongs to. That pairing is the condition the terms
-                          attach — the image is permitted as part of showing
-                          somebody that listing, not as a picture of the
-                          product.
-                          
-                          Which is also why it is not reused as the figure's
-                          catalogue photo, however tempting 130,000 of them
-                          are. This listing will end and take its photograph
-                          with it; a product shot cannot be something that
-                          disappears when somebody's auction closes. See
-                          docs/PRESS_IMAGES.md.
-                          
-                          Lazy because there are twelve of these below the
-                          fold, and no fixed dimensions because the hosts serve
-                          whatever aspect the seller uploaded.
-                        */}
-                        <a
-                          href={withAffiliate(l.url, "figure-listing")}
-                          target="_blank"
-                          rel="noopener noreferrer nofollow"
-                          tabIndex={-1}
-                          aria-hidden
-                          className="shrink-0"
-                        >
-                          <span className="flex size-11 items-center justify-center overflow-hidden rounded border border-border bg-surface-2">
-                            {l.imageUrl ? (
-                              // eslint-disable-next-line @next/next/no-img-element -- marketplace CDNs, hotlinked on purpose
-                              <img
-                                src={l.imageUrl}
-                                alt=""
-                                loading="lazy"
-                                decoding="async"
-                                className="size-full object-cover"
-                              />
-                            ) : (
-                              <span aria-hidden className="text-[10px] text-muted">
-                                —
-                              </span>
-                            )}
-                          </span>
-                        </a>
                         <span className="min-w-0 flex-1">
                           {/*
                             The title is the link. It is also the thing a reader
