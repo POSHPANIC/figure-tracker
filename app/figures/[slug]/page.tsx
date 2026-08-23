@@ -198,6 +198,23 @@ async function FigureView({
   // be picked out by kind rather than taken as the first one.
   const archiveId = figure.identifiers.find((i) => i.kind === "GSC_PRODUCT");
 
+  // The number printed on the box — "Nendoroid 1935", "figma EX-038". Written
+  // with its line, because the number alone means nothing: 350 is a different
+  // product depending on whether it is a Nendoroid or a figma.
+  const releaseNumber = (() => {
+    const id = figure.identifiers.find(
+      (i) => i.kind === "NENDOROID_NO" || i.kind === "FIGMA_NO",
+    );
+    if (!id) return null;
+    // figma is lowercase on the box and everywhere else on this site.
+    return `${id.kind === "FIGMA_NO" ? "figma" : "Nendoroid"} ${id.value}`;
+  })();
+
+  // The barcode. Shown where we have it, which is rarely — it comes from
+  // retailer feeds that publish gtin13, and most of the catalogue was imported
+  // from an archive that never carried one.
+  const jan = figure.identifiers.find((i) => i.kind === "JAN")?.value ?? null;
+
   const [history, stats] = await Promise.all([
     getPriceHistory(figure.id, condition, HISTORY_DAYS),
     getFigureStats(figure.id, condition),
@@ -364,6 +381,7 @@ async function FigureView({
               )}
             </Spec>
             <Spec label="Type">{CATEGORY_LABELS[figure.category]}</Spec>
+            {releaseNumber && <Spec label="Number">{releaseNumber}</Spec>}
             {figure.scale && <Spec label="Scale">{figure.scale}</Spec>}
             {figure.heightMm && <Spec label="Height">{figure.heightMm} mm</Spec>}
             <Spec label="Released">
@@ -395,6 +413,14 @@ async function FigureView({
                 "—"
               )}
             </Spec>
+            {/* Last, and only where we hold one. It is the barcode on the box —
+                useful for searching a Japanese marketplace, useless to read,
+                and absent from nearly every entry the archive gave us. */}
+            {jan && (
+              <Spec label="JAN">
+                <span className="tabular">{jan}</span>
+              </Spec>
+            )}
           </dl>
 
           {/*

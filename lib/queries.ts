@@ -194,7 +194,11 @@ export async function getFigureBySlug(slug: string, condition?: ItemCondition) {
       // product, and the release number, which is what makes their store
       // search land on the right thing.
       identifiers: {
-        where: { kind: { in: ["GSC_PRODUCT", "NENDOROID_NO", "FIGMA_NO"] } },
+        // JAN is here because the page shows the barcode. The list is explicit
+        // rather than open so a retailer SKU never leaks onto a public page —
+        // KOTOBUKIYA_SKU and the rest are our plumbing, not the product's
+        // identity.
+        where: { kind: { in: ["GSC_PRODUCT", "NENDOROID_NO", "FIGMA_NO", "JAN"] } },
         select: { kind: true, value: true },
       },
       listings: {
