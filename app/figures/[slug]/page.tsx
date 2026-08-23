@@ -24,6 +24,7 @@ import { ebaySearchUrl } from "@/lib/ebay-search";
 import { goodsmileSearchUrl } from "@/lib/goodsmile-search";
 import { getFigureBySlug, getFigureStats, getPriceHistory } from "@/lib/queries";
 import { getFigureUserState } from "@/lib/user-queries";
+import { SITE_URL } from "@/lib/site";
 import { getFigureIdBySlug, getFigureImagesBySlug, figureCacheTag, supersededTarget } from "@/lib/queries";
 import { formatCurrency, formatPercent, formatUsd, trendOf } from "@/lib/money";
 import { approxAt, formatMoney, type DisplayMoney } from "@/lib/currency";
@@ -47,9 +48,20 @@ export async function generateMetadata({
   if (!figure) return { title: "Figure not found" };
 
   const value = figure.marketValueUsd ? formatUsd(figure.marketValueUsd) : "unpriced";
+
+  // A folded reissue points at the entry it was folded into.
+  //
+  // The page also redirects, but that redirect is issued from inside a Suspense
+  // boundary — the response has already begun streaming by then, so Next sends
+  // it client-side rather than as a 3xx. A browser follows it and a crawler
+  // does not, which would leave two indexed pages for one figure. This is the
+  // half of the answer crawlers read.
+  const canonicalSlug = figure.supersededBy?.slug ?? slug;
+
   return {
     title: `${figure.name} — price history`,
     description: `${figure.name} by ${figure.manufacturer?.name ?? "unknown maker"}. Current market value ${value}, with full price history and live listings.`,
+    alternates: { canonical: `${SITE_URL}/figures/${canonicalSlug}` },
   };
 }
 

@@ -185,6 +185,7 @@ export async function getFigureBySlug(slug: string, condition?: ItemCondition) {
   return prisma.figure.findUnique({
     where: { slug },
     include: {
+      supersededBy: { select: { slug: true } },
       manufacturer: true,
       series: { include: { franchise: { select: { name: true, slug: true } } } },
       characters: { include: { series: { select: { name: true, slug: true } } } },
