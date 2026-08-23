@@ -703,3 +703,30 @@ The only route is to ask. robots.txt says we are welcome, so their Cloudflare
 setting is far more likely a blanket default than a decision about us — which is
 a reasonable thing to raise with them, and a reasonable thing for them to
 change. Until then the step is a nightly no-op and should be treated as one.
+
+
+## Kotobukiya: no affiliate programme, and a dead domain to avoid
+
+Checked when the question came up, because 288 figures link to their US store
+and monetising those links would be worth having.
+
+**There is no affiliate programme on kotobukiya-us.com.** No affiliate page —
+`/pages/affiliate`, `/pages/affiliates` and `/pages/affiliate-program` all 404 —
+and nothing in the footer. If you want one, the route is to ask:
+`shop@kotobukiya-us.com`.
+
+**Do not sign up at kotoeu.com.** Search results describe it as Kotobukiya's
+official European store with an affiliate programme at `/support/affiliate`.
+That page 404s, and the domain no longer belongs to Kotobukiya at all — it now
+serves a gambling site titled "UnoVegas - Dapatkan Rumus Menang Slot Gacor
+Online". Google's index still describes it as the official store, which is
+exactly what makes it dangerous: somebody following that result would hand
+their details to whoever owns the domain now.
+
+Verified that nothing here links to it: no code references, and zero rows across
+`Figure.storeUrl`, `Listing.url` and `Submission.referenceUrl`. Every outbound
+store link this site has goes to one of three hosts — kotobukiya-us.com (288),
+solarisjapan.com (34), goodsmile.com (1).
+
+Kotobukiya Japan runs "Premium Partner Shops", but that is a retailer and
+distributor programme, not an affiliate one. It is not the thing to apply for.
