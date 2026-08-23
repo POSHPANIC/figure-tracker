@@ -43,6 +43,9 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     // second against seven thousand rows.
     figures = await Promise.race([
       prisma.figure.findMany({
+        // A folded reissue redirects to the entry it was folded into, and a
+        // sitemap full of redirects is a sitemap asking to be ignored.
+        where: { supersededById: null },
         select: { slug: true, updatedAt: true },
         orderBy: { updatedAt: "desc" },
         take: MAX_URLS - staticPages.length,

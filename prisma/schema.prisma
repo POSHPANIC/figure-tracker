@@ -140,6 +140,22 @@ model Figure {
   /// This is what a Japanese seller titles a listing with, so it is what any
   /// search against the secondhand market has to be built from.
   nameJa      String?
+  /// The entry this one was folded into, when two archive records describe the
+  /// same product.
+  ///
+  /// Good Smile publishes a reissue as its own archive entry, so the catalogue
+  /// holds two rows for one figure — same name, maker, scale and sculpt, a
+  /// later date and sometimes a different price. A seller's title cannot tell
+  /// them apart, so the matcher scored both identically, called it a tie and
+  /// refused to answer: every listing for those products went unmatched.
+  ///
+  /// Superseded rather than deleted. Both entries are real records of real
+  /// releases, their pages stay reachable by redirect, and a merge decided by
+  /// a heuristic should be reversible by setting one column back to null.
+  supersededById String?
+  supersededBy   Figure?  @relation("Reissues", fields: [supersededById], references: [id], onDelete: SetNull)
+  supersedes     Figure[] @relation("Reissues")
+
   /// The kana reading of that name — "ねんどろいど えんで㔲ぁー".
   ///
   /// A pronunciation guide, not a title: nobody writes a listing this way, so

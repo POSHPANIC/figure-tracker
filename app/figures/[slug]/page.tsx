@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Suspense } from "react";
 import { cacheLife, cacheTag } from "next/cache";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { after } from "next/server";
 import { headers } from "next/headers";
 import type { Metadata } from "next";
@@ -24,7 +24,7 @@ import { ebaySearchUrl } from "@/lib/ebay-search";
 import { goodsmileSearchUrl } from "@/lib/goodsmile-search";
 import { getFigureBySlug, getFigureStats, getPriceHistory } from "@/lib/queries";
 import { getFigureUserState } from "@/lib/user-queries";
-import { getFigureIdBySlug, getFigureImagesBySlug, figureCacheTag } from "@/lib/queries";
+import { getFigureIdBySlug, getFigureImagesBySlug, figureCacheTag, supersededTarget } from "@/lib/queries";
 import { formatCurrency, formatPercent, formatUsd, trendOf } from "@/lib/money";
 import { approxAt, formatMoney, type DisplayMoney } from "@/lib/currency";
 import { getDisplayMoney, historicalMoney } from "@/lib/currency-server";
@@ -98,6 +98,12 @@ async function FigurePageBody({ params, searchParams }: PageProps<"/figures/[slu
     : "NEW_SEALED";
 
   const money = await getDisplayMoney();
+
+  // A reissue that was folded into another entry has no listings of its own —
+  // they moved with it. Send the reader to the page that can actually answer
+  // the question, rather than showing them the emptier half of one figure.
+  const target = await supersededTarget(slug);
+  if (target) redirect(`/figures/${target}`);
 
   return (
     <FigureView

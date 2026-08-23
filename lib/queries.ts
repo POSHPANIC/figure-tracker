@@ -74,7 +74,10 @@ export type FigureFilters = {
 };
 
 function buildWhere(f: FigureFilters): Prisma.FigureWhereInput {
-  const where: Prisma.FigureWhereInput = {};
+  // A folded reissue is the same product as the entry it points at, so listing
+  // both would show the reader the same figure twice — once with the listings
+  // and once without.
+  const where: Prisma.FigureWhereInput = { supersededById: null };
 
   if (f.q?.trim()) {
     const q = normalizeQuery(f.q);
@@ -301,6 +304,7 @@ export async function getTopMovers(direction: "up" | "down", take = 6) {
 
   return prisma.figure.findMany({
     where: {
+      supersededById: null,
       change30dPct: direction === "up" ? { gt: 0 } : { lt: 0 },
       salesVolume90d: { gte: 3 },
     },
@@ -315,6 +319,7 @@ export async function getMostTracked(take = 8) {
   catalogueCacheLife();
 
   return prisma.figure.findMany({
+    where: { supersededById: null },
     select: figureCardSelect,
     orderBy: { salesVolume90d: "desc" },
     take,
@@ -351,7 +356,7 @@ export async function getCatalogTotals() {
   catalogueCacheLife();
 
   const [figures, sales, sources] = await Promise.all([
-    prisma.figure.count(),
+    prisma.figure.count({ where: { supersededById: null } }),
     prisma.sale.count(),
     prisma.source.count({ where: { enabled: true } }),
   ]);
@@ -392,4 +397,19 @@ export async function getFigureImagesBySlug(slug: string) {
       },
     },
   });
+}
+
+/**
+ * Where a folded reissue's page should send the reader.
+ *
+ * Both entries describe real releases, so neither URL is deleted — but only one
+ * of them carries the listings, and that is the page worth showing. Returns
+ * null for a figure that stands on its own, which is nearly all of them.
+ */
+export async function supersededTarget(slug: string): Promise<string | null> {
+  const row = await prisma.figure.findUnique({
+    where: { slug },
+    select: { supersededBy: { select: { slug: true } } },
+  });
+  return row?.supersededBy?.slug ?? null;
 }

@@ -25,6 +25,12 @@ export async function loadCandidates(force = false): Promise<MatchCandidate[]> {
   // thousand rows and no parameters at all.
   const [figures, releaseNumbers] = await Promise.all([
     prisma.figure.findMany({
+      // A reissue folded into the product it reissues is not a separate thing
+      // to match against — it is the same figure with a later date, and the
+      // whole reason it was folded is that no seller's title can tell the two
+      // apart. Leaving it here would keep the tie that bestMatch refuses to
+      // guess at, which is what sent those listings nowhere.
+      where: { supersededById: null },
       select: {
         id: true,
         name: true,
