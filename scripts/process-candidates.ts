@@ -28,9 +28,14 @@ import { decide as decideNsfw } from "../lib/ingest/nsfw";
  * pass earlier this week — so anything ambiguous stays in the queue rather than
  * being guessed at.
  *
- * Small batches on purpose. This fetches one page per candidate at a polite
- * interval, and a catalogue grown twenty figures a night is one somebody can
- * still check.
+ * The batch is sized to what discovery queues, not to what a person can read.
+ * Those were the same thing when the queue was small; they stopped being when
+ * Solaris began proposing sixty a night against a batch of twenty, and the
+ * backlog reached 267 with no way to ever fall. A queue that only grows is not
+ * a review queue, it is a list nobody will read.
+ *
+ * Still one page per candidate at a polite interval, so sixty is about a
+ * minute of fetching.
  */
 
 const APPLY = process.argv.includes("--yes");

@@ -85,7 +85,9 @@ jobs:
         env:
           DIRECT_DATABASE_URL: ${{ secrets.DIRECT_DATABASE_URL }}
           DATABASE_URL: ${{ secrets.DIRECT_DATABASE_URL }}
-        run: npm run process:candidates -- --yes --take 20
+        # Matched to what discovery queues above, so the backlog stops
+        # growing. It was 20 against 60 a night, and the queue reached 267.
+        run: npm run process:candidates -- --yes --take 60
 
       # One slice of HobbySearch. Unlike the other sources this creates figures
       # directly, because it has what a review queue exists to establish: a JAN
