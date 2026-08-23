@@ -63,12 +63,33 @@ async function fetchPage(url: string): Promise<string | null> {
 /**
  * A figure already in the catalogue that this is probably the same product as.
  *
- * Deliberately crude and deliberately eager to say yes. Its job is not to
- * decide anything — it is to send the ambiguous cases to a person. A false
- * "similar" costs one manual review; a false "nothing like it" costs a
- * duplicate that somebody has to find and merge later.
+ * Eager to say yes on purpose. Its job is not to decide anything — it is to
+ * send ambiguous cases to a person. A false "similar" costs one manual review;
+ * a false "nothing like it" costs a duplicate somebody has to find and merge.
+ *
+ * But it was matching on the character's name alone, and a catalogue of 7,373
+ * figures has one of nearly every popular character. So a new figma was being
+ * held back because a POP UP PARADE of the same character existed — a
+ * different product from a different line that could not be a duplicate of it.
+ * It blocked 18 of every 20 candidates, and got worse as the catalogue grew:
+ * the nightly create rate fell 13, 10, 6, 5 while the queue went past 267.
+ *
+ * Same character *and* same line now. figma #705 Nekomata Okayu no longer
+ * looks like POP UP PARADE Nekomata Okayu, and figma HK416 no longer looks
+ * like Nendoroid 416 — which was matching on "416" inside "hk416".
+ *
+ * A candidate whose line we do not know keeps the old broad comparison, since
+ * there is nothing to narrow it by.
  */
-async function findSimilar(title: string): Promise<{ slug: string; name: string } | null> {
+const LINE_CATEGORY: Record<string, "FIGMA" | "NENDOROID"> = {
+  FIGMA: "FIGMA",
+  NENDOROID: "NENDOROID",
+};
+
+async function findSimilar(
+  title: string,
+  line: string | null,
+): Promise<{ slug: string; name: string } | null> {
   // Their titles read "Series - Character - Line - Ver. (Manufacturer)". The
   // character is the second segment and is the part most likely to appear in a
   // name the catalogue already uses.
@@ -77,8 +98,15 @@ async function findSimilar(title: string): Promise<{ slug: string; name: string 
   const needle = normalizeQuery(character);
   if (needle.length < 4) return null;
 
+  const category = line ? LINE_CATEGORY[line.toUpperCase()] : undefined;
+
   const rows = await prisma.figure.findMany({
-    where: { searchText: { contains: needle } },
+    where: {
+      searchText: { contains: needle },
+      ...(category ? { category } : {}),
+      // A folded reissue is not a separate product to be duplicated.
+      supersededById: null,
+    },
     select: { slug: true, name: true },
     take: 1,
   });
@@ -178,7 +206,7 @@ async function handle(c: Candidate): Promise<{ outcome: Outcome; detail: string 
   }
 
   // --- Tier 3 test before tier 2: is something like it already listed? -----
-  const similar = await findSimilar(specs.name ?? title);
+  const similar = await findSimilar(specs.name ?? title, c.line);
   if (similar) {
     return { outcome: "left", detail: `looks like ${similar.slug}` };
   }
