@@ -26,6 +26,7 @@ import { getFigureBySlug, getFigureStats, getPriceHistory } from "@/lib/queries"
 import { getFigureUserState } from "@/lib/user-queries";
 import { SITE_URL } from "@/lib/site";
 import { safeHttpUrl } from "@/lib/safe-url";
+import { amiamiSearchUrl, withSovrn } from "@/lib/sovrn";
 import { getFigureIdBySlug, getFigureImagesBySlug, figureCacheTag, supersededTarget } from "@/lib/queries";
 import { formatCurrency, formatPercent, formatUsd, trendOf } from "@/lib/money";
 import { approxAt, formatMoney, type DisplayMoney } from "@/lib/currency";
@@ -249,6 +250,11 @@ async function FigureView({
 
   // Whether the store link is the maker's own shop or a retailer's.
   const fromManufacturer = figure.storeUrl ? isManufacturerStore(figure.storeUrl) : true;
+
+  // Wrapped for Sovrn when a key is configured, and a plain link to their
+  // search when it is not — the reader gets somewhere useful either way.
+  const amiamiTarget = amiamiSearchUrl(figure.name);
+  const amiami = amiamiTarget ? withSovrn(amiamiTarget, "figure-page") : null;
 
   // Only where there is no live way to buy it. A figure still on sale should
   // send the reader to the shop, not to the used market.
@@ -635,6 +641,25 @@ async function FigureView({
                 </a>
                 .
               </p>
+            )}
+            {amiami && (
+              /* AmiAmi carries essentially every Japanese release, and unlike
+                 the manufacturer stores it keeps selling them after the
+                 preorder window closes — so this is worth offering on every
+                 figure rather than only the ones with a dead store link.
+
+                 A search, and labelled as one. We hold no AmiAmi product ids
+                 — that is the feed this site has been asking them for — so
+                 what this can honestly say is "look for it here", not "it is
+                 in stock". */
+              <a
+                href={amiami}
+                target="_blank"
+                rel="nofollow noopener noreferrer"
+                className="mt-3 inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs font-medium transition hover:border-foreground"
+              >
+                Search AmiAmi <ExternalLink className="size-3 text-muted" />
+              </a>
             )}
             {secondhand.length > 0 && (
               /* For the 96% of the catalogue no shop sells any more. A proxy
