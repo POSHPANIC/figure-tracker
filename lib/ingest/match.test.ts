@@ -3,9 +3,10 @@ import { describe, it } from "node:test";
 import {
   MATCH_ACCEPT_THRESHOLD,
   bestMatch,
+  canonicalLineNumber,
+  descriptorTokens,
   extractLineNumber,
   isNotAFigure,
-  descriptorTokens,
   normalizeCondition,
   scoreMatch,
   tokenize,
@@ -518,6 +519,75 @@ describe("normalizeCondition", () => {
     assert.equal(normalizeCondition("Pre-owned"), "USED_COMPLETE");
     assert.equal(normalizeCondition("For parts or not working"), "DAMAGED");
     assert.equal(normalizeCondition(null), "UNKNOWN");
+  });
+});
+
+describe("canonicalLineNumber", () => {
+  it("reconciles the ways one number gets written", () => {
+    // A tenth of the numbered catalogue is not a plain number, and all of it
+    // was invisible to the matcher until this existed.
+    assert.equal(canonicalLineNumber("EX-038"), canonicalLineNumber("EX038"));
+    assert.equal(canonicalLineNumber("EX-038"), canonicalLineNumber("ex 38"));
+    assert.equal(canonicalLineNumber("SP-113"), canonicalLineNumber("sp113"));
+    assert.equal(canonicalLineNumber("figFIX-006"), canonicalLineNumber("figfix 6"));
+  });
+
+  it("keeps genuinely different numbers apart", () => {
+    assert.notEqual(canonicalLineNumber("EX-038"), canonicalLineNumber("350"));
+    assert.notEqual(canonicalLineNumber("EX-038"), canonicalLineNumber("SP-038"));
+    assert.notEqual(canonicalLineNumber("1935"), canonicalLineNumber("1935-DX"));
+  });
+
+  it("returns null for anything that is not a release number", () => {
+    assert.equal(canonicalLineNumber(null), null);
+    assert.equal(canonicalLineNumber(""), null);
+    assert.equal(canonicalLineNumber("Third Ascension"), null);
+  });
+});
+
+describe("prefixed release numbers", () => {
+  const lily = (name: string, lineNumber: string | null): MatchCandidate => ({
+    id: name,
+    name,
+    nameJa: null,
+    category: "FIGMA",
+    lineNumber,
+    scale: null,
+    manufacturerName: "Max Factory",
+    seriesName: "Fate/Grand Order",
+    characterNames: ["Altria Pendragon"],
+    characterNamesJa: [],
+  });
+
+  const base = lily("figma Saber/Altria Pendragon [Lily]", "350");
+  const third = lily("figma Saber/Altria Pendragon [Lily]: Third Ascension ver.", "EX-038");
+
+  it("rejects an EX-038 listing from the plain-numbered figure", () => {
+    // The reported bug: this scored 0.87 against figma 350 and pulled its
+    // asking median with it, because EX-038 was invisible to the number gate.
+    const title = "Max Factory Figma EX-038 Saber Lily Altria Pendragon Fate Grand Order FGO";
+    assert.equal(scoreMatch(title, base), 0);
+  });
+
+  it("gives that listing to the figure whose number it names", () => {
+    // And it must land somewhere. Rejecting it from the wrong figure while
+    // leaving it attached to nothing would only be half a fix — the title
+    // names the manufacturer's own identifier for exactly one product.
+    const title = "Max Factory Figma EX-038 Saber Lily Altria Pendragon Fate Grand Order FGO";
+    assert.ok(scoreMatch(title, third) >= 0.8, String(scoreMatch(title, third)));
+  });
+
+  it("keeps plain-numbered listings on the plain-numbered figure", () => {
+    const title = "Max Factory figma 350 Fate/Grand Order Saber/Altria Pendragon [Lily] Japan new";
+    assert.ok(scoreMatch(title, base) >= 0.8);
+    assert.equal(scoreMatch(title, third), 0);
+  });
+
+  it("still requires distinguishing words when no number is quoted", () => {
+    // The number exemption must not become a general relaxation: a title with
+    // no number has to earn the match the old way.
+    const title = "Max Factory figma Saber Altria Pendragon Lily Fate Grand Order";
+    assert.equal(scoreMatch(title, third), 0);
   });
 });
 

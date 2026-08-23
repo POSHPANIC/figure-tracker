@@ -319,7 +319,10 @@ export const tokenize = memoized(tokenizeImpl);
 
 /**
  * The release number a title gives for a product line — the 1935 in
- * "Nendoroid 1935 Marin Kitagawa".
+ * "Nendoroid 1935 Marin Kitagawa", the EX-038 in "figma EX-038 Saber Lily".
+ *
+ * Returned as the title wrote it. Comparing two of these goes through
+ * canonicalLineNumber, which is where spelling differences are reconciled.
  *
  * Only counted when it sits next to the line word. Marketplace titles are full
  * of unrelated numbers — years, heights, quantities, "100% authentic" — and any
@@ -329,8 +332,47 @@ export const tokenize = memoized(tokenizeImpl);
  * the "#" from "#1935", so both spellings arrive here in the same shape.
  */
 export function extractLineNumber(text: string): string | null {
-  const m = normalize(text).match(/\b(?:nendoroid|figma)\s+(?:no\.?\s*)?(\d{1,4})\b/);
-  return m ? m[1] : null;
+  const m = normalize(text).match(
+    /\b(?:nendoroid|figma)\s+(?:no\.?\s*)?((?:ex|sp|figfix)[\s-]?)?(\d{1,4})([\s-]?dx)?\b/,
+  );
+  if (!m) return null;
+  return `${m[1] ?? ""}${m[2]}${m[3] ?? ""}`.trim();
+}
+
+/**
+ * One comparable form for a release number, however it was written.
+ *
+ * A tenth of the numbered catalogue is not a plain number: 129 figures are
+ * SP-###, 55 are EX-###, 53 carry DX, 18 are figFIX-###. Every one was
+ * invisible here, because the pattern only ever read digits — and invisible is
+ * worse than wrong, because it fails in both directions at once.
+ *
+ * figma EX-038 is a different product from figma 350, but a listing naming one
+ * could never be rejected from the other, so "Figma EX-038 Saber Lily" scored
+ * 0.87 against figma 350 and dragged its asking median with it. Meanwhile
+ * EX-038's own listings never earned the number bonus, landed at 0.72-0.75 —
+ * under the 0.8 asking threshold — and the figure they actually belong to
+ * showed no price at all.
+ *
+ * Leading zeros go, because a seller writing EX-38 means EX-038. The separator
+ * goes, because "EX-038", "EX 038" and "EX038" are one number written three
+ * ways and normalize() has already turned the last into the middle.
+ *
+ * A trailing a/b variant is deliberately not read out of titles, and so is not
+ * kept here either. Reading it would mean treating a lone "a" after the number
+ * as a suffix, and "Nendoroid 390 A Certain Magical Index" is a real title in
+ * this catalogue. Those figures keep the behaviour they already had.
+ */
+export function canonicalLineNumber(raw: string | null | undefined): string | null {
+  if (!raw) return null;
+  const m = normalize(raw)
+    .replace(/\s+/g, "")
+    .match(/^((?:ex|sp|figfix)-?)?0*(\d{1,4})(-?dx)?[ab]?$/);
+  if (!m) return null;
+
+  const prefix = m[1] ? m[1].replace(/-/g, "") : "";
+  const suffix = m[3] ? "dx" : "";
+  return `${prefix}:${m[2]}:${suffix}`;
 }
 
 /** Pull "1/7", "1/8" etc. out of a title. */
@@ -515,12 +557,29 @@ export function scoreMatch(title: string, figure: MatchCandidate): number {
     }
   }
 
+  const figureLineNumber = canonicalLineNumber(figure.lineNumber);
+  const titleLineNumber = canonicalLineNumber(extractLineNumber(title));
+  const numberIdentifies = figureLineNumber !== null && titleLineNumber === figureLineNumber;
+
   // --- Gate 4: every distinguishing word must be present. ---
   // This is what stops "Marin Kitagawa Race Queen Ver." matching "Marin
   // Kitagawa Swimsuit Ver." — same character, series, scale and maker, but the
   // one word that identifies the product is missing.
-  for (const token of descriptorTokens(figure)) {
-    if (!titleTokens.has(token)) return 0;
+  //
+  // Unless the title quotes the release number and it is this figure's. That is
+  // the manufacturer's own identifier for exactly one product, and it settles
+  // the question more precisely than an adjective can: "Figma EX-038 Saber Lily
+  // Altria Pendragon" is the Third Ascension figure whether or not the seller
+  // wrote "Third Ascension". Without this the number fix would only have
+  // stopped that listing attaching to the wrong figure, and left it attached to
+  // nothing.
+  //
+  // Symmetric with Gate 5, which rejects on a number that disagrees. A number
+  // trusted to disqualify is a number trusted to identify.
+  if (!numberIdentifies) {
+    for (const token of descriptorTokens(figure)) {
+      if (!titleTokens.has(token)) return 0;
+    }
   }
 
   // --- Gate 5: a stated release number must agree. ---
@@ -531,8 +590,7 @@ export function scoreMatch(title: string, figure: MatchCandidate): number {
   // Only when both sides carry one. Plenty of catalogue entries have no
   // recorded number, and rejecting those would throw away the many listings
   // that do quote one.
-  const titleLineNumber = extractLineNumber(title);
-  if (figure.lineNumber && titleLineNumber && titleLineNumber !== figure.lineNumber) {
+  if (figureLineNumber && titleLineNumber && titleLineNumber !== figureLineNumber) {
     return 0;
   }
 
@@ -604,7 +662,13 @@ export function scoreMatch(title: string, figure: MatchCandidate): number {
   //
   // The strict reading above still governs rejection, where a wrong answer
   // discards a good listing and precision matters more than reach.
-  if (figure.lineNumber && titleTokens.has(figure.lineNumber)) score += 0.2;
+  //
+  // Matched on the canonical form rather than by looking for the raw string
+  // among the tokens. "EX-038" is never a token: normalize() splits it, so the
+  // figure it belongs to could not earn this even from a listing that named it
+  // exactly.
+  if (numberIdentifies) score += 0.2;
+  else if (figure.lineNumber && titleTokens.has(figure.lineNumber)) score += 0.2;
 
   // Japanese name appearing verbatim is near-conclusive.
   if (figure.nameJa && normalize(title).includes(normalize(figure.nameJa))) {
