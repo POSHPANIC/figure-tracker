@@ -8,6 +8,7 @@ import { USER_AGENT } from "../lib/site";
 import {
   STORE_ORIGIN,
   categoryFor,
+  characterKitCollections,
   classify,
   parseSpecs,
   planSync,
@@ -93,9 +94,38 @@ async function productPage(url: string): Promise<string | null> {
   return html;
 }
 
+/**
+ * Which products belong to the character-kit lines.
+ *
+ * Read from their own collections rather than guessed from titles, because the
+ * titles do not say: "VELRETTA First Engage Ver." is a bishoujo kit and reads
+ * like nothing at all. Four small requests, and it is the difference between
+ * importing Frame Arms Girl and importing Zoids.
+ */
+async function readCharacterKitIds(): Promise<Set<string>> {
+  const ids = new Set<string>();
+  for (const handle of characterKitCollections()) {
+    const body = await fetchText(`${STORE_ORIGIN}/collections/${handle}/products.json?limit=250`);
+    if (!body) {
+      // A collection that cannot be read means those kits look like every other
+      // plastic model and are skipped. Better than importing Hexa Gear.
+      console.warn(`  ! could not read collection ${handle} — its kits will be skipped`);
+      continue;
+    }
+    for (const product of (JSON.parse(body).products ?? []) as { id: number }[]) {
+      ids.add(String(product.id));
+    }
+    await new Promise((r) => setTimeout(r, 300));
+  }
+  return ids;
+}
+
 async function readIndex(): Promise<{ candidates: Candidate[]; skipped: Map<string, number> }> {
   const candidates: Candidate[] = [];
   const skipped = new Map<string, number>();
+
+  const characterKitIds = await readCharacterKitIds();
+  console.log(`  ${characterKitIds.size} product(s) in the character-kit lines`);
 
   for (let page = 1; page <= 40; page += 1) {
     const body = await fetchText(`${STORE_ORIGIN}/products.json?limit=250&page=${page}`);
@@ -105,7 +135,7 @@ async function readIndex(): Promise<{ candidates: Candidate[]; skipped: Map<stri
     if (products.length === 0) break;
 
     for (const product of products) {
-      const verdict = classify(product);
+      const verdict = classify(product, characterKitIds);
       if (verdict.ok) candidates.push(verdict.candidate);
       else skipped.set(verdict.reason, (skipped.get(verdict.reason) ?? 0) + 1);
     }

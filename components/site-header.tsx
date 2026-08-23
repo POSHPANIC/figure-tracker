@@ -175,26 +175,6 @@ export function SiteFooter() {
               <FooterLink href="/figures">Browse figures</FooterLink>
               <Sep />
               <FooterLink href="/feedback">Feedback</FooterLink>
-              <Sep />
-              {/*
-                Sovrn verification. They confirm a publisher owns a site by
-                requiring one of their links on it, clicked once from a real
-                browser — so this is a real affiliate link and is marked as
-                one: rel="sponsored" is what Google asks for a paid link, and
-                nofollow keeps it out of the ranking it would otherwise pass.
-
-                Delete this once the account is verified. It is scaffolding,
-                not a feature, and a single product link in a footer is not
-                something a reader has any use for.
-              */}
-              <a
-                href="https://sovrn.co/1h4rco7"
-                target="_blank"
-                rel="nofollow sponsored noopener noreferrer"
-                className="term-item px-2 py-1 text-[11px] uppercase tracking-[0.14em] text-muted hover:text-background"
-              >
-                AmiAmi
-              </a>
             </nav>
 
             <div className="term-rule mt-5 pt-4">

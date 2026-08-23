@@ -33,6 +33,8 @@ export type StoreProduct = {
 
 export type Candidate = {
   productId: string;
+  /** A character kit rather than a finished figure — files as MODEL_KIT. */
+  isCharacterKit: boolean;
   title: string;
   url: string;
   sku: string | null;
@@ -59,7 +61,42 @@ export type Verdict = { ok: true; candidate: Candidate } | { ok: false; reason: 
  */
 const BONUS_TAG = /^bonus item$/i;
 
-export function classify(product: StoreProduct): Verdict {
+/**
+ * The kit lines that are character figures rather than machines.
+ *
+ * Their store sells 854 plastic models, and "model kit" covers two unlike
+ * things. HEXA GEAR is mecha; M.S.G is a box of weapons; Zoids are animals made
+ * of gears. But FRAME ARMS GIRL and MEGAMI DEVICE are bishoujo figures that
+ * happen to arrive on a runner, collected and resold exactly like a painted
+ * one — and SOUSAISHOJOTEIEN and ARCANADEA are the same idea under other names.
+ *
+ * Their own Shopify collections already draw this line, so this uses theirs
+ * rather than guessing from titles. Guessing does not work: the lines are many,
+ * their names change, and "VELRETTA First Engage Ver." says nothing about what
+ * it is.
+ */
+const CHARACTER_KIT_COLLECTIONS = [
+  "frame-arms-girl",
+  "megami-device",
+  "sousaishojoteien",
+  "arcanadea",
+] as const;
+
+export function characterKitCollections(): readonly string[] {
+  return CHARACTER_KIT_COLLECTIONS;
+}
+
+/**
+ * Weapon and option-part sets, which the store tags itself.
+ *
+ * Inside those four collections sit 59 of them — "FRAME ARMS Girl weapon set2",
+ * "MEGAMI DEVICE M.S.G 09 HAND SET". They belong to a figure without being one.
+ */
+function isSupportUnit(product: StoreProduct): boolean {
+  return (product.tags ?? []).some((t) => (t ?? "").toLowerCase().includes("support-unit"));
+}
+
+export function classify(product: StoreProduct, characterKitIds?: ReadonlySet<string>): Verdict {
   // Bonus items are tested before product_type, because most of them carry no
   // type at all. Testing type first reports 117 of them as "no product_type",
   // which reads like a gap in their data rather than what it is.
@@ -69,10 +106,19 @@ export function classify(product: StoreProduct): Verdict {
   }
 
   const type = (product.product_type ?? "").trim();
-  if (type !== "Figure") {
-    // Plastic Model is the bulk of their store and is a different product
-    // class — model kits, not finished figures. Excluded on purpose rather
-    // than by accident; see the note in the importer.
+  const isCharacterKit =
+    type === "Plastic Model" &&
+    characterKitIds !== undefined &&
+    characterKitIds.has(String(product.id)) &&
+    !isSupportUnit(product);
+
+  if (type !== "Figure" && !isCharacterKit) {
+    // Most plastic models are a different product class — machines, not
+    // characters. The ones that are characters come in through the collection
+    // check above; everything else is excluded on purpose.
+    if (type === "Plastic Model" && characterKitIds?.has(String(product.id))) {
+      return { ok: false, reason: "support unit" };
+    }
     return { ok: false, reason: type ? `product_type ${type}` : "no product_type" };
   }
 
@@ -86,6 +132,7 @@ export function classify(product: StoreProduct): Verdict {
     ok: true,
     candidate: {
       productId: String(product.id),
+      isCharacterKit,
       title: product.title.trim(),
       url: `${STORE_ORIGIN}/products/${product.handle}`,
       sku: variant?.sku?.trim() || null,

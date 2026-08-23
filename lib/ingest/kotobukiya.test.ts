@@ -249,3 +249,55 @@ describe("planSync", () => {
     assert.deepEqual(planSync([], ["a", "b"]).delist, ["a", "b"]);
   });
 });
+
+describe("character kits", () => {
+  const kit = (over: Record<string, unknown> = {}) =>
+    ({
+      id: 99,
+      title: "FRAME ARMS GIRL MIZUKI School Swimsuits Ver.",
+      handle: "190526066878",
+      product_type: "Plastic Model",
+      tags: [],
+      variants: [{ price: "47.99", available: true, sku: "KP123" }],
+      images: [],
+      ...over,
+    }) as Parameters<typeof classify>[0];
+
+  it("is excluded when we do not know the collections", () => {
+    // No id set means the collection lookup failed. Importing every plastic
+    // model then would bring in Hexa Gear and Zoids.
+    assert.equal(classify(kit()).ok, false);
+  });
+
+  it("is excluded when it belongs to no character-kit line", () => {
+    const v = classify(kit(), new Set(["other"]));
+    assert.equal(v.ok, false);
+    assert.equal(v.ok === false && v.reason, "product_type Plastic Model");
+  });
+
+  it("is imported when its line is a character one", () => {
+    const v = classify(kit(), new Set(["99"]));
+    assert.equal(v.ok, true);
+    assert.equal(v.ok === true && v.candidate.isCharacterKit, true);
+  });
+
+  it("still refuses a weapon set inside that line", () => {
+    // "MEGAMI DEVICE M.S.G 09 HAND SET" belongs to a figure without being one,
+    // and their own tag says so.
+    const v = classify(kit({ tags: ["cat_support-unit"] }), new Set(["99"]));
+    assert.equal(v.ok, false);
+    assert.equal(v.ok === false && v.reason, "support unit");
+  });
+
+  it("still refuses a bonus item inside that line", () => {
+    const v = classify(kit({ tags: ["Bonus Item"] }), new Set(["99"]));
+    assert.equal(v.ok, false);
+    assert.equal(v.ok === false && v.reason, "bonus item");
+  });
+
+  it("leaves finished figures on the path they always took", () => {
+    const v = classify(kit({ product_type: "Figure" }), new Set());
+    assert.equal(v.ok, true);
+    assert.equal(v.ok === true && v.candidate.isCharacterKit, false);
+  });
+});
