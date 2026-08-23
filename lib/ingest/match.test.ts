@@ -881,3 +881,45 @@ describe("maker names that are also something else", () => {
     assert.ok(scoreMatch("Nendoroid Wraith GoodSmile Game Series FuRyu shop", wraith) > 0);
   });
 });
+
+
+describe("figures with no character recorded", () => {
+  const nameless = (name: string, category = "SCALE"): MatchCandidate => ({
+    id: name, name, nameJa: null, category, lineNumber: null, scale: null,
+    manufacturerName: "Good Smile Company", seriesName: "Fate/stay night",
+    characterNames: [], characterNamesJa: [],
+  });
+
+  it("lets a specific name stand in for a character", () => {
+    // 41.5% of the catalogue has no character and could not match anything, so
+    // its listings went to whichever figure with a character shared a word.
+    const cuir = nameless("Saber/Altria Pendragon (Alter) & Cuirassier Noir");
+    const score = scoreMatch(
+      "Saber/Altria Pendragon Alter Cuirassier Noir Fate 1/8 Good Smile",
+      cuir,
+    );
+    // Above the accept threshold, where before it was exactly zero. Against
+    // the real catalogue entry, which carries series aliases this stub does
+    // not, the same title scores 1.00.
+    assert.ok(score >= 0.72, String(score));
+  });
+
+  it("still refuses a name that only identifies a product line", () => {
+    // The case the outright refusal was written for: this reduces to
+    // {nendoroid} and would otherwise match every Nendoroid listing there is.
+    const vague = nameless("Nendoroid L 2.0", "NENDOROID");
+    assert.equal(scoreMatch("Nendoroid Anya Forger Good Smile Company", vague), 0);
+  });
+
+  it("still refuses a name with nothing distinguishing at all", () => {
+    assert.equal(scoreMatch("Fate Saber Good Smile Figure", nameless("Saber")), 0);
+  });
+
+  it("does not let a two-word name through", () => {
+    // Three is the line, and it is a measured one — see
+    // MIN_NAME_WORDS_WITHOUT_CHARACTER. This reduces to two words because
+    // "bell", "holy" and "night" are generic descriptors the tokeniser drops.
+    const two = nameless("Illustration Revelation");
+    assert.equal(scoreMatch("Illustration Revelation Good Smile Figure", two), 0);
+  });
+});

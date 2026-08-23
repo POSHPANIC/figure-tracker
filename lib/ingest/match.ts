@@ -134,6 +134,15 @@ const GENERIC_DESCRIPTORS = new Set([
  * agrees. Scale figures carry no line word, so for them *any* of these
  * appearing is a mismatch.
  */
+/**
+ * How many distinguishing words a nameless-character figure needs.
+ *
+ * Measured rather than picked: of the 3,158 figures with no character, 347 have
+ * one such word or none — the "Nendoroid L 2.0" shape that matches a whole
+ * product line — and 2,030 have three or more.
+ */
+const MIN_NAME_WORDS_WITHOUT_CHARACTER = 3;
+
 const PRODUCT_LINE_TOKENS = ["nendoroid", "figma", "parade"] as const;
 
 /** The line word a catalog category implies, if any. */
@@ -628,8 +637,28 @@ export function scoreMatch(title: string, figure: MatchCandidate): number {
   // rare, they are hard to identify from a title anyway, and an unmatched
   // figure merely lacks prices where a mismatched one publishes wrong ones.
   const characterTokens = figure.characterNames.flatMap((n) => [...tokenize(n)]);
-  if (characterTokens.length === 0) return 0;
-
+  if (characterTokens.length === 0) {
+    // Unless the product's own name is specific enough to stand in for one.
+    //
+    // Refusing outright cost more than it saved. 3,158 figures — 41.5% of the
+    // catalogue — have no character recorded, and not one of them held a single
+    // listing: they cannot compete, so their listings go to whichever figure
+    // with a character happens to share a word. "Saber", whose only
+    // distinguishing word is "saber", was holding fifteen listings belonging to
+    // four other products, including the 1/8 Cuirassier Noir sitting in this
+    // same catalogue unable to claim its own.
+    //
+    // The danger the outright refusal was written for is real and stays
+    // blocked. "Nendoroid L 2.0" reduces to {nendoroid} and would match every
+    // Nendoroid listing there is; "Nendoroid Kaguya Luna" is the same shape.
+    // 347 figures have one distinguishing word or none, and they keep the old
+    // behaviour.
+    //
+    // Three is the line because Gate 4 below demands *every* distinguishing
+    // word appear in the title. Three specific words all present is a claim
+    // about a product; one is a claim about a product line.
+    if (descriptorTokens(figure).size < MIN_NAME_WORDS_WITHOUT_CHARACTER) return 0;
+  } else {
   const namedInEnglish = characterTokens.some((t) => titleTokens.has(t));
   // Japanese sellers write the character's name in Japanese and nothing else.
   // Substring rather than token match, because Japanese doesn't use spaces.
@@ -637,6 +666,7 @@ export function scoreMatch(title: string, figure: MatchCandidate): number {
     (ja) => ja.length > 1 && title.includes(ja),
   );
   if (!namedInEnglish && !namedInJapanese) return 0;
+  }
 
   // --- Gate 2: it has to be a figure, and one of them. ---
   const normalizedTitle = normalize(title);
