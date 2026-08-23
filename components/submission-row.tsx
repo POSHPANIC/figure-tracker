@@ -1,6 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import { safeHttpUrl } from "@/lib/safe-url";
 import { useState, useTransition } from "react";
 import {
   Bug,
@@ -165,7 +166,7 @@ export function SubmissionRow({ submission }: { submission: QueuedSubmission }) 
               <Detail label="Reference">
                 {submission.referenceUrl && (
                   <a
-                    href={submission.referenceUrl}
+                    href={safeHttpUrl(submission.referenceUrl) ?? "#"}
                     target="_blank"
                     rel="noopener noreferrer nofollow"
                     className="inline-flex items-center gap-1 break-all term-link"

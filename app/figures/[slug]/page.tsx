@@ -25,6 +25,7 @@ import { goodsmileSearchUrl } from "@/lib/goodsmile-search";
 import { getFigureBySlug, getFigureStats, getPriceHistory } from "@/lib/queries";
 import { getFigureUserState } from "@/lib/user-queries";
 import { SITE_URL } from "@/lib/site";
+import { safeHttpUrl } from "@/lib/safe-url";
 import { getFigureIdBySlug, getFigureImagesBySlug, figureCacheTag, supersededTarget } from "@/lib/queries";
 import { formatCurrency, formatPercent, formatUsd, trendOf } from "@/lib/money";
 import { approxAt, formatMoney, type DisplayMoney } from "@/lib/currency";
@@ -298,7 +299,7 @@ async function FigureView({
               <p className="mt-1.5 text-[11px] text-muted">
                 {primaryImage.sourceUrl ? (
                   <a
-                    href={primaryImage.sourceUrl}
+                    href={safeHttpUrl(primaryImage.sourceUrl) ?? "#"}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="hover:text-foreground hover:underline"

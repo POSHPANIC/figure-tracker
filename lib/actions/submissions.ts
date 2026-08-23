@@ -1,6 +1,7 @@
 "use server";
 
 import { headers } from "next/headers";
+import { safeHttpUrl } from "@/lib/safe-url";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { currentUser, requireUser } from "@/auth";
@@ -140,7 +141,12 @@ function fieldsFor(kind: SubmissionKind, input: z.infer<typeof submissionSchema>
     // Series is no longer asked for — the site stopped showing it when
     // browsing moved to franchises.
     series: null,
-    referenceUrl: kind === "FIGURE" ? (editable(input, "storeUrl") ?? null) : null,
+    // Checked rather than trusted. Anyone can send this form, and the
+    // moderation queue renders this value as a link for a moderator to click —
+    // which is their job, so "javascript:" here would run in the session of the
+    // one person on the site who can change things.
+    referenceUrl:
+      kind === "FIGURE" ? (safeHttpUrl(editable(input, "storeUrl")) ?? null) : null,
     // Both kinds are about one particular figure. A sale report without it is
     // unpublishable — there is nothing to attach the price to.
     figureId: kind === "EDIT" || kind === "SALE" ? (input.figureId ?? null) : null,

@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { isSafeHttpUrl } from "@/lib/safe-url";
 import { z } from "zod";
 import { requireUser } from "@/auth";
 import { prisma } from "@/lib/prisma";
@@ -29,7 +30,11 @@ const addSchema = z.object({
   figureId: z.string().min(1),
   url: z.string().trim().min(1),
   credit: z.string().trim().min(1, "Credit is required — it's a condition of most permissions."),
-  sourceUrl: z.union([z.string().trim().url(), z.literal("")]).optional(),
+  // Not z.url(): it accepts "javascript:alert(1)", and this is rendered as a
+  // link on the public figure page.
+  sourceUrl: z
+    .union([z.string().trim().refine(isSafeHttpUrl, "Source must be an http(s) link"), z.literal("")])
+    .optional(),
   licenseNote: z.string().trim().max(500).optional(),
   makePrimary: z.string().optional(),
 });

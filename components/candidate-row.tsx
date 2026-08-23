@@ -1,6 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import { safeHttpUrl } from "@/lib/safe-url";
 import { useEffect, useState, useTransition } from "react";
 import { ExternalLink, PackageSearch, X } from "lucide-react";
 import { acceptCandidate, dismissCandidate } from "@/lib/actions/candidates";
@@ -114,7 +115,7 @@ export function CandidateRow({ candidate }: { candidate: QueuedCandidate }) {
           // The product page it came from, which settles what it actually is
           // far faster than a search does.
           <a
-            href={candidate.sourceUrl}
+            href={safeHttpUrl(candidate.sourceUrl) ?? "#"}
             target="_blank"
             rel="nofollow noreferrer noopener"
             className="flex shrink-0 items-center gap-1 text-xs term-link"
