@@ -221,9 +221,12 @@ export function PriceChart({ data, maxDays, money, msrpDisplay }: Props) {
                    wanted, not just the middle. */
                 <ErrorBar
                   dataKey="spread"
-                  stroke="var(--accent)"
-                  strokeWidth={1.5}
-                  width={7}
+                  /* Muted and hairline. The range is context for the median,
+                     not a rival to it — drawn in the accent at full weight it
+                     read as the subject of the chart. */
+                  stroke="var(--muted)"
+                  strokeWidth={1}
+                  width={4}
                   direction="y"
                   isAnimationActive={false}
                 />
@@ -236,13 +239,18 @@ export function PriceChart({ data, maxDays, money, msrpDisplay }: Props) {
                  the level, never as the first point of a trend. */
               <ReferenceLine
                 y={msrpAxis}
-                stroke="var(--muted)"
+                /* The signal red the header's status strip uses. It is the
+                   one lit colour on the site, and this is the one line here
+                   that is not an observation of the market — being told apart
+                   at a glance is the whole job. Not --alert, which stays
+                   unspent for the places that mean it. */
+                stroke="var(--signal)"
                 strokeDasharray="4 4"
                 strokeWidth={1}
                 label={{
                   value: `original price, ${formatCurrency(msrpDisplay, money.currency)}`,
                   position: "insideTopLeft",
-                  fill: "var(--muted)",
+                  fill: "var(--signal)",
                   fontSize: 10,
                 }}
               />
