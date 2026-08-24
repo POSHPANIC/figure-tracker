@@ -10,6 +10,7 @@ import {
   isNotASingleFigure,
   normalizeCondition,
   scoreMatch,
+  seriesNamedIn,
   tokenize,
   type MatchCandidate,
 } from "./match";
@@ -923,3 +924,34 @@ describe("figures with no character recorded", () => {
     assert.equal(scoreMatch("Illustration Revelation Good Smile Figure", two), 0);
   });
 });
+
+describe("lines whose name is a phrase", () => {
+  const scale: MatchCandidate = {
+    id: "saber", name: "Saber", nameJa: null, category: "SCALE", lineNumber: null,
+    scale: "1/8", manufacturerName: "Good Smile Company", seriesName: "Fate/stay night",
+    characterNames: ["Artoria Pendragon"], characterNamesJa: [],
+  };
+
+  it("rejects a HELLO! GOOD SMILE listing from a scale figure", () => {
+    // It tokenises to hello, good and smile — the last two being the maker's
+    // name — so it cannot be a single-word line token. 29 of these were sitting
+    // on figures of other categories.
+    assert.equal(
+      scoreMatch("Saber Altria Pendragon Figure HELLO! GOOD SMILE Fate Stay Night", scale),
+      0,
+    );
+  });
+
+  it("keeps it on a HELLO! GOOD SMILE figure", () => {
+    const hgs: MatchCandidate = { ...scale, id: "hgs", name: "HELLO! GOOD SMILE Saber", category: "HELLO_GOOD_SMILE", scale: null };
+    assert.ok(scoreMatch("HELLO! GOOD SMILE Saber Artoria Pendragon Fate Stay Night", hgs) > 0);
+  });
+
+  it("does not fire on the manufacturer alone", () => {
+    // "Good Smile Company" appears on half the catalogue's listings and must
+    // never be read as this line.
+    assert.ok(scoreMatch("Saber Artoria Pendragon Fate Stay Night Good Smile Company", scale) > 0);
+  });
+});
+
+

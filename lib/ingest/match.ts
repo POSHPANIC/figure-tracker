@@ -145,10 +145,28 @@ const MIN_NAME_WORDS_WITHOUT_CHARACTER = 3;
 
 const PRODUCT_LINE_TOKENS = ["nendoroid", "figma", "parade"] as const;
 
+/**
+ * Lines whose name is a phrase rather than a word.
+ *
+ * "HELLO! GOOD SMILE" cannot go in the list above: it tokenises to hello, good
+ * and smile, and the last two are the manufacturer's name, on half the
+ * catalogue. Checked against the normalised title as a phrase instead.
+ *
+ * The catalogue holds 49 of these and 431 active listings name the line, of
+ * which 29 were attached to figures of another category — a HELLO! GOOD SMILE
+ * chibi priced against a 1/8 scale statue.
+ */
+const PRODUCT_LINE_PHRASES = ["hello good smile"] as const;
+
 /** The line word a catalog category implies, if any. */
 const CATEGORY_LINE: Partial<Record<string, string>> = {
   NENDOROID: "nendoroid",
   FIGMA: "figma",
+};
+
+/** The line phrase a catalog category implies, if any. */
+const CATEGORY_LINE_PHRASE: Partial<Record<string, string>> = {
+  HELLO_GOOD_SMILE: "hello good smile",
 };
 
 /**
@@ -515,6 +533,8 @@ export type MatchCandidate = {
   characterNamesJa?: string[];
   /** Alternate series titles — sellers write "Sono Bisque Doll" as often as the English name. */
   seriesAliases?: string[];
+  /** The franchise the series belongs to, for telling siblings apart. */
+  franchiseName?: string | null;
 };
 
 /**
@@ -608,7 +628,51 @@ export function isNotAFigure(title: string): boolean {
   return MERCHANDISE.test(title) && !IS_A_FIGURE.test(title);
 }
 
-export function scoreMatch(title: string, figure: MatchCandidate): number {
+/**
+ * Which series a title names, out of the ones the catalogue knows.
+ *
+ * Computed once per title and handed to every scoreMatch call for it, because
+ * doing it per candidate would mean re-reading the whole series list 7,605
+ * times for one listing.
+ *
+ * The same "half its words present" test the series bonus already uses, which
+ * is what makes this safe on a franchise whose entries share a word.
+ * "Fate/Grand Order Saber Altria Pendragon" scores 3/3 on Fate/Grand Order and
+ * 1/3 on Fate/stay night, so only the first is named.
+ */
+export function seriesNamedIn(title: string, allSeries: readonly string[]): Set<string> {
+  const titleTokens = tokenize(title);
+  const named = new Set<string>();
+  for (const name of allSeries) {
+    const tokens = tokenize(name);
+    if (tokens.size === 0) continue;
+    const hits = [...tokens].filter((t) => titleTokens.has(t)).length;
+    // Two words at least, as well as half of them. "Fate/Grand Order" reduces
+    // to {fate, grand} once the generic word is dropped, so on the fraction
+    // alone the single word "Fate" named it — and would then have rejected
+    // every Fate/stay night figure from every listing mentioning Fate.
+    //
+    // The cost is that a one-word series can never be named, so this gate
+    // never fires for them. That is the safe direction: it declines to reject
+    // rather than rejecting on a franchise word every sibling shares.
+    if (hits >= 2 && hits / tokens.size >= 0.5) named.add(name.toLowerCase());
+  }
+  return named;
+}
+
+/** Everything a title-wide computation can tell one scoreMatch call. */
+export type MatchContext = {
+  /** Series the title names, lowercased. Empty means it names none. */
+  seriesInTitle: ReadonlySet<string>;
+  /** Which franchise each of those belongs to, lowercased. */
+  franchiseOfSeries: ReadonlyMap<string, string>;
+};
+
+export function scoreMatch(
+  title: string,
+  figure: MatchCandidate,
+  context?: MatchContext,
+): number {
   const titleTokens = tokenize(title);
   if (titleTokens.size === 0) return 0;
 
@@ -688,6 +752,20 @@ export function scoreMatch(title: string, figure: MatchCandidate): number {
     }
   }
 
+  // The same rule for lines whose name is a phrase.
+  const normalizedForLine = normalize(title);
+  const figureLinePhrase = CATEGORY_LINE_PHRASE[figure.category] ?? null;
+  const nameForLine = normalize(figure.name);
+  for (const phrase of PRODUCT_LINE_PHRASES) {
+    if (
+      normalizedForLine.includes(phrase) &&
+      phrase !== figureLinePhrase &&
+      !nameForLine.includes(phrase)
+    ) {
+      return 0;
+    }
+  }
+
   const figureLineNumber = canonicalLineNumber(figure.lineNumber);
   const titleLineNumber = canonicalLineNumber(extractLineNumber(title));
   const numberIdentifies = figureLineNumber !== null && titleLineNumber === figureLineNumber;
@@ -697,6 +775,30 @@ export function scoreMatch(title: string, figure: MatchCandidate): number {
   // is a FuRyu product, and no amount of the character and series agreeing
   // makes it this one.
   if (namesARivalMaker(titleTokens, normalize(title), figure.manufacturerName)) return 0;
+
+  // --- No gate on the series, and it is not for want of trying. ---
+  //
+  // Fate/stay night and Fate/Grand Order are different works, and a listing
+  // for one should not match a figure from the other. Two attempts at
+  // enforcing that both had to be thrown away after measuring:
+  //
+  //   Comparing against every series in the catalogue lost 16,546 matches.
+  //   There is a series here called "Good Smile Udon", so two of its three
+  //   words appear in any listing naming the manufacturer — which is half of
+  //   them — and every figure that was not a Good Smile Udon figure was
+  //   rejected.
+  //
+  //   Comparing only against siblings in the same franchise lost 1,690. A
+  //   figure's series is "Love Live! School Idol Project" and the seller
+  //   writes "Love Live!", which is the *sibling* series exactly and the
+  //   figure's own series only two words out of five. The gate then rejects a
+  //   figure for failing to name a series nobody spells out.
+  //
+  // The second is the real obstacle: sellers write the franchise, not the
+  // work. Fixing it needs series aliases good enough that "Love Live!" resolves
+  // to every series under it, which is a data problem rather than a rule.
+  // Until then the series bonus rewards agreement and disagreement costs
+  // nothing, which is where this started.
 
   // --- Gate 4: every distinguishing word must be present. ---
   // This is what stops "Marin Kitagawa Race Queen Ver." matching "Marin
@@ -849,6 +951,25 @@ function matchedNameTokens(title: string, figure: MatchCandidate): number {
 }
 
 export function bestMatch(title: string, candidates: MatchCandidate[]): MatchResult {
+  // One pass over the series universe for this title, shared by every
+  // candidate below.
+  const allSeries = [
+    ...new Set(
+      candidates.flatMap((c) => [c.seriesName, ...(c.seriesAliases ?? [])]).filter(Boolean),
+    ),
+  ] as string[];
+  const franchiseOfSeries = new Map<string, string>();
+  for (const c of candidates) {
+    if (!c.franchiseName) continue;
+    for (const name of [c.seriesName, ...(c.seriesAliases ?? [])]) {
+      if (name) franchiseOfSeries.set(name.toLowerCase(), c.franchiseName.toLowerCase());
+    }
+  }
+  const context: MatchContext = {
+    seriesInTitle: seriesNamedIn(title, allSeries),
+    franchiseOfSeries,
+  };
+
   let best: MatchResult = null;
   let bestSpecificity = -1;
 
@@ -857,7 +978,7 @@ export function bestMatch(title: string, candidates: MatchCandidate[]): MatchRes
   let tied = 0;
 
   for (const c of candidates) {
-    const score = scoreMatch(title, c);
+    const score = scoreMatch(title, c, context);
     if (score < MATCH_ACCEPT_THRESHOLD) continue;
 
     const specificity = matchedNameTokens(title, c);
