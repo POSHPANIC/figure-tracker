@@ -194,6 +194,28 @@ describe("worksNameThisSeries", () => {
   it("refuses when the source names nothing", () => {
     assert.equal(worksNameThisSeries([], series({ id: "1", name: "Blue Archive" })), false);
   });
+  it("folds full-width characters onto the ASCII they stand for", () => {
+    // One series the sellers spell three ways. The full-width halves only
+    // reach the ASCII spelling once the name is compatibility-folded.
+    assert.equal(
+      normalizeSeriesName("THE iDOLM＠STER"),
+      normalizeSeriesName("THE IDOLM@STER"),
+    );
+    assert.equal(
+      normalizeSeriesName("THE IDOLM@STER２"),
+      normalizeSeriesName("THE IDOLM@STER2"),
+    );
+    assert.equal(normalizeSeriesName("YU-GI-OH！"), normalizeSeriesName("Yu-Gi-Oh!"));
+  });
+
+  it("still keeps a sequel apart from the series it follows", () => {
+    // Folding must not go so far that the "2" stops counting.
+    assert.notEqual(
+      normalizeSeriesName("THE IDOLM@STER２"),
+      normalizeSeriesName("THE IDOLM@STER"),
+    );
+  });
+
 });
 
 describe("pickCanonical", () => {
@@ -220,6 +242,35 @@ describe("pickCanonical", () => {
     ]);
     assert.equal(chosen.id, "2");
   });
+
+  it("takes the ASCII spelling of a name over the full-width one", () => {
+    // "YU-GI-OH!" carries more figures, but the full-width exclamation mark
+    // is how a Japanese keyboard types it, not how the series is titled.
+    const chosen = pickCanonical([
+      { ...series({ id: "1", name: "YU-GI-OH！" }), figureCount: 17 },
+      { ...series({ id: "2", name: "Yu-Gi-Oh!" }), figureCount: 14 },
+    ]);
+    assert.equal(chosen.name, "Yu-Gi-Oh!");
+  });
+
+  it("does not let spelling override a genuinely different name", () => {
+    // Both are ASCII, so the ASCII preference has nothing to say and the
+    // bigger row still wins -- the rule only reorders one name's spellings.
+    const chosen = pickCanonical([
+      { ...series({ id: "1", name: "Demon Slayer" }), figureCount: 80 },
+      { ...series({ id: "2", name: "Demon Slayer: Kimetsu no Yaiba" }), figureCount: 2 },
+    ]);
+    assert.equal(chosen.name, "Demon Slayer");
+  });
+
+  it("keeps the AniList row even when another spells the name in ASCII", () => {
+    const chosen = pickCanonical([
+      { ...series({ id: "1", name: "Shugo Chara！", anilistId: 3468 }), figureCount: 3 },
+      { ...series({ id: "2", name: "Shugo Chara!" }), figureCount: 9 },
+    ]);
+    assert.equal(chosen.id, "1");
+  });
+
 });
 
 describe("groupDuplicates", () => {

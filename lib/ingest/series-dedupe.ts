@@ -42,6 +42,12 @@ export const CONCLUSIVE: Evidence[] = ["same name", "known alias", "same AniList
  */
 export function normalizeSeriesName(name: string): string {
   return name
+    // Compatibility-fold first, so full-width characters become the ASCII ones
+    // they stand for and the punctuation rules below can see them. Sellers
+    // write the same title both ways -- "THE IDOLM@STER2" and
+    // "THE iDOLM＠STER" are one series -- and without this fold the
+    // full-width halves never meet their ASCII spellings.
+    .normalize("NFKC")
     .toLowerCase()
     // Full-width and typographic characters that stand in for ASCII ones.
     .replace(/[×✕╳]/g, " x ")
@@ -195,12 +201,35 @@ export function worksNameThisSeries(workNames: string[], series: SeriesLike): bo
  * Miku", and the longer name survives as a synonym either way.
  */
 export function pickCanonical<T extends SeriesLike & { figureCount: number }>(group: T[]): T {
-  return [...group].sort((x, y) => {
+  const winner = [...group].sort((x, y) => {
     const anilist = Number(y.anilistId != null) - Number(x.anilistId != null);
     if (anilist !== 0) return anilist;
     if (y.figureCount !== x.figureCount) return y.figureCount - x.figureCount;
     return x.name.length - y.name.length;
   })[0];
+
+  // Among spellings of the *same* name, prefer the ASCII one for the heading.
+  // Sellers type "YU-GI-OH！" and "Yu-Gi-Oh!", and whichever happens to
+  // carry more figures wins the sort above -- but a full-width "！" in an
+  // otherwise-Latin title is a Japanese-keyboard artefact, not a title. This
+  // only ever reorders names that are compatibility-identical, so it cannot
+  // move the heading to a different series the way a broader rule could.
+  // Never at the cost of the AniList link, though: a nicer-looking heading is
+  // not worth losing the Japanese title and synonyms hanging off it.
+  return group.find((s) => s !== winner
+    && (s.anilistId != null) === (winner.anilistId != null)
+    && sameSpelling(s.name, winner.name)
+    && compatChars(s.name) < compatChars(winner.name)) ?? winner;
+}
+
+/** Whether two names differ only by character width, case, or composition. */
+function sameSpelling(a: string, b: string): boolean {
+  return a.normalize("NFKC").toLowerCase() === b.normalize("NFKC").toLowerCase();
+}
+
+/** How many characters the name spells the wide way. */
+function compatChars(name: string): number {
+  return [...name].filter((c) => c.normalize("NFKC") !== c).length;
 }
 
 /**
