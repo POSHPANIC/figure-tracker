@@ -6,6 +6,7 @@ import {
   parseProductPage,
   tidyName,
   productIdFromUrl,
+  readReleaseNumber,
   productLinks,
   readScale,
   type NinNinProduct,
@@ -235,5 +236,39 @@ describe("tidyName", () => {
   it("is null for nothing", () => {
     assert.equal(tidyName(null), null);
     assert.equal(tidyName("   "), null);
+  });
+});
+
+describe("readReleaseNumber", () => {
+  it("reads the line and number out of the slug", () => {
+    // A real URL. The leading 254320 is their product id, not the release
+    // number, which is the trap this pattern has to step over.
+    assert.deepEqual(
+      readReleaseNumber(
+        "https://www.nin-nin-game.com/en/nendoroid/254320-nendoroid-930-hatsune-miku-magical-mirai-2017-limited-bonus-good-smile-company-.html",
+      ),
+      { line: "NENDOROID", number: "930" },
+    );
+  });
+
+  it("reads figma the same way", () => {
+    assert.deepEqual(
+      readReleaseNumber("https://www.nin-nin-game.com/en/figma/254100-figma-439-tanya-degurechaff.html"),
+      { line: "FIGMA", number: "439" },
+    );
+  });
+
+  it("stores the number unpadded, as the catalogue holds it", () => {
+    assert.deepEqual(
+      readReleaseNumber("https://www.nin-nin-game.com/en/nendoroid/254321-nendoroid-007-someone-x.html"),
+      { line: "NENDOROID", number: "7" },
+    );
+  });
+
+  it("is null when the slug names no release number", () => {
+    assert.equal(
+      readReleaseNumber("https://www.nin-nin-game.com/en/figures/254600-monster-hunter-mizutsune.html"),
+      null,
+    );
   });
 });

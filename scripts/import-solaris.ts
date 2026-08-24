@@ -195,6 +195,16 @@ async function heldBy(kind: string, value: string): Promise<string | null> {
   return row?.figureId ?? null;
 }
 
+/** Whether a figure already carries a barcode, in either flavour. */
+async function hasBarcode(figureId: string): Promise<boolean> {
+  return Boolean(
+    await prisma.figureIdentifier.findFirst({
+      where: { figureId, kind: { in: ["JAN", "UPC"] } },
+      select: { id: true },
+    }),
+  );
+}
+
 async function slugOf(id: string): Promise<string> {
   const row = await prisma.figure.findUnique({ where: { id }, select: { slug: true } });
   return row?.slug ?? id;
@@ -218,15 +228,43 @@ async function handle(c: SolarisCandidate): Promise<{ outcome: Outcome; detail: 
   // --- Known product: refresh what the shop says, and stop -----------------
   const known = await heldBy("SOLARIS_PRODUCT", c.productId);
   if (known) {
-    if (APPLY) await prisma.figure.update({ where: { id: known }, data: storeFields(c) });
+    if (APPLY) {
+      await prisma.figure.update({ where: { id: known }, data: storeFields(c) });
+      // Barcode too, if it still has none. A figure imported before this
+      // script recorded barcodes would otherwise never get one: every later
+      // run recognises the product and stops here, so "known" quietly meant
+      // "never looked at again".
+      if (!(await hasBarcode(known))) {
+        const html = await fetchPage(c.url);
+        await new Promise((r) => setTimeout(r, PAGE_DELAY_MS));
+        const jan = html ? parseProductPage(html).jan : null;
+        if (jan) {
+          await recordIdentifiers(known, c, jan);
+          return { outcome: "attached", detail: `+JAN ${jan} → ${await slugOf(known)}` };
+        }
+      }
+    }
     return { outcome: "refreshed", detail: c.title.slice(0, 58) };
   }
 
-  // --- Release number: exact, and costs no page fetch ----------------------
+  // --- Release number: exact, and usually costs no page fetch --------------
   if (c.line && c.number) {
     const kind = c.line === "FIGMA" ? "FIGMA_NO" : "NENDOROID_NO";
     const match = await heldBy(kind, c.number);
-    if (match) return attach(match, c, null, `${c.line} #${c.number}`);
+    if (match) {
+      // One exception to skipping the fetch: if the figure has no barcode, the
+      // page we are declining to read is carrying one. This used to pass null
+      // and move on, so every attach by release number threw a JAN away — and
+      // a barcode is the identifier that means the same thing to every shop,
+      // which is what makes the *next* source cheap to match.
+      let jan: string | null = null;
+      if (!(await hasBarcode(match))) {
+        const html = await fetchPage(c.url);
+        await new Promise((r) => setTimeout(r, PAGE_DELAY_MS));
+        jan = html ? parseProductPage(html).jan : null;
+      }
+      return attach(match, c, jan, `${c.line} #${c.number}${jan ? ` +JAN ${jan}` : ""}`);
+    }
   }
 
   // --- Everything else needs the product page ------------------------------

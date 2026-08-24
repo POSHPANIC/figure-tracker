@@ -52,6 +52,31 @@ export function productIdFromUrl(url: string): string | null {
   return /\/(\d+)-[a-z0-9-]*\.html/i.exec(url)?.[1] ?? null;
 }
 
+/**
+ * The line and number on the box, read from the product URL.
+ *
+ * They write it into both the title and the slug — "Nendoroid 930: Hatsune
+ * Miku" becomes `/254320-nendoroid-930-hatsune-miku-…`. Taking it from the URL
+ * means a whole listing can be checked against what this catalogue already
+ * holds without fetching a single product page, and only the matches cost a
+ * request. That is the difference between a backfill that reads 508 pages and
+ * one that reads the handful it needs.
+ *
+ * The leading digits are their product id, not the release number, so the
+ * pattern has to step over them.
+ */
+export function readReleaseNumber(
+  url: string,
+): { line: "NENDOROID" | "FIGMA"; number: string } | null {
+  const m = /\/\d+-(nendoroid|figma)-(\d{1,4})-/i.exec(url);
+  if (!m) return null;
+  return {
+    line: m[1].toLowerCase() === "figma" ? "FIGMA" : "NENDOROID",
+    // Stored unpadded, matching how the catalogue holds them.
+    number: String(Number(m[2])),
+  };
+}
+
 export type NinNinProduct = {
   productId: string;
   url: string;
