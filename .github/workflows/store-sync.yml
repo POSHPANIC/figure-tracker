@@ -63,31 +63,20 @@ jobs:
           DATABASE_URL: ${{ secrets.DIRECT_DATABASE_URL }}
         run: npm run import:kotobukiya -- --yes
 
-      # Look for products the catalogue does not have. Reads a few pages of a
-      # retailer's index and writes candidates; creates nothing. Capped, so the
-      # queue stays a length somebody can actually work through.
-      - name: Look for missing figures at Solaris
-        if: always()
-        env:
-          DIRECT_DATABASE_URL: ${{ secrets.DIRECT_DATABASE_URL }}
-          DATABASE_URL: ${{ secrets.DIRECT_DATABASE_URL }}
-        run: npm run discover:solaris -- --yes --pages 8 --max 60
-
-      # Work through part of the queue. Reads each candidate's product page and
-      # either attaches it to a figure we hold, creates it, or leaves it for a
-      # person — see scripts/process-candidates.ts for why those are the tiers.
+      # Import a retailer's catalogue outright. Products already held are
+      # refreshed for price and stock; the rest are attached to a figure we hold
+      # or created, decided on exact identifiers alone.
       #
-      # Twenty a night on purpose. It is one page fetch per candidate at a
-      # polite interval, and a catalogue that grows twenty figures a day is one
-      # somebody can still check.
-      - name: Research and add candidates
+      # This replaced a discover-then-review pair. The review half never
+      # happened: 27 products a night were parked as "left for review" and not
+      # one was ever looked at again, so the queue was losing them rather than
+      # holding them. See scripts/import-solaris.ts.
+      - name: Sync Solaris
         if: always()
         env:
           DIRECT_DATABASE_URL: ${{ secrets.DIRECT_DATABASE_URL }}
           DATABASE_URL: ${{ secrets.DIRECT_DATABASE_URL }}
-        # Matched to what discovery queues above, so the backlog stops
-        # growing. It was 20 against 60 a night, and the queue reached 267.
-        run: npm run process:candidates -- --yes --take 60
+        run: npm run import:solaris -- --yes --pages 8 --max 60
 
       # One slice of HobbySearch. Unlike the other sources this creates figures
       # directly, because it has what a review queue exists to establish: a JAN

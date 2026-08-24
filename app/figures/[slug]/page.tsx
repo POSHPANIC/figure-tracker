@@ -200,6 +200,10 @@ async function FigureView({
   // be picked out by kind rather than taken as the first one.
   const archiveId = figure.identifiers.find((i) => i.kind === "GSC_PRODUCT");
 
+  // The shop link as it will be published, tagged if we have a tag for that
+  // shop. Computed once so the markup can tell a paid link from a plain one.
+  const storeHref = figure.storeUrl ? withSolarisAffiliate(figure.storeUrl) : null;
+
   // Its own franchise first, then any it only borrows from, with duplicates
   // dropped — a collab whose costume comes from its own franchise would
   // otherwise print the same name twice.
@@ -589,9 +593,13 @@ async function FigureView({
               // closed preorder is why the marketplace prices below exist, and
               // hiding it would leave the reader wondering.
               <a
-                href={withSolarisAffiliate(figure.storeUrl)}
+                href={storeHref ?? figure.storeUrl}
                 target="_blank"
-                rel="noopener noreferrer"
+                // "sponsored" only when the link actually earns something —
+                // which is why it is derived from the tag rather than assumed.
+                // Google asks for it on monetised links, and this one is
+                // monetised for Solaris and not for anybody else's store.
+                rel={storeHref === figure.storeUrl ? "noopener noreferrer" : "sponsored nofollow noopener noreferrer"}
                 className="mt-3 flex items-center gap-3 rounded-lg border border-border p-3 transition hover:border-foreground"
               >
                 <StoreMark url={figure.storeUrl} className="shrink-0 text-sm" />
