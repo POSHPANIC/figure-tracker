@@ -11,6 +11,14 @@ export type SearchTextParts = {
   nameJa?: string | null;
   /** The kana reading, so someone typing kana still finds the figure. */
   nameJaReading?: string | null;
+  /**
+   * The number on the box — the 1935 in "Nendoroid 1935".
+   *
+   * Collectors search by it, and it was the one identifier this blob did not
+   * carry: "nendoroid 1935" returned nothing at all while the figure sat there
+   * with NENDOROID_NO recorded against it.
+   */
+  releaseNumber?: string | null;
   scale?: string | null;
   manufacturerName?: string | null;
   seriesName?: string | null;
@@ -47,6 +55,7 @@ export function buildSearchText(parts: SearchTextParts): string {
     parts.name,
     parts.nameJa,
     parts.nameJaReading,
+    parts.releaseNumber,
     parts.scale,
     parts.manufacturerName,
     parts.seriesName,
@@ -81,4 +90,38 @@ export function buildSearchText(parts: SearchTextParts): string {
 /** Normalize a user's query the same way the stored text was normalized. */
 export function normalizeQuery(query: string): string {
   return query.trim().toLowerCase().replace(/\s+/g, " ");
+}
+
+/**
+ * The words a query is really asking for.
+ *
+ * Matching the whole query as one substring quietly failed on every name
+ * carrying punctuation, which is most of them. The blob holds "ruler/altria
+ * pendragon", so "ruler altria" was not in it — nor was "fate grand order" in
+ * "fate/grand order", nor "re zero" in "re:zero". Those are not obscure
+ * queries; they are how people type a slash.
+ *
+ * Splitting on anything that is not a letter or a digit fixes both sides at
+ * once, because the same treatment is applied to the stored text when it is
+ * searched. Word order stops mattering too, which is worth having: "pendragon
+ * ruler" finds the same figure.
+ *
+ * Single characters are dropped. "a" and "&" appear in nearly every blob and
+ * asking for them narrows nothing while costing a scan.
+ */
+export function queryTokens(query: string): string[] {
+  const normalized = normalizeQuery(query);
+
+  // Scales survive the split. "1/7" is stored as one token and is a real thing
+  // to search by, but splitting on the slash leaves "1" and "7", which are then
+  // dropped for being single characters — so "1/7 saber" would quietly become
+  // "saber" and return every Saber in the catalogue.
+  const scales = [...normalized.matchAll(/\b\d{1,2}\/\d{1,2}\b/g)].map((m) => m[0]);
+
+  const words = normalized
+    .replace(/\b\d{1,2}\/\d{1,2}\b/g, " ")
+    .split(/[^\p{L}\p{N}]+/u)
+    .filter((t) => t.length > 1);
+
+  return [...new Set([...scales, ...words])];
 }

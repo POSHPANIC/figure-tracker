@@ -14,6 +14,10 @@ const figureSelect = {
   name: true,
   nameJa: true,
   nameJaReading: true,
+  identifiers: {
+    where: { kind: { in: ["NENDOROID_NO", "FIGMA_NO"] as string[] } },
+    select: { value: true },
+  },
   scale: true,
   manufacturer: { select: { name: true } },
   series: { select: { name: true, titleJa: true, synonyms: true } },
@@ -25,6 +29,7 @@ type FigureRow = {
   name: string;
   nameJa: string | null;
   nameJaReading: string | null;
+  identifiers: { value: string }[];
   scale: string | null;
   manufacturer: { name: string } | null;
   series: { name: string; titleJa: string | null; synonyms: string[] } | null;
@@ -36,6 +41,7 @@ function textFor(figure: FigureRow): string {
     name: figure.name,
     nameJa: figure.nameJa,
     nameJaReading: figure.nameJaReading,
+    releaseNumber: figure.identifiers[0]?.value ?? null,
     scale: figure.scale,
     manufacturerName: figure.manufacturer?.name,
     seriesName: figure.series?.name,

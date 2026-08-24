@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { buildSearchText, normalizeQuery } from "./search-text";
+import {
+  buildSearchText,
+  normalizeQuery,
+  queryTokens,
+} from "./search-text";
 
 /**
  * Search text failing is silent — a figure just stops being findable, with no
@@ -94,5 +98,46 @@ describe("normalizeQuery", () => {
 
   it("leaves non-Latin text alone", () => {
     assert.equal(normalizeQuery(" 喜多川海夢 "), "喜多川海夢");
+  });
+});
+
+describe("queryTokens", () => {
+  it("splits on the punctuation that sits inside these names", () => {
+    // The bug: the blob holds "ruler/altria pendragon", so a search for
+    // "ruler altria" was not a substring of it and returned nothing.
+    assert.deepEqual(queryTokens("ruler altria"), ["ruler", "altria"]);
+    assert.deepEqual(queryTokens("Re:Zero Rem"), ["re", "zero", "rem"]);
+    assert.deepEqual(queryTokens("fate/grand order"), ["fate", "grand", "order"]);
+  });
+
+  it("keeps a scale whole", () => {
+    // Splitting on the slash leaves "1" and "7", which are then dropped for
+    // being single characters — so "1/7 saber" would quietly become "saber".
+    assert.deepEqual(queryTokens("1/7 saber"), ["1/7", "saber"]);
+    assert.deepEqual(queryTokens("1/8 altria"), ["1/8", "altria"]);
+  });
+
+  it("keeps a release number", () => {
+    assert.deepEqual(queryTokens("nendoroid 1935"), ["nendoroid", "1935"]);
+  });
+
+  it("drops single characters, which narrow nothing", () => {
+    assert.deepEqual(queryTokens("a & b"), []);
+    assert.deepEqual(queryTokens("miku & rin"), ["miku", "rin"]);
+  });
+
+  it("does not care about word order or repeats", () => {
+    assert.deepEqual(queryTokens("pendragon ruler pendragon"), ["pendragon", "ruler"]);
+  });
+});
+
+describe("buildSearchText carries the release number", () => {
+  it("includes it so a collector can search by it", () => {
+    const text = buildSearchText({
+      name: "Nendoroid Marin Kitagawa",
+      releaseNumber: "1935",
+      manufacturerName: "Good Smile Company",
+    });
+    assert.ok(text.includes("1935"), text);
   });
 });

@@ -3,7 +3,7 @@ import { cacheLife } from "next/cache";
 import { prisma } from "./prisma";
 import { dayValue, type ValueBasis } from "./figure-value";
 import { filterOptions } from "./filter-options";
-import { normalizeQuery } from "./search-text";
+import { normalizeQuery, queryTokens } from "./search-text";
 import type { Prisma } from "./generated/prisma/client";
 import type { FigureCategory, ItemCondition } from "./generated/prisma/enums";
 
@@ -81,17 +81,33 @@ function buildWhere(f: FigureFilters): Prisma.FigureWhereInput {
 
   if (f.q?.trim()) {
     const q = normalizeQuery(f.q);
+    const tokens = queryTokens(f.q);
+
     // One indexed column rather than five OR'd joins. searchText is stored
     // lowercase, so no `mode: "insensitive"` — that forces a sequential scan.
     //
     // It also reaches things the joins couldn't: character aliases and series
     // synonyms live in Postgres arrays, and Prisma has no partial match for
     // array elements, so "Saber" could never find Altria Pendragon before.
-    where.OR = [
-      { searchText: { contains: q } },
-      // Safety net for a figure created since the last index rebuild.
-      { name: { contains: q, mode: "insensitive" } },
-    ];
+    //
+    // Every word, rather than the whole query as one string. The blob holds
+    // "ruler/altria pendragon", so a search for "ruler altria" was not in it
+    // and returned nothing — and neither did "fate grand order" against
+    // "fate/grand order", or "re zero" against "re:zero". Punctuation sits
+    // between words in most of these names, which made a whole class of
+    // ordinary searches silently fail.
+    //
+    // AND across the words, so more words still narrow. Word order stops
+    // mattering, which is the other half of what a person expects.
+    where.AND = tokens.length
+      ? tokens.map((t) => ({
+          OR: [
+            { searchText: { contains: t } },
+            // Safety net for a figure created since the last index rebuild.
+            { name: { contains: t, mode: "insensitive" as const } },
+          ],
+        }))
+      : [{ OR: [{ searchText: { contains: q } }, { name: { contains: q, mode: "insensitive" as const } }] }];
   }
   if (f.category) where.category = f.category;
   // Franchise reaches a figure through its series, so the two combine into one
