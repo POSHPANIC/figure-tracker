@@ -78,6 +78,21 @@ jobs:
           DATABASE_URL: ${{ secrets.DIRECT_DATABASE_URL }}
         run: npm run import:solaris -- --yes --pages 8 --max 60
 
+      # Nin-Nin Game, same shape as Solaris. Their pages carry the JAN on
+      # every product, so attaching is exact here — and each run records
+      # barcodes against figures that had none, which is what makes every
+      # later source easier to match.
+      #
+      # Store links only fill a gap: they run no affiliate programme, so
+      # overwriting a tagged Solaris link with one that cannot earn would
+      # cost money on every figure both shops stock.
+      - name: Sync Nin-Nin Game
+        if: always()
+        env:
+          DIRECT_DATABASE_URL: ${{ secrets.DIRECT_DATABASE_URL }}
+          DATABASE_URL: ${{ secrets.DIRECT_DATABASE_URL }}
+        run: npm run import:ninnin -- --yes --max 60
+
       # One slice of HobbySearch. Unlike the other sources this creates figures
       # directly, because it has what a review queue exists to establish: a JAN
       # barcode proving the figure is not already listed, and the manufacturer's
