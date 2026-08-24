@@ -31,13 +31,21 @@ export const FILTER_KINDS: FilterKind[] = ["franchise", "character", "manufactur
 async function franchiseOptions(query: string, take: number): Promise<FilterOption[]> {
   const rows = await prisma.franchise.findMany({
     where: query ? { name: { contains: query, mode: "insensitive" } } : undefined,
-    select: { name: true, slug: true, series: { select: { _count: { select: { figures: true } } } } },
+    select: {
+      name: true,
+      slug: true,
+      series: { select: { _count: { select: { figures: true } } } },
+      // Collab pieces are filed elsewhere but browse under this franchise too,
+      // so the count has to include them or it contradicts the page it opens.
+      // They cannot double-count: a figure is never its own franchise's collab.
+      _count: { select: { collabFigures: true } },
+    },
   });
   return rows
     .map((f) => ({
       name: f.name,
       slug: f.slug,
-      count: f.series.reduce((n, s) => n + s._count.figures, 0),
+      count: f.series.reduce((n, s) => n + s._count.figures, 0) + f._count.collabFigures,
     }))
     .filter((f) => f.count > 0)
     .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name))

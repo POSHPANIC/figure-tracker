@@ -113,11 +113,27 @@ function buildWhere(f: FigureFilters): Prisma.FigureWhereInput {
   // Franchise reaches a figure through its series, so the two combine into one
   // clause rather than competing: choosing a franchise and then a series inside
   // it narrows, as you would expect from two filters.
-  if (f.seriesSlug || f.franchiseSlug) {
+  if (f.seriesSlug) {
     where.series = {
-      ...(f.seriesSlug ? { slug: f.seriesSlug } : {}),
+      slug: f.seriesSlug,
       ...(f.franchiseSlug ? { franchise: { slug: f.franchiseSlug } } : {}),
     };
+  } else if (f.franchiseSlug) {
+    // A collab piece is filed under its own franchise while wearing another's
+    // costume, and its info box names both. Browsing the borrowed one has to
+    // reach it too, or that link leads to a page the figure is missing from.
+    const borrowed = {
+      OR: [
+        { series: { franchise: { slug: f.franchiseSlug } } },
+        { collabFranchises: { some: { slug: f.franchiseSlug } } },
+      ],
+    };
+    const existing = where.AND
+      ? Array.isArray(where.AND)
+        ? where.AND
+        : [where.AND]
+      : [];
+    where.AND = [...existing, borrowed];
   }
   if (f.manufacturerSlug) where.manufacturer = { slug: f.manufacturerSlug };
   // Many-to-many: a figure can depict several characters, and one of them
@@ -204,6 +220,9 @@ export async function getFigureBySlug(slug: string, condition?: ItemCondition) {
       supersededBy: { select: { slug: true } },
       manufacturer: true,
       series: { include: { franchise: { select: { name: true, slug: true } } } },
+      // The franchises a collab piece borrows from. Ordered by name so the
+      // info box does not reshuffle between requests.
+      collabFranchises: { select: { name: true, slug: true }, orderBy: { name: "asc" } },
       characters: { include: { series: { select: { name: true, slug: true } } } },
       images: { orderBy: { sortOrder: "asc" } },
       // The archive id, which links back to the manufacturer's entry for the

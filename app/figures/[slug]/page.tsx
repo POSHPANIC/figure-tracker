@@ -200,6 +200,16 @@ async function FigureView({
   // be picked out by kind rather than taken as the first one.
   const archiveId = figure.identifiers.find((i) => i.kind === "GSC_PRODUCT");
 
+  // Its own franchise first, then any it only borrows from, with duplicates
+  // dropped — a collab whose costume comes from its own franchise would
+  // otherwise print the same name twice.
+  const franchises = (() => {
+    const own = figure.series?.franchise;
+    const seen = new Set(own ? [own.slug] : []);
+    const rest = figure.collabFranchises.filter((f) => !seen.has(f.slug));
+    return own ? [own, ...rest] : rest;
+  })();
+
   // The number printed on the box — "Nendoroid 1935", "figma EX-038". Written
   // with its line, because the number alone means nothing: 350 is a different
   // product depending on whether it is a Nendoroid or a figma.
@@ -359,16 +369,27 @@ async function FigureView({
               and nothing else, which is why this was done in the page rather
               than by dropping anything.
             */}
-            <Spec label="Franchise">
-              {figure.series?.franchise ? (
-                <Link
-                  href={`/figures?franchise=${figure.series.franchise.slug}`}
-                  className="term-link"
-                >
-                  {figure.series.franchise.name}
-                </Link>
-              ) : (
+            {/*
+              A collab piece belongs to one franchise and wears another's
+              costume, so both are named here — its own first, the borrowed
+              ones under it. Listing them beats choosing: whichever one we
+              picked alone, someone searching the other would not find it.
+            */}
+            <Spec label={franchises.length > 1 ? "Franchises" : "Franchise"}>
+              {franchises.length === 0 ? (
                 "—"
+              ) : (
+                <span className="flex flex-col items-end gap-0.5">
+                  {franchises.map((f) => (
+                    <Link
+                      key={f.slug}
+                      href={`/figures?franchise=${f.slug}`}
+                      className="term-link"
+                    >
+                      {f.name}
+                    </Link>
+                  ))}
+                </span>
               )}
             </Spec>
             <Spec label="Character">
