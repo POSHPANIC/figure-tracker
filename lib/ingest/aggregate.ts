@@ -209,17 +209,34 @@ export async function writeAskSnapshots(forDay?: Date): Promise<number> {
  * How confident the matcher has to be before a listing counts toward the asking
  * price.
  *
- * Deliberately stricter than MATCH_ACCEPT_THRESHOLD, which is 0.72. A listing
- * shown in a list is one a reader can judge for themselves; a listing folded
- * into a published number is one nobody can see. Showing more than we average
- * over is the right way round.
+ * Still stricter than MATCH_ACCEPT_THRESHOLD, which is 0.6 — a listing shown in
+ * a list is one a reader can judge for themselves, while a listing folded into
+ * a published number is one nobody can see, so showing more than we average
+ * over stays the right way round.
  *
- * A third of attached listings score below this — 23,235 of 67,135 — and a
- * median inherits whatever is in its sample. Applying the threshold pulls the
- * median spread between a figure's cheapest and dearest listing from 2.46x down
- * to 2.02x, and cuts the figures showing a tenfold spread from 239 to 82.
+ * This was 0.8, chosen to keep the median's sample clean: it pulled the median
+ * spread between a figure's cheapest and dearest listing from 2.46x to 2.02x,
+ * and cut the figures showing a tenfold spread from 239 to 82. Those numbers
+ * were real, but they measured tightness rather than accuracy, and 0.8 was
+ * buying that tightness by discarding correct matches.
+ *
+ * What it discarded: sellers who name the series are penalised for it, because
+ * the extra words dilute the score. "Nendoroid Saekano Fine Eriri Spencer
+ * Sawamura Kimono Ver." scores 0.75 against the figure it plainly is. Eriri's
+ * page listed 11 new/sealed listings and priced from 3 of them, publishing an
+ * $80 median against a real spread of $70-$103. Of 14 excluded listings sampled
+ * at random, 13 were correct; the one that was not matched a Nendoroid Doll to
+ * a Nendoroid.
+ *
+ * And 701 figures held three or more new/sealed listings while showing no price
+ * at all, because every listing they had sat below 0.8.
+ *
+ * 0.72 rather than 0.6 because the 0.6-0.71 band is where the genuinely
+ * doubtful matches live. The right fix is to stop docking sellers for naming
+ * the series, which is being worked through by hand; this is the floor until
+ * then, not a verdict on what a confident match is.
  */
-const ASK_MIN_MATCH_SCORE = 0.8;
+const ASK_MIN_MATCH_SCORE = 0.72;
 
 /**
  * How many listings before a median means anything.
