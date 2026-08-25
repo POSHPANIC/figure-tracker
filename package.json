@@ -33,6 +33,7 @@
     "derive:multi-characters": "tsx scripts/derive-multi-characters.ts",
     "merge:character": "tsx scripts/merge-character.ts",
     "discover:figures": "tsx scripts/discover-figures.ts",
+    "backfill:goodsmile": "tsx scripts/backfill-goodsmile.ts",
     "import:ninnin": "tsx scripts/import-ninnin.ts",
     "import:solaris": "tsx scripts/import-solaris.ts",
     "discover:hobbysearch": "tsx scripts/discover-hobbysearch.ts",
