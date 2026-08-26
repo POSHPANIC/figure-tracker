@@ -143,7 +143,6 @@ async function main() {
   let added = 0;
   let wrongCountry = 0;
   let dry = 0;
-  let lastMatched = from - 1;
   // The last id with a product behind it, and how far the walk actually got.
   let frontier = from - 1;
   let scanned = from - 1;
@@ -162,6 +161,7 @@ async function main() {
         dry += 1;
         if (dry >= DRY_RUN_LENGTH) {
           console.log(`\n  ${DRY_RUN_LENGTH} ids in a row with nothing behind them — stopping at ${id}.`);
+          hitTheEnd = true;
           break;
         }
         continue;
@@ -194,7 +194,6 @@ async function main() {
     }
 
     if (WRITE) await addIdentifier(figure.id, "GSC_SHOP_PRODUCT", String(id));
-    lastMatched = id;
 
     if (!product.gtin) {
       unmatched += 1;
@@ -219,7 +218,17 @@ async function main() {
   console.log(`  ${alreadyHad} figure(s) already had one; ${unmatched} product(s) matched nothing; ${ambiguous} ambiguous by name.`);
   const held = await prisma.figureIdentifier.count({ where: { kind: "JAN" } });
   console.log(`  JAN identifiers now held: ${held}${WRITE ? "" : " (unchanged — this was a report)"}`);
-  console.log(`\n  Next run resumes at ${WRITE ? lastMatched + 1 : from}.`);
+
+  // Past the end of their range, sit just behind the last live product rather
+  // than running off into empty ids. New releases are added at the top, so a
+  // short nightly re-walk of the tail is what finds them.
+  const next = hitTheEnd ? Math.max(1, frontier - TAIL_REWIND) : scanned + 1;
+  if (WRITE) await saveCursor(next);
+  console.log(
+    `\n  Next run resumes at ${next}` +
+      `${hitTheEnd ? ` (rewound behind the last live product, ${frontier})` : ""}.`,
+  );
+  if (!WRITE) console.log("  Cursor not moved — this was a report.");
   await prisma.$disconnect();
 }
 
