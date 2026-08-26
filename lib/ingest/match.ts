@@ -143,7 +143,23 @@ const GENERIC_DESCRIPTORS = new Set([
  */
 const MIN_NAME_WORDS_WITHOUT_CHARACTER = 3;
 
-const PRODUCT_LINE_TOKENS = ["nendoroid", "figma", "parade"] as const;
+const PRODUCT_LINE_TOKENS = [
+  "nendoroid",
+  "figma",
+  "parade",
+  // threezero's two Transformers lines. Their large "Premium Scale" figures are
+  // catalogued under bare character names — STARSCREAM, OPTIMUS PRIME, Megatron
+  // — so nothing in those names contradicts a listing for a different line of
+  // the same character, and every DLX and MDLX listing on the market landed on
+  // them: a $250 MDLX Coronation Starscream against a $800 16-inch statue.
+  //
+  // Checked before adding, because both read like abbreviations of "deluxe":
+  // of the 97 listings naming one, not a single one also spells "deluxe" out,
+  // and no figure in the catalogue carries either word. So these reject rather
+  // than move — we do not hold the products, and matching nothing is right.
+  "mdlx",
+  "dlx",
+] as const;
 
 /**
  * Lines whose name is a phrase rather than a word.

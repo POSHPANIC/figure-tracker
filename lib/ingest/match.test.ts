@@ -1138,3 +1138,44 @@ describe("a stated size as a tiebreak", () => {
     assert.equal(bestMatch("Motoko Kusanagi Swimsuit Ver. 275mm", [withFans, swimsuit])?.figureId, "sw");
   });
 });
+
+describe("threezero's Transformers lines", () => {
+  /**
+   * threeA's large Premium Scale figures are catalogued under bare character
+   * names, so nothing in the name contradicts a listing for a different line of
+   * the same character. All 97 DLX and MDLX listings on the market had landed
+   * on four of them.
+   */
+  const starscream: MatchCandidate = {
+    id: "ss",
+    name: "STARSCREAM",
+    nameJa: "STARSCREAM（スタースクリーム）",
+    scale: null,
+    heightMm: 406,
+    category: "OTHER",
+    manufacturerName: "threeA",
+    seriesName: "Transformers",
+    characterNames: ["Starscream"],
+  };
+
+  it("keeps a listing for the figure itself", () => {
+    const hit = bestMatch('threeA 16" STARSCREAM Decepticons Figure Transformers Dark of the Moon', [starscream]);
+    assert.ok(hit && hit.score > 0.7, `expected a match, got ${JSON.stringify(hit)}`);
+  });
+
+  it("rejects the MDLX line", () => {
+    assert.equal(bestMatch("Transformers MDLX Coronation Starscream Action Figure - ThreeA Toys", [starscream]), null);
+  });
+
+  it("rejects the DLX line", () => {
+    assert.equal(bestMatch("ThreeZero 3A Toys DLX 1/72 BLITZWING Starscream Action Figure", [starscream]), null);
+  });
+
+  it("does not mistake a spelled-out deluxe for the line", () => {
+    // The correct listings say "Deluxe Edition" and "Deluxe Version" in full.
+    // Of the 97 titles naming DLX or MDLX, none also spelled deluxe out — which
+    // is what made it safe to treat the abbreviations as line names.
+    const hit = bestMatch("Perfect Threezero 3a Starscream Premium Scale Deluxe Edition Action Figure", [starscream]);
+    assert.ok(hit && hit.score > 0, `expected a match, got ${JSON.stringify(hit)}`);
+  });
+});
