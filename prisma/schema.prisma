@@ -947,3 +947,16 @@ model FigureCandidate {
 
   @@index([status, listingCount])
 }
+
+/// Small pieces of operational state that belong to no one row.
+///
+/// Added for the Good Smile shop crawl, which walks product ids and has to
+/// remember where it stopped. It had been inferring that from the highest id it
+/// had *matched*, which is not the same thing: the ids past the last match were
+/// re-walked every night, and once the shop adds products beyond them there is
+/// no way to tell "not reached yet" from "reached and matched nothing".
+model Setting {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt
+}

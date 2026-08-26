@@ -10,6 +10,7 @@ import {
 } from "../lib/ingest/solaris";
 import { parseProductPage, tidyName, type SolarisSpecs } from "../lib/ingest/solaris-product";
 import { decide as decideNsfw, fromRetailerTags as nsfwFromTags } from "../lib/ingest/nsfw";
+import { findHeldProduct } from "../lib/ingest/held-product";
 
 /**
  * Import Solaris Japan's catalogue directly.
@@ -282,6 +283,17 @@ async function handle(c: SolarisCandidate): Promise<{ outcome: Outcome; detail: 
   if (!specs.name) return { outcome: "skipped", detail: "no product name on the page" };
 
   const name = tidyName(specs.name);
+
+  // Last check before creating. Exact identifiers have already had their say;
+  // this catches the figures that carry none — mostly scale figures, which have
+  // no number on the box — where creating would make a second copy of something
+  // already listed. See lib/ingest/same-product.ts for why it is this narrow.
+  const held = await findHeldProduct({
+    name,
+    manufacturer: specs.manufacturer ?? c.vendor,
+    category: categoryFor(specs),
+  });
+  if (held) return attach(held.id, c, specs.jan, `same product as ${held.name.slice(0, 40)}`);
   if (!APPLY) return { outcome: "created", detail: name.slice(0, 58) };
 
   const base = slugify(name);

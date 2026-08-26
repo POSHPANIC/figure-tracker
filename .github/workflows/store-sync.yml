@@ -96,20 +96,22 @@ jobs:
       # A slice of Good Smile's shop, for barcodes.
       #
       # Their archive built most of this catalogue and publishes no barcode at
-      # all; their shop publishes one on every product. Nothing joins the two
-      # — different id spaces, no cross-links, and the shop's only listing
-      # route is /en/search, which their robots.txt disallows — so this walks
-      # product ids and matches on an exact name plus manufacturer.
+      # all; their shop publishes one on every product. Nothing joins the two —
+      # different id spaces, no cross-links, and the shop's only listing route
+      # is /en/search, which their robots.txt disallows — so this walks product
+      # ids and matches on an exact name plus manufacturer.
       #
-      # 800 a night because that is ~15 minutes of polite fetching, and the id
-      # range is about 14,000. It resumes from the highest shop id held, so
-      # each night continues where the last stopped.
+      # The first sweep is done: ids 1–13,424, and 4,400 barcodes. What this
+      # keeps doing is catching new releases, which the shop adds at the top of
+      # the id range. On reaching the end the cursor rewinds to just behind the
+      # last live product, so each night re-walks a short tail and then carries
+      # on into whatever is new.
       - name: Recover barcodes from Good Smile
         if: always()
         env:
           DIRECT_DATABASE_URL: ${{ secrets.DIRECT_DATABASE_URL }}
           DATABASE_URL: ${{ secrets.DIRECT_DATABASE_URL }}
-        run: npm run backfill:goodsmile -- --write --max 800
+        run: npm run backfill:goodsmile -- --write --max 400
 
       # One slice of HobbySearch. Unlike the other sources this creates figures
       # directly, because it has what a review queue exists to establish: a JAN

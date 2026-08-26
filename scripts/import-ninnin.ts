@@ -13,6 +13,7 @@ import {
   type NinNinProduct,
 } from "../lib/ingest/ninnin";
 import { decide as decideNsfw } from "../lib/ingest/nsfw";
+import { findHeldProduct } from "../lib/ingest/held-product";
 
 /**
  * Import Nin-Nin Game's catalogue.
@@ -196,6 +197,26 @@ async function handle(url: string): Promise<{ outcome: Outcome; detail: string }
   }
 
   if (!product.name) return { outcome: "skipped", detail: "no product name" };
+
+  // Last check before creating. Their barcode has already been tried, and most
+  // of what it cannot reach is scale figures holding no identifier at all.
+  const held = await findHeldProduct({
+    name: product.name,
+    manufacturer: product.manufacturer,
+    category: categoryFor(product),
+  });
+  if (held) {
+    let linked = false;
+    if (APPLY) {
+      linked = await writeStore(held.id, product);
+      await recordIdentifiers(held.id, product);
+    }
+    return {
+      outcome: "attached",
+      detail: `same product as ${held.name.slice(0, 36)}${APPLY && !linked ? " (kept its shop link)" : ""}`,
+    };
+  }
+
   if (!APPLY) return { outcome: "created", detail: product.name.slice(0, 52) };
 
   const base = slugify(product.name);

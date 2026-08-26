@@ -37,16 +37,24 @@ import {
  * series. A barcode is an exact join key, so a wrong one is worse than none:
  * it would send some later source's listings to the wrong figure.
  *
- * Resumption is derived rather than stored. Ids are walked in order and each
- * matched product records its shop id, so the highest one held is where the
- * last run got to. That skips ids below it that matched nothing, which is the
- * intended behaviour — a T-shirt will not start matching later.
+ * Where it stopped is remembered in Setting, not inferred. It used to resume
+ * from the highest shop id it had *matched*, which cannot tell "not reached
+ * yet" from "reached and matched nothing" — so the ids past the last match were
+ * re-walked nightly, and new products beyond them were only found by accident.
+ *
+ * On reaching the end of their range the cursor rewinds to just behind the last
+ * live product rather than stopping. That is what keeps catching new releases:
+ * the shop adds them at the top, so a short nightly re-walk of the tail finds
+ * them the day they appear.
  */
 
 const WRITE = process.argv.includes("--write");
 const DELAY_MS = 1100;
-/** Their ids stop somewhere below this; the walk exits early on a dry stretch. */
-const ID_CEILING = 15_000;
+/** A backstop only. The walk normally ends on a dry stretch, not here. */
+const ID_CEILING = 40_000;
+/** How far behind the last live product to rewind, to catch new releases. */
+const TAIL_REWIND = 120;
+const CURSOR_KEY = "goodsmile:shopCursor";
 /** Consecutive 404s that mean the end of the range rather than a gap. */
 const DRY_RUN_LENGTH = 400;
 
@@ -98,14 +106,27 @@ async function addIdentifier(figureId: string, kind: string, value: string): Pro
   return true;
 }
 
-/** Where the last run got to, from the highest shop id we hold. */
+/** Where the last run stopped. */
 async function resumeFrom(): Promise<number> {
+  const row = await prisma.setting.findUnique({ where: { key: CURSOR_KEY } });
+  const stored = Number(row?.value);
+  if (Number.isFinite(stored) && stored > 0) return stored;
+
+  // No cursor yet. Fall back to the highest id already matched, so a database
+  // that has been crawled once does not start again from the beginning.
   const rows = await prisma.figureIdentifier.findMany({
     where: { kind: "GSC_SHOP_PRODUCT" },
     select: { value: true },
   });
-  const highest = rows.reduce((max, r) => Math.max(max, Number(r.value) || 0), 0);
-  return highest + 1;
+  return rows.reduce((max, r) => Math.max(max, Number(r.value) || 0), 0) + 1;
+}
+
+async function saveCursor(next: number) {
+  await prisma.setting.upsert({
+    where: { key: CURSOR_KEY },
+    create: { key: CURSOR_KEY, value: String(next) },
+    update: { value: String(next) },
+  });
 }
 
 async function main() {
@@ -123,8 +144,13 @@ async function main() {
   let wrongCountry = 0;
   let dry = 0;
   let lastMatched = from - 1;
+  // The last id with a product behind it, and how far the walk actually got.
+  let frontier = from - 1;
+  let scanned = from - 1;
+  let hitTheEnd = false;
 
   for (let id = from; id <= to; id += 1) {
+    scanned = id;
     await sleep(DELAY_MS);
     let html: string;
     try {
@@ -146,6 +172,7 @@ async function main() {
       continue;
     }
     dry = 0;
+    frontier = id;
     seen += 1;
 
     const product = parseShopProduct(html);
