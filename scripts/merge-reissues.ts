@@ -55,6 +55,27 @@ function numbersOf(f: Row): string[] {
   return f.identifiers.filter((i) => i.kind.endsWith("_NO")).map((i) => i.value);
 }
 
+/**
+ * A name with any reissue marker taken off.
+ *
+ * Good Smile's archive gives a reissue the same name as the original, which is
+ * what the exact-name grouping below was written for. The shops do not: Solaris
+ * and Nin-Nin write "Nendoroid Tomoe 2026 Re-release" and "Aoba (Rerelease)",
+ * so a reissue imported from them has a name nothing else shares and could
+ * never be grouped with the product it reissues.
+ *
+ * Stripping the marker is all this does. Everything that decides whether two
+ * entries are really one product — maker, category, scale, height, and at most
+ * one release number between them — is unchanged and still has to pass.
+ */
+export function productName(name: string): string {
+  return name
+    .replace(/\s*\((?:\d{4}\s*)?re-?(?:issue|release)(?:\s+edition)?\)\s*/gi, " ")
+    .replace(/\s+(?:\d{4}\s+)?re-?(?:issue|release)(?:\s+edition)?\s*$/gi, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 /** Everything that must agree before two entries can be one product. */
 function identityKey(f: Row): string {
   return [
@@ -66,12 +87,10 @@ function identityKey(f: Row): string {
 }
 
 async function main() {
-  const dupNames = await prisma.$queryRaw<{ name: string }[]>`
-    SELECT name FROM "Figure" GROUP BY name HAVING count(*) > 1
-  `;
-
+  // Every figure, grouped in memory rather than prefiltered in SQL. The old
+  // query asked for names held by more than one row, which by construction
+  // cannot see a reissue whose name carries a marker the original lacks.
   const rows = (await prisma.figure.findMany({
-    where: { name: { in: dupNames.map((n) => n.name) } },
     select: {
       id: true, name: true, slug: true, category: true, scale: true, heightMm: true,
       releaseDate: true, msrpAmount: true, supersededById: true,
@@ -84,10 +103,12 @@ async function main() {
 
   const byName = new Map<string, Row[]>();
   for (const r of rows) {
-    const list = byName.get(r.name) ?? [];
+    const key = productName(r.name).toLowerCase();
+    const list = byName.get(key) ?? [];
     list.push(r);
-    byName.set(r.name, list);
+    byName.set(key, list);
   }
+  for (const [key, group] of byName) if (group.length < 2) byName.delete(key);
 
   let merged = 0;
   let movedListings = 0;
