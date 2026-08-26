@@ -6,7 +6,9 @@ import {
   canonicalLineNumber,
   descriptorTokens,
   extractLineNumber,
+  extractSizesMm,
   isNotAFigure,
+  isUnofficial,
   isNotASingleFigure,
   normalizeCondition,
   scoreMatch,
@@ -955,3 +957,184 @@ describe("lines whose name is a phrase", () => {
 });
 
 
+
+describe("size", () => {
+  const statue = {
+    id: "f1",
+    name: "Shoto Todoroki",
+    nameJa: "轟焦凍",
+    scale: "1/4",
+    heightMm: 345,
+    category: "SCALE",
+    manufacturerName: "FREEing",
+    seriesName: "My Hero Academia",
+    characterNames: ["Shouto Todoroki"],
+  };
+
+  it("reads every size a title states", () => {
+    // Sellers say it twice in two units; taking the first would be a coin-flip.
+    assert.deepEqual(extractSizesMm("47cm (18.5in)").map(Math.round), [470, 470]);
+    assert.deepEqual(extractSizesMm("6.5-Inch Figure").map(Math.round), [165]);
+    assert.deepEqual(extractSizesMm("6Inch Action Figure").map(Math.round), [152]);
+  });
+
+  it("ignores a bare number, which is a release number or a scale", () => {
+    assert.deepEqual(extractSizesMm("Nendoroid 1935 Marin Kitagawa"), []);
+    assert.deepEqual(extractSizesMm("1/4 Scale Figure"), []);
+  });
+
+  it("rejects a title stating a size nothing like the figure's", () => {
+    // Forty dollars of action figure against eight hundred of statue.
+    assert.equal(bestMatch("Shoto Todoroki - 6.5-Inch Figure with Swappable Faceplates", [statue]), null);
+    assert.equal(bestMatch("Hero Aka Shoto Todoroki 6Inch Action Figure", [statue]), null);
+  });
+
+  it("keeps a listing that measures the box rather than the figure", () => {
+    // The correct listing for that same statue, a third taller than the
+    // catalogue height because it is measured with the base.
+    const hit = bestMatch("My Hero Academia Shoto Todoroki 1/4 Figure FREEing Japan 47cm (18.5in)", [statue]);
+    assert.ok(hit && hit.score > 0.7, `expected a match, got ${JSON.stringify(hit)}`);
+  });
+
+  it("says nothing when the title states no size", () => {
+    const hit = bestMatch("FREEing B-STYLE My Hero Academia Shoto Todoroki 1/4 Scale Figure", [statue]);
+    assert.ok(hit && hit.score > 0.7);
+  });
+
+  it("says nothing when the catalogue has no height", () => {
+    const { heightMm: _drop, ...noHeight } = statue;
+    assert.notEqual(bestMatch("Shoto Todoroki 6.5-Inch Figure", [noHeight]), null);
+  });
+});
+
+describe("Funko", () => {
+  it("never matches a Japanese scale figure", () => {
+    assert.equal(
+      bestMatch("Shoto Todoroki Pre-Release Chase Exclusive Funko Pop with Free Pop Protector", [
+        {
+          id: "f1", name: "Shoto Todoroki", nameJa: null, scale: "1/4", heightMm: 345,
+          category: "SCALE", manufacturerName: "FREEing",
+          seriesName: "My Hero Academia", characterNames: ["Shouto Todoroki"],
+        },
+      ]),
+      null,
+    );
+  });
+});
+
+describe("unofficial resin", () => {
+  const withFans: MatchCandidate = {
+    id: "wf",
+    name: "Motoko Kusanagi",
+    nameJa: "草薙素子",
+    scale: "1/4",
+    heightMm: 275,
+    category: "SCALE",
+    manufacturerName: "With Fans!",
+    seriesName: "Ghost in the Shell S.A.C",
+    characterNames: ["Motoko Kusanagi"],
+  };
+
+  it("spots a made-to-order cast", () => {
+    // Real titles. The same bootleg listed from $92 to $1,173.
+    assert.equal(isUnofficial("Motoko Kusanagi Figure / Statue various sizes"), true);
+    assert.equal(isUnofficial("Motoko Kusanagi-25cm Figure/Statue,3d printed,Painted,handmade"), true);
+    assert.equal(isUnofficial("Major Motoko Kusanagi Resin Figure / Statue various sizes"), true);
+  });
+
+  it("leaves an official resin statue alone", () => {
+    // With Fans! cast this one in resin themselves; resin is not the tell.
+    assert.equal(isUnofficial("With Fans! GHOST IN THE SHELL Kusanagi Motoko 1/4 Resin Figure Model Genuine"), false);
+    assert.equal(isUnofficial("Hdge technical statue No.6 Ghost in the Shell S.A.C Motoko Kusanagi"), false);
+  });
+
+  it("never matches a catalogued figure", () => {
+    assert.equal(bestMatch("Motoko Kusanagi Figure / Statue various sizes", [withFans]), null);
+  });
+
+  it("still matches the genuine article", () => {
+    const hit = bestMatch("With Fans! GHOST IN THE SHELL Kusanagi Motoko 1/4 Resin Figure Model Genuine", [withFans]);
+    assert.ok(hit && hit.score > 0.7, `expected a match, got ${JSON.stringify(hit)}`);
+  });
+});
+
+describe("Hyper Body", () => {
+  const withFans: MatchCandidate = {
+    id: "wf", name: "Motoko Kusanagi", nameJa: null, scale: "1/4", heightMm: 275,
+    category: "SCALE", manufacturerName: "With Fans!",
+    seriesName: "Ghost in the Shell S.A.C", characterNames: ["Motoko Kusanagi"],
+  };
+  /** Named the way the sellers do. See the note on the last test here. */
+  const hyperBody: MatchCandidate = {
+    id: "hb",
+    name: "Hyper Body Motoko Kusanagi Simple Armored Suit Ver.",
+    nameJa: null, scale: null, heightMm: null, category: "OTHER",
+    manufacturerName: "Good Smile Arts Shanghai",
+    seriesName: "Ghost in the Shell S.A.C", characterNames: ["Motoko Kusanagi"],
+  };
+
+  it("does not put a $120 Hyper Body on a $1,200 statue", () => {
+    const title = "GHOST IN THE SHELL Hyper Body Motoko Kusanagi Simple Armored Suit Ver.";
+    assert.equal(bestMatch(title, [withFans]), null);
+  });
+
+  it("puts it on the figure whose own name carries the line", () => {
+    const title = "GHOST IN THE SHELL Hyper Body Motoko Kusanagi Simple Armored Suit Ver.";
+    assert.equal(bestMatch(title, [withFans, hyperBody])?.figureId, "hb");
+  });
+
+  it("does not reach the catalogue's own Hyper Body entry, which is named differently", () => {
+    // Worth pinning down rather than glossing: the entry imported from Nin-Nin
+    // is "…Simplified Armored Suit Ver. Hyper Body (Reissue)" and sellers write
+    // "Simple Armored Suit Ver.", so Gate 4 rejects it there too. The listings
+    // come off the wrong figure but land on nothing — better, not fixed.
+    const asImported: MatchCandidate = {
+      ...hyperBody,
+      name: "Ghost in the Shell: Motoko Kusanagi - Simplified Armored Suit Ver. Hyper Body (Reissue)",
+    };
+    const title = "GHOST IN THE SHELL Hyper Body Motoko Kusanagi Simple Armored Suit Ver.";
+    assert.equal(bestMatch(title, [withFans, asImported]), null);
+  });
+});
+
+describe("a stated size as a tiebreak", () => {
+  /**
+   * Real case, and the reason the size gate alone was not enough. The
+   * catalogue holds two figures named plainly "Motoko Kusanagi" — Good Smile's
+   * 200mm and With Fans!' 275mm — and neither name carries a word to tell them
+   * apart. A listing saying "Approx 275mm" scored 0.870 against both, and
+   * bestMatch refuses a tie, so the listing that identified its figure most
+   * precisely was the one that matched nothing at all.
+   */
+  const base = {
+    nameJa: null, scale: null, category: "SCALE" as const,
+    seriesName: "Ghost in the Shell S.A.C", characterNames: ["Motoko Kusanagi"],
+  };
+  const gsc: MatchCandidate = { ...base, id: "gsc", name: "Motoko Kusanagi", heightMm: 200, manufacturerName: "Good Smile Company" };
+  const withFans: MatchCandidate = { ...base, id: "wf", name: "Motoko Kusanagi", heightMm: 275, manufacturerName: "With Fans!" };
+
+  it("picks the figure whose height the listing states", () => {
+    const t = "Ghost in the Shell: Motoko Kusanagi; With Fans! Approx 275mm";
+    assert.equal(bestMatch(t, [gsc, withFans])?.figureId, "wf");
+    // Order must not decide it.
+    assert.equal(bestMatch(t, [withFans, gsc])?.figureId, "wf");
+  });
+
+  it("picks the other one when the other one is the size stated", () => {
+    const t = "Ghost in the Shell Motoko Kusanagi Figure 200mm";
+    assert.equal(bestMatch(t, [gsc, withFans])?.figureId, "gsc");
+  });
+
+  it("still refuses the tie when no size is stated", () => {
+    // Nothing to choose between them, so nothing is chosen. That is the
+    // behaviour this tiebreak narrows, not one it replaces.
+    assert.equal(bestMatch("Ghost in the Shell Motoko Kusanagi Figure", [gsc, withFans]), null);
+  });
+
+  it("is too small to override a real distinguishing word", () => {
+    const swimsuit: MatchCandidate = { ...base, id: "sw", name: "Motoko Kusanagi Swimsuit Ver.", heightMm: 200, manufacturerName: "Good Smile Company" };
+    // 275mm agrees with With Fans!, but the title names a variant only the
+    // swimsuit figure accounts for.
+    assert.equal(bestMatch("Motoko Kusanagi Swimsuit Ver. 275mm", [withFans, swimsuit])?.figureId, "sw");
+  });
+});

@@ -156,7 +156,18 @@ const PRODUCT_LINE_TOKENS = ["nendoroid", "figma", "parade"] as const;
  * which 29 were attached to figures of another category — a HELLO! GOOD SMILE
  * chibi priced against a 1/8 scale statue.
  */
-const PRODUCT_LINE_PHRASES = ["hello good smile"] as const;
+const PRODUCT_LINE_PHRASES = [
+  "hello good smile",
+  // Good Smile Arts Shanghai's line. Twenty-five listings for their "Hyper
+  // Body Motoko Kusanagi Simple Armored Suit Ver." — a $120 figure — were
+  // attached to With Fans!' $1,200 1/4 statue, because the statue is catalogued
+  // as plainly "Motoko Kusanagi" and so has no word to contradict them with.
+  //
+  // No entry in CATEGORY_LINE_PHRASE is needed: the gate already lets a title
+  // through when the figure's own name carries the phrase, and the Hyper Body
+  // figure is named for its line.
+  "hyper body",
+] as const;
 
 /** The line word a catalog category implies, if any. */
 const CATEGORY_LINE: Partial<Record<string, string>> = {
@@ -276,6 +287,11 @@ const MAKER_HOUSES: string[][] = [
 const RIVAL_MAKERS = [
   "furyu", "banpresto", "taito", "megahouse", "kaiyodo", "aniplex",
   "union creative", "quesq", "emontoys", "pulchra", "estream", "hobby max",
+  // Funko make vinyl Pops and nothing else. The name is theirs alone — no
+  // character, series or licensor shares it — so it is the safest entry here.
+  // A "Shoto Todoroki Funko Pop" was landing on FREEing's 1/4 scale statue,
+  // eighty dollars against eight hundred.
+  "funko",
 ];
 
 /**
@@ -509,11 +525,40 @@ function extractScale(text: string): string | null {
   return m ? `1/${m[1]}` : null;
 }
 
+/**
+ * Physical sizes a title states, in millimetres.
+ *
+ * Sellers write the same measurement several ways in one title — "47cm
+ * (18.5in)" — so every one is collected and the gate below only rejects when
+ * they *all* disagree. Taking the first would have thrown that listing away.
+ *
+ * Deliberately ignores a bare number: "Nendoroid 1935" is not 1,935 of
+ * anything, and "1/4" is a scale, which Gate 6 handles.
+ */
+export function extractSizesMm(text: string): number[] {
+  const sizes: number[] = [];
+  const pattern = /(\d{1,3}(?:\.\d)?)\s*-?\s*(mm|cm|inch|inches|in)\b/gi;
+  for (const m of normalize(text).matchAll(pattern)) {
+    const value = Number(m[1]);
+    if (!Number.isFinite(value) || value <= 0) continue;
+    const unit = m[2].toLowerCase();
+    const mm = unit === "mm" ? value : unit === "cm" ? value * 10 : value * 25.4;
+    // Anything outside this is a shipping box or a typo, not a figure.
+    if (mm >= 20 && mm <= 2000) sizes.push(mm);
+  }
+  return sizes;
+}
+
 export type MatchCandidate = {
   id: string;
   name: string;
   nameJa: string | null;
   scale: string | null;
+  /**
+   * How tall the figure is, when the archive said. Used only to reject a title
+   * that states a wildly different size — see the size gate below.
+   */
+  heightMm?: number | null;
   /** FigureCategory value — decides which product line the figure belongs to. */
   category: string;
   manufacturerName: string | null;
@@ -629,6 +674,25 @@ export function isNotAFigure(title: string): boolean {
 }
 
 /**
+ * Made-to-order resin, which is a figure but not a *product*.
+ *
+ * Fifteen listings reading "Motoko Kusanagi Figure / Statue various sizes" sat
+ * on a 1/4 With Fans! statue at prices from $92 to $1,173 — the same seller's
+ * bootleg offered in whatever size you ask for. Something sold in various sizes
+ * is by definition not one catalogued release, and its price says nothing about
+ * the release it was standing next to.
+ *
+ * Every phrase here is one an official product never uses. "Garage kit" is
+ * deliberately absent: those are a legitimate category with real releases.
+ */
+const UNOFFICIAL =
+  /\b(3\s?d[-\s]?print(?:ed|ing)?|hand[-\s]?made|various\s+sizes|made[-\s]to[-\s]order|custom[-\s]made|bootleg|fan[-\s]?made|unofficial)\b/i;
+
+export function isUnofficial(title: string): boolean {
+  return UNOFFICIAL.test(title);
+}
+
+/**
  * Which series a title names, out of the ones the catalogue knows.
  *
  * Computed once per title and handed to every scoreMatch call for it, because
@@ -682,6 +746,9 @@ export function scoreMatch(
   // figure at all?", which is fine while the search returns figures and useless
   // when it returns a character's whole merchandise line.
   if (isNotAFigure(title)) return 0;
+
+  // --- Gate 0b: and a product, not somebody's resin cast of one. ---
+  if (isUnofficial(title)) return 0;
 
   // --- Gate 1: the character must be named, in some language. ---
   //
@@ -845,6 +912,33 @@ export function scoreMatch(
   const titleScale = extractScale(title);
   if (figure.scale && titleScale && titleScale !== figure.scale) return 0;
 
+  // --- Gate 6b: a stated size must be the same order of thing. ---
+  // The inch-measured half of Gate 6. A scale figure often states no fraction
+  // and a size instead, and "Shoto Todoroki - 6.5-Inch Figure" was landing on
+  // FREEing's 345mm 1/4 statue: same character, same series, nothing in the
+  // title to contradict, forty dollars against eight hundred.
+  //
+  // Half to double, which is far looser than it sounds and deliberately so.
+  // Sellers measure the box, or the figure with its base: the correct listing
+  // for that same statue says "47cm (18.5in)" against a catalogue height of
+  // 345mm, a third larger. A tighter bound rejects the right listing to catch
+  // the wrong one.
+  //
+  // A size stated *exactly* right is also the tiebreak below, which is a
+  // separate job from the rejection: the catalogue holds two figures named
+  // plainly "Motoko Kusanagi", one 200mm and one 275mm, and a title saying
+  // "Approx 275mm" scored 0.870 against both. bestMatch refuses a tie, quite
+  // rightly, so a listing that named its figure precisely matched nothing.
+  let sizeAgrees = false;
+  if (figure.heightMm) {
+    const sizes = extractSizesMm(title);
+    if (sizes.length > 0) {
+      const ratios = sizes.map((mm) => mm / figure.heightMm!);
+      if (!ratios.some((r) => r >= 0.5 && r <= 2)) return 0;
+      sizeAgrees = ratios.some((r) => r >= 0.93 && r <= 1.07);
+    }
+  }
+
   const overlap = [...nameTokensForLine].filter((t) => titleTokens.has(t)).length;
   const nameScore = nameTokensForLine.size ? overlap / nameTokensForLine.size : 0;
 
@@ -924,6 +1018,14 @@ export function scoreMatch(
   if (figure.nameJa && normalize(title).includes(normalize(figure.nameJa))) {
     score += 0.25;
   }
+
+  // A size stated to within a few percent. Small on purpose: this is a
+  // tiebreak, not evidence on its own. The catalogue holds two figures named
+  // plainly "Motoko Kusanagi" — 200mm from Good Smile, 275mm from With Fans! —
+  // and "With Fans! Approx 275mm" scored 0.870 against both, so the listing
+  // that identified its figure most precisely was the one that matched
+  // nothing. Sellers who bother to measure are usually right about it.
+  if (sizeAgrees) score += 0.05;
 
   return Math.max(0, Math.min(1, score));
 }
