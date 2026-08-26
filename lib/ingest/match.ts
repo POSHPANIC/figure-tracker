@@ -783,6 +783,8 @@ export function scoreMatch(
   // originals — can never match a listing. That is the right trade: they are
   // rare, they are hard to identify from a title anyway, and an unmatched
   // figure merely lacks prices where a mismatched one publishes wrong ones.
+  /** Whether this figure got past Gate 1 on its name rather than its cast. */
+  let identifiedByNameAlone = false;
   const characterTokens = figure.characterNames.flatMap((n) => [...tokenize(n)]);
   const namedInEnglish = characterTokens.some((t) => titleTokens.has(t));
   // Japanese sellers write the character's name in Japanese and nothing else.
@@ -817,6 +819,13 @@ export function scoreMatch(
     // name — and left the figure matching nothing at all, because every seller
     // writes the handle. Attaching a true fact had made the figure invisible.
     if (descriptorTokens(figure).size < MIN_NAME_WORDS_WITHOUT_CHARACTER) return 0;
+    // Only when we know who the figure depicts and the title says someone else.
+    // A figure with no character recorded is not contradicting anything, and
+    // penalising those cost 870 correct matches in a dry run — "figma Love
+    // Live! Sunshine!! Kunikida Hanamaru" onto figma Hanamaru Kunikida,
+    // "Nendoroid 776 Sakurakoji Luna" onto Nendoroid Luna Sakurakouji — all
+    // sitting at exactly 0.60 with no room to give.
+    identifiedByNameAlone = characterTokens.length > 0;
   }
 
   // --- Gate 2: it has to be a figure, and one of them. ---
@@ -1046,6 +1055,20 @@ export function scoreMatch(
   // that identified its figure most precisely was the one that matched
   // nothing. Sellers who bother to measure are usually right about it.
   if (sizeAgrees) score += 0.05;
+
+  // A figure whose character we know, and whose title names somebody else, is
+  // weaker evidence than one whose character the title actually names.
+  //
+  // Without this the fallback did the harm the gate was written to prevent.
+  // "POP UP PARADE Chainsaw Man" is a figure of Denji, and against "Chainsaw
+  // Man Makima Pop Up Parade Figure" it scored 0.870 on its name alone —
+  // exactly level with POP UP PARADE Makima, whose character the title names.
+  // The tie went unresolved and a Makima listing left Makima's page.
+  //
+  // Small deliberately: it has to settle a tie, not overturn a score. Two
+  // hundredths clears SCORE_EPSILON by a wide margin and is far below the gap
+  // any real piece of evidence opens up.
+  if (identifiedByNameAlone) score -= 0.02;
 
   return Math.max(0, Math.min(1, score));
 }

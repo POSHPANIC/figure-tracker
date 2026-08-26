@@ -1239,3 +1239,53 @@ describe("a character recorded under a name nobody sells them by", () => {
     assert.equal(scoreMatch("Nendoroid Rem Re:Zero Good Smile Company", thin), 0);
   });
 });
+
+describe("name-alone identification ranks below a named character", () => {
+  /**
+   * The regression the Gate 1 fallback caused, and the reason it is scoped.
+   * "POP UP PARADE Chainsaw Man" is a figure of Denji. Against "Chainsaw Man
+   * Makima Pop Up Parade Figure" its whole name is present, so the fallback let
+   * it score 0.870 — exactly level with POP UP PARADE Makima, whose character
+   * the title actually names. bestMatch refuses a tie, so a Makima listing left
+   * Makima's page and landed nowhere.
+   */
+  const base = {
+    nameJa: null, scale: null, category: "OTHER" as const,
+    manufacturerName: "Good Smile Company", seriesName: "Chainsaw Man",
+  };
+  const makima: MatchCandidate = { ...base, id: "makima", name: "POP UP PARADE Makima", characterNames: ["Makima"] };
+  const denji: MatchCandidate = { ...base, id: "denji", name: "POP UP PARADE Chainsaw Man", characterNames: ["Denji"] };
+  const title = "Good Smile Company Chainsaw Man Makima Pop Up Parade Figure";
+
+  it("gives the listing to the figure the title names", () => {
+    assert.equal(bestMatch(title, [makima, denji])?.figureId, "makima");
+    assert.equal(bestMatch(title, [denji, makima])?.figureId, "makima");
+  });
+
+  it("scores the contradicted figure below the named one", () => {
+    assert.ok(scoreMatch(title, denji) < scoreMatch(title, makima));
+  });
+
+  it("does not penalise a figure with no character recorded", () => {
+    // Those are not contradicting anything, and penalising them cost 870
+    // correct matches sitting at exactly 0.60 with no room to give.
+    const chono: MatchCandidate = {
+      id: "chono", name: "figma Masahiro Chono", nameJa: null, scale: null,
+      category: "FIGMA", manufacturerName: "Good Smile Company",
+      seriesName: "New Japan Pro-Wrestling", characterNames: [],
+    };
+    assert.ok(scoreMatch("figma Masahiro Chono non-scale ABS PVC painted", chono) >= MATCH_ACCEPT_THRESHOLD);
+  });
+
+  it("still lets a contradicted figure win when nothing competes", () => {
+    // Frau Koujiro, whose recorded character is Kona Furugoori: penalised, but
+    // still the answer when no other figure claims the title.
+    const frau: MatchCandidate = {
+      id: "frau", name: "Nendoroid Frau Koujiro", nameJa: null, scale: null,
+      category: "NENDOROID", manufacturerName: "Good Smile Company",
+      seriesName: "Robotics;Notes", characterNames: ["Kona Furugoori"],
+    };
+    const hit = bestMatch("Nendoroid Robotics Notes Frau Koujiro ABS PVC Painted Action Figure", [frau]);
+    assert.equal(hit?.figureId, "frau");
+  });
+});
