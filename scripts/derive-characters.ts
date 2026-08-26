@@ -4,6 +4,7 @@
  *   npm run derive:characters              # dry run
  *   npm run derive:characters -- --yes     # apply
  *   npm run derive:characters -- --limit 50
+ *   npm run derive:characters -- --series "My Hero Academia"
  *
  * Figures imported from the Good Smile archive arrive with a series but no
  * characters, because the archive has no character field. That leaves them
@@ -49,6 +50,20 @@ import { rebuildSearchTextFor } from "../lib/ingest/search-index";
 import { slugify } from "../lib/utils";
 
 const APPLY = process.argv.includes("--yes");
+
+/**
+ * Work one series at a time, when asked.
+ *
+ * The batch is ordered oldest-first, and the oldest imports are the hardest:
+ * a run of 40 resolved none of them, every one dying on a series AniList has
+ * never heard of because it is a product line rather than a show. That says
+ * nothing about the series where the answer is already in the catalogue, and
+ * without a way to aim at one there was no way to tell the two apart.
+ */
+const SERIES = (() => {
+  const i = process.argv.indexOf("--series");
+  return i !== -1 ? process.argv[i + 1] : null;
+})();
 const LIMIT = Number(
   (() => {
     const i = process.argv.indexOf("--limit");
@@ -260,7 +275,11 @@ const applied = new Set<string>();
 
 async function main() {
   const figures = await prisma.figure.findMany({
-    where: { characters: { none: {} } },
+    where: {
+      characters: { none: {} },
+      supersededById: null,
+      ...(SERIES ? { series: { name: { contains: SERIES, mode: "insensitive" as const } } } : {}),
+    },
     select: {
       id: true,
       name: true,
@@ -272,7 +291,9 @@ async function main() {
     ...(Number.isFinite(LIMIT) ? { take: LIMIT } : {}),
   });
 
-  console.log(`figures with no character: ${figures.length}`);
+  console.log(
+    `figures with no character: ${figures.length}${SERIES ? ` (series matching "${SERIES}")` : ""}`,
+  );
   if (figures.length === 0) {
     console.log("Nothing to do.");
     await prisma.$disconnect();
