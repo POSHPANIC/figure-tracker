@@ -1179,3 +1179,63 @@ describe("threezero's Transformers lines", () => {
     assert.ok(hit && hit.score > 0, `expected a match, got ${JSON.stringify(hit)}`);
   });
 });
+
+describe("a character recorded under a name nobody sells them by", () => {
+  /**
+   * Regression from deriving characters off AniList. "Nendoroid Frau Koujiro"
+   * was given the character Kona Furugoori, which is correct — Frau Koujiro is
+   * her handle in Robotics;Notes and Kona Furugoori is her name — and left the
+   * figure matching nothing at all, because every seller writes the handle.
+   * Attaching a true fact had made the figure invisible.
+   */
+  const frau: MatchCandidate = {
+    id: "frau",
+    name: "Nendoroid Frau Koujiro",
+    nameJa: null,
+    scale: null,
+    category: "NENDOROID",
+    manufacturerName: "Good Smile Company",
+    seriesName: "Robotics;Notes",
+    characterNames: ["Kona Furugoori"],
+    characterNamesJa: ["古郡こな"],
+  };
+
+  it("falls back to the figure's own name", () => {
+    const t = "Nendoroid Robotics Notes Frau Koujiro ABS PVC Painted Action Figure Good Smile";
+    assert.ok(scoreMatch(t, frau) > 0.7, `expected a match, got ${scoreMatch(t, frau)}`);
+  });
+
+  it("still matches when a title uses both names", () => {
+    assert.ok(scoreMatch("Nendoroid Frau Koujiro Kona Furugoori Robotics Notes", frau) > 0.7);
+  });
+
+  it("does not match on the character name alone", () => {
+    // Gate 4 is untouched by any of this: naming the person is not naming the
+    // product, and "Nendoroid Kona Furugoori" is not a product this catalogue
+    // holds under that name.
+    assert.equal(scoreMatch("Nendoroid Kona Furugoori Robotics Notes", frau), 0);
+  });
+
+  it("does not open the door the gate was built to close", () => {
+    // "Nendoroid L 2.0" reduces to one distinguishing word, so the fallback
+    // refuses it exactly as before — it would otherwise match every Nendoroid
+    // listing on the market.
+    const l: MatchCandidate = {
+      id: "l", name: "Nendoroid L 2.0", nameJa: null, scale: null,
+      category: "NENDOROID", manufacturerName: "Good Smile Company",
+      seriesName: "DEATH NOTE", characterNames: ["L Lawliet"], characterNamesJa: [],
+    };
+    assert.equal(scoreMatch("Good Smile Company Nendoroid Anya Forger", l), 0);
+  });
+
+  it("does not let a two-word figure claim another character's listing", () => {
+    // Two distinguishing words is under the line, so a figure whose character
+    // goes unnamed cannot fall back onto a thin name.
+    const thin: MatchCandidate = {
+      id: "thin", name: "Nendoroid Saber", nameJa: null, scale: null,
+      category: "NENDOROID", manufacturerName: "Good Smile Company",
+      seriesName: "Fate/stay night", characterNames: ["Altria Pendragon"], characterNamesJa: [],
+    };
+    assert.equal(scoreMatch("Nendoroid Rem Re:Zero Good Smile Company", thin), 0);
+  });
+});

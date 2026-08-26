@@ -784,7 +784,13 @@ export function scoreMatch(
   // rare, they are hard to identify from a title anyway, and an unmatched
   // figure merely lacks prices where a mismatched one publishes wrong ones.
   const characterTokens = figure.characterNames.flatMap((n) => [...tokenize(n)]);
-  if (characterTokens.length === 0) {
+  const namedInEnglish = characterTokens.some((t) => titleTokens.has(t));
+  // Japanese sellers write the character's name in Japanese and nothing else.
+  // Substring rather than token match, because Japanese doesn't use spaces.
+  const namedInJapanese = (figure.characterNamesJa ?? []).some(
+    (ja) => ja.length > 1 && title.includes(ja),
+  );
+  if (!namedInEnglish && !namedInJapanese) {
     // Unless the product's own name is specific enough to stand in for one.
     //
     // Refusing outright cost more than it saved. 3,158 figures — 41.5% of the
@@ -804,15 +810,13 @@ export function scoreMatch(
     // Three is the line because Gate 4 below demands *every* distinguishing
     // word appear in the title. Three specific words all present is a claim
     // about a product; one is a claim about a product line.
+    // The same fallback now covers a second case: a character recorded under a
+    // name nobody sells them by. Deriving characters from AniList gave
+    // "Nendoroid Frau Koujiro" the character Kona Furugoori, which is right —
+    // Frau Koujiro is her handle in Robotics;Notes and Kona Furugoori is her
+    // name — and left the figure matching nothing at all, because every seller
+    // writes the handle. Attaching a true fact had made the figure invisible.
     if (descriptorTokens(figure).size < MIN_NAME_WORDS_WITHOUT_CHARACTER) return 0;
-  } else {
-  const namedInEnglish = characterTokens.some((t) => titleTokens.has(t));
-  // Japanese sellers write the character's name in Japanese and nothing else.
-  // Substring rather than token match, because Japanese doesn't use spaces.
-  const namedInJapanese = (figure.characterNamesJa ?? []).some(
-    (ja) => ja.length > 1 && title.includes(ja),
-  );
-  if (!namedInEnglish && !namedInJapanese) return 0;
   }
 
   // --- Gate 2: it has to be a figure, and one of them. ---
