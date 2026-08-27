@@ -1354,3 +1354,57 @@ describe("sizeAgreesWith", () => {
     assert.equal(sizeAgreesWith("275mm", { ...f, heightMm: null }), false);
   });
 });
+
+describe("identifying by name alone needs the whole name", () => {
+  /**
+   * Gate 4 demands a figure's *distinguishing* words and deliberately skips the
+   * character's, since Gate 1 is supposed to have covered those. A figure that
+   * reaches the name-alone fallback has broken that assumption, and nothing
+   * else asks.
+   *
+   * "POP UP PARADE Kyoko Sakura" is recorded under the character Kyouko Sakura
+   * — spelled with a u, which a title reading "Kyoko Kirigiri" does not name.
+   * So it fell through to the fallback, where "sakura" counted as a character
+   * word nobody wanted, and it outscored POP UP PARADE Kyoko Kirigiri, whose
+   * name the title states in full.
+   */
+  const base = {
+    nameJa: null, scale: null, heightMm: 170, category: "OTHER" as const,
+    manufacturerName: "Good Smile Company",
+  };
+  const sakura: MatchCandidate = {
+    ...base, id: "sakura", name: "POP UP PARADE Kyoko Sakura",
+    seriesName: "Puella Magi Madoka Magica", characterNames: ["Kyouko Sakura"],
+  };
+  const kirigiri: MatchCandidate = {
+    ...base, id: "kirigiri", name: "POP UP PARADE Kyoko Kirigiri",
+    seriesName: "Danganronpa", characterNames: [],
+  };
+  const title = "GSC Pop Up Parade Kyoko Kirigiri Action Figure New in Stock";
+
+  it("refuses the figure whose name the title only half contains", () => {
+    assert.equal(scoreMatch(title, sakura), 0);
+  });
+
+  it("gives the listing to the figure named in full", () => {
+    assert.equal(bestMatch(title, [sakura, kirigiri])?.figureId, "kirigiri");
+    assert.equal(bestMatch(title, [kirigiri, sakura])?.figureId, "kirigiri");
+  });
+
+  it("leaves the fallback working where the whole name is present", () => {
+    // Frau Koujiro, recorded as Kona Furugoori: the character is unnamed, but
+    // every word of the product's name is in the title.
+    const frau: MatchCandidate = {
+      id: "frau", name: "Nendoroid Frau Koujiro", nameJa: null, scale: null,
+      category: "NENDOROID", manufacturerName: "Good Smile Company",
+      seriesName: "Robotics;Notes", characterNames: ["Kona Furugoori"],
+    };
+    // Clears the threshold rather than any particular number: without the
+    // maker's name this title scores exactly 0.700, and asserting "> 0.7" made
+    // the test fail on the boundary while the code was doing the right thing.
+    assert.ok(
+      scoreMatch("Nendoroid Robotics Notes Frau Koujiro ABS PVC Figure", frau) >=
+        MATCH_ACCEPT_THRESHOLD,
+    );
+  });
+});

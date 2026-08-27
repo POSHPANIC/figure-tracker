@@ -841,6 +841,20 @@ export function scoreMatch(
     // name — and left the figure matching nothing at all, because every seller
     // writes the handle. Attaching a true fact had made the figure invisible.
     if (descriptorTokens(figure).size < MIN_NAME_WORDS_WITHOUT_CHARACTER) return 0;
+
+    // And the whole name has to be there, not just its distinguishing half.
+    //
+    // Gate 4 below demands the distinguishing words, and deliberately excludes
+    // the character's — Gate 1 is supposed to have covered those. When a figure
+    // arrives here that assumption has failed, and nothing else asks. "POP UP
+    // PARADE Kyoko Sakura" is recorded under the character Kyouko Sakura, which
+    // a title reading "Kyoko Kirigiri" does not name, so it reached this
+    // fallback and matched: "sakura" was a character word, so no gate ever
+    // wanted it. It outscored POP UP PARADE Kyoko Kirigiri, whose name the
+    // title states in full.
+    for (const token of tokenize(figure.name)) {
+      if (!titleTokens.has(token)) return 0;
+    }
     // Only when we know who the figure depicts and the title says someone else.
     // A figure with no character recorded is not contradicting anything, and
     // penalising those cost 870 correct matches in a dry run — "figma Love
