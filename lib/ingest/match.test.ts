@@ -7,6 +7,7 @@ import {
   descriptorTokens,
   extractLineNumber,
   extractSizesMm,
+  sizeAgreesWith,
   isNotAFigure,
   isUnofficial,
   isNotASingleFigure,
@@ -1287,5 +1288,69 @@ describe("name-alone identification ranks below a named character", () => {
     };
     const hit = bestMatch("Nendoroid Robotics Notes Frau Koujiro ABS PVC Painted Action Figure", [frau]);
     assert.equal(hit?.figureId, "frau");
+  });
+});
+
+describe("words outrank a measurement", () => {
+  /**
+   * The size tiebreak started life inside the score, and there it decided cases
+   * it had no business deciding. A rematch dry run wanted to move 683 listings,
+   * and roughly a quarter of the sample went from a specific figure to a
+   * generic one purely because the generic's height was nearer the number in
+   * the title. Sellers measure the box, or the figure with its base, or nothing
+   * at all; the words they wrote are better evidence than the number.
+   */
+  const base = {
+    nameJa: null, scale: null, category: "OTHER" as const,
+    manufacturerName: "Good Smile Company", seriesName: "VOCALOID",
+    characterNames: ["Hatsune Miku"],
+  };
+  const generic: MatchCandidate = { ...base, id: "generic", name: "Hatsune Miku", heightMm: 180 };
+  const specific: MatchCandidate = {
+    ...base, id: "specific", name: "Hatsune Miku: Symphony 2019 Ver.", heightMm: 210,
+  };
+  const title = "Good Smile Company Hatsune Miku Symphony 2019 Ver 170mm Japan";
+
+  it("prefers the figure whose name the title spells out", () => {
+    // 170mm is within 7% of the generic's 180mm and nowhere near 210mm, so as a
+    // score the size sent this to the wrong figure.
+    assert.equal(bestMatch(title, [generic, specific])?.figureId, "specific");
+    assert.equal(bestMatch(title, [specific, generic])?.figureId, "specific");
+  });
+
+  it("still uses size once the words are equal", () => {
+    // Two figures named identically: nothing to choose but the measurement.
+    const short: MatchCandidate = { ...base, id: "short", name: "Motoko Kusanagi", heightMm: 200, characterNames: ["Motoko Kusanagi"] };
+    const tall: MatchCandidate = { ...base, id: "tall", name: "Motoko Kusanagi", heightMm: 275, characterNames: ["Motoko Kusanagi"] };
+    const t = "Ghost in the Shell Motoko Kusanagi Figure Approx 275mm";
+    assert.equal(bestMatch(t, [short, tall])?.figureId, "tall");
+    assert.equal(bestMatch(t, [tall, short])?.figureId, "tall");
+  });
+
+  it("still refuses a tie when neither words nor size separate them", () => {
+    const a: MatchCandidate = { ...base, id: "a", name: "Motoko Kusanagi", heightMm: 200, characterNames: ["Motoko Kusanagi"] };
+    const b: MatchCandidate = { ...base, id: "b", name: "Motoko Kusanagi", heightMm: 275, characterNames: ["Motoko Kusanagi"] };
+    assert.equal(bestMatch("Ghost in the Shell Motoko Kusanagi Figure", [a, b]), null);
+  });
+});
+
+describe("sizeAgreesWith", () => {
+  const f: MatchCandidate = {
+    id: "f", name: "x", nameJa: null, scale: null, heightMm: 275, category: "SCALE",
+    manufacturerName: "With Fans!", seriesName: "Ghost in the Shell", characterNames: ["Motoko Kusanagi"],
+  };
+
+  it("agrees within a few percent", () => {
+    assert.equal(sizeAgreesWith("Approx 275mm", f), true);
+    assert.equal(sizeAgreesWith("27cm", f), true);
+  });
+
+  it("does not agree with a box measurement", () => {
+    assert.equal(sizeAgreesWith("47cm (18.5in)", f), false);
+  });
+
+  it("says nothing when there is no size or no height", () => {
+    assert.equal(sizeAgreesWith("no size here", f), false);
+    assert.equal(sizeAgreesWith("275mm", { ...f, heightMm: null }), false);
   });
 });

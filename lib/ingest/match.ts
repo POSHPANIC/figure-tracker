@@ -565,6 +565,28 @@ export function extractSizesMm(text: string): number[] {
   return sizes;
 }
 
+/**
+ * Whether a title states a size this figure actually is, to within a few
+ * percent.
+ *
+ * A tiebreak rather than a score, and the distinction is the whole point. As a
+ * score it decided cases it had no business deciding: a 170mm plush of Hatsune
+ * Miku went to the 180mm "Hatsune Miku" instead of the 210mm "Hatsune Miku:
+ * Symphony 2019 Ver." whose name the title spells out, purely because the
+ * heights happened to line up. Sellers measure the box, or the figure with its
+ * base, or nothing at all — that is worth consulting only once the words have
+ * had their say.
+ */
+export function sizeAgreesWith(title: string, figure: MatchCandidate): boolean {
+  if (!figure.heightMm) return false;
+  const sizes = extractSizesMm(title);
+  if (sizes.length === 0) return false;
+  return sizes.some((mm) => {
+    const ratio = mm / figure.heightMm!;
+    return ratio >= 0.93 && ratio <= 1.07;
+  });
+}
+
 export type MatchCandidate = {
   id: string;
   name: string;
@@ -958,13 +980,13 @@ export function scoreMatch(
   // plainly "Motoko Kusanagi", one 200mm and one 275mm, and a title saying
   // "Approx 275mm" scored 0.870 against both. bestMatch refuses a tie, quite
   // rightly, so a listing that named its figure precisely matched nothing.
-  let sizeAgrees = false;
   if (figure.heightMm) {
     const sizes = extractSizesMm(title);
-    if (sizes.length > 0) {
-      const ratios = sizes.map((mm) => mm / figure.heightMm!);
-      if (!ratios.some((r) => r >= 0.5 && r <= 2)) return 0;
-      sizeAgrees = ratios.some((r) => r >= 0.93 && r <= 1.07);
+    if (sizes.length > 0 && !sizes.some((mm) => {
+      const ratio = mm / figure.heightMm!;
+      return ratio >= 0.5 && ratio <= 2;
+    })) {
+      return 0;
     }
   }
 
@@ -1048,14 +1070,6 @@ export function scoreMatch(
     score += 0.25;
   }
 
-  // A size stated to within a few percent. Small on purpose: this is a
-  // tiebreak, not evidence on its own. The catalogue holds two figures named
-  // plainly "Motoko Kusanagi" — 200mm from Good Smile, 275mm from With Fans! —
-  // and "With Fans! Approx 275mm" scored 0.870 against both, so the listing
-  // that identified its figure most precisely was the one that matched
-  // nothing. Sellers who bother to measure are usually right about it.
-  if (sizeAgrees) score += 0.05;
-
   // A figure whose character we know, and whose title names somebody else, is
   // weaker evidence than one whose character the title actually names.
   //
@@ -1117,6 +1131,7 @@ export function bestMatch(title: string, candidates: MatchCandidate[]): MatchRes
 
   let best: MatchResult = null;
   let bestSpecificity = -1;
+  let bestSized = -1;
 
   // How many candidates are tied at the top. More than one and there is no
   // answer to give.
@@ -1127,17 +1142,26 @@ export function bestMatch(title: string, candidates: MatchCandidate[]): MatchRes
     if (score < MATCH_ACCEPT_THRESHOLD) continue;
 
     const specificity = matchedNameTokens(title, c);
+    // Consulted last, and only once the words have had their say. As part of
+    // the score it decided cases it had no business deciding: a "Symphony 2019
+    // Ver" listing left the Symphony 2019 figure for a plain "Hatsune Miku"
+    // because the plain one's height happened to be nearer the stated 170mm.
+    // Words the seller wrote beat a measurement they may have taken off a box.
+    const sized = sizeAgreesWith(title, c) ? 1 : 0;
     const sameScore = best !== null && Math.abs(score - best.score) <= SCORE_EPSILON;
+    const better =
+      best === null ||
+      score > best.score + SCORE_EPSILON ||
+      (sameScore &&
+        (specificity > bestSpecificity ||
+          (specificity === bestSpecificity && sized > bestSized)));
 
-    if (best === null || score > best.score + SCORE_EPSILON) {
+    if (better) {
       best = { figureId: c.id, score };
       bestSpecificity = specificity;
+      bestSized = sized;
       tied = 1;
-    } else if (sameScore && specificity > bestSpecificity) {
-      best = { figureId: c.id, score };
-      bestSpecificity = specificity;
-      tied = 1;
-    } else if (sameScore && specificity === bestSpecificity) {
+    } else if (sameScore && specificity === bestSpecificity && sized === bestSized) {
       tied += 1;
     }
   }
