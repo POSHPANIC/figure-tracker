@@ -8,6 +8,8 @@
  * product URLs by the same number.
  */
 
+import { cleanVendor } from "./solaris";
+
 export type SolarisSpecs = {
   /** The manufacturer's barcode, from their JSON-LD. The exact join key. */
   jan: string | null;
@@ -108,12 +110,16 @@ export function parseProductPage(html: string): SolarisSpecs {
     jan = parseJan(typeof d.sku === "string" ? d.sku : null);
     name = typeof d.name === "string" ? d.name : null;
     const brand = d.brand as { name?: unknown } | string | undefined;
-    manufacturer =
+    // Through cleanVendor: their brand carries the same role label their
+    // vendor field does — "Max Factory<NBSP>as ManufacturerSentinel" — because
+    // it is the same string. See lib/ingest/solaris.ts.
+    manufacturer = cleanVendor(
       typeof brand === "string"
         ? brand
         : typeof brand?.name === "string"
           ? brand.name
-          : null;
+          : null,
+    );
     break;
   }
 

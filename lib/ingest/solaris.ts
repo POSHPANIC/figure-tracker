@@ -68,14 +68,41 @@ const GOOD_SMILE_GROUP = [
   "phat company",
 ];
 
+/**
+ * The maker, out of a vendor string with a role label baked into it.
+ *
+ * Solaris publish "Max Factory<NBSP>as ManufacturerSentinel" — a non-breaking
+ * space, the words "as Manufacturer", then a second company with no separator
+ * at all. Their storefront runs two vendor entries together and leaks the label
+ * between them, identically in every field: the JSON-LD brand, Shopify's vendor
+ * and the description all carry it.
+ *
+ * The first name is the manufacturer — that is what the label it precedes says
+ * — and the second is the other company credited, usually the distributor of a
+ * shop exclusive. Only the first is kept, because a figure records one maker.
+ *
+ * Forty figures held names like "Good Smile Arts Shanghai as ManufacturerGood
+ * Smile Company", and nine manufacturer rows existed that were never companies.
+ */
+export function cleanVendor(vendor: string | null | undefined): string | null {
+  if (!vendor) return null;
+  const cleaned = vendor
+    .replace(/\u00a0/g, " ")
+    .split(/\s*as\s+Manufacturer/i)[0]
+    .replace(/\s+/g, " ")
+    .trim();
+  return cleaned || null;
+}
+
 export function isGoodSmileGroup(vendor: string | null | undefined): boolean {
   if (!vendor) return false;
-  // Their vendor strings are not always clean — one reads "Good Smile Arts
-  // Shanghai as ManufacturerGood Smile Company" — so this asks whether a
-  // known name appears, rather than whether the field equals one.
-  const v = vendor.toLowerCase().replace(/ /g, " ");
+  // Asks whether a known name appears rather than whether the field equals one.
+  // cleanVendor takes the role label off, but a vendor string can still name
+  // the group in passing.
+  const v = (cleanVendor(vendor) ?? "").toLowerCase();
   return GOOD_SMILE_GROUP.some((name) => v.includes(name));
 }
+
 
 /** "Blue Archive - Asagi Mutsuki - Nendoroid (#3124)" -> NENDOROID / 3124. */
 export function readReleaseNumber(title: string): { line: "NENDOROID" | "FIGMA"; number: string } | null {
@@ -100,7 +127,7 @@ export function classify(
     return { ok: false, reason: type ? `product_type ${type}` : "no product_type" };
   }
 
-  const vendor = product.vendor?.replace(/ /g, " ").trim() || null;
+  const vendor = cleanVendor(product.vendor);
   const release = readReleaseNumber(product.title);
 
   // Good Smile group products are skipped only when they carry no release

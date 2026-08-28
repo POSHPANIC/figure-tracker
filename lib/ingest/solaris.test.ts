@@ -1,6 +1,12 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { candidateKey, classify, isGoodSmileGroup, readReleaseNumber } from "./solaris";
+import {
+  candidateKey,
+  classify,
+  cleanVendor,
+  isGoodSmileGroup,
+  readReleaseNumber,
+} from "./solaris";
 
 const FIGURE = {
   id: 8842119,
@@ -109,5 +115,47 @@ describe("classify", () => {
 describe("candidateKey", () => {
   it("namespaces by source so it cannot collide with a release number key", () => {
     assert.equal(candidateKey("8842119"), "SOLARIS:8842119");
+  });
+});
+
+describe("cleanVendor", () => {
+  const NBSP = " ";
+
+  it("takes the maker out of a string with the role label run into it", () => {
+    // Real values. Solaris' storefront runs two vendor entries together and
+    // leaks the label between them; the first is the one the label describes.
+    assert.equal(cleanVendor(`Max Factory${NBSP}as ManufacturerSentinel`), "Max Factory");
+    assert.equal(
+      cleanVendor(`Good Smile Arts Shanghai${NBSP}as ManufacturerGood Smile Company`),
+      "Good Smile Arts Shanghai",
+    );
+    assert.equal(cleanVendor(`Chugai Mining${NBSP}as ManufacturerGood Smile Company`), "Chugai Mining");
+  });
+
+  it("leaves an ordinary vendor alone", () => {
+    assert.equal(cleanVendor("Good Smile Company"), "Good Smile Company");
+    assert.equal(cleanVendor("threeA"), "threeA");
+  });
+
+  it("still normalises a non-breaking space on its own", () => {
+    assert.equal(cleanVendor(`Orange${NBSP}Rouge`), "Orange Rouge");
+  });
+
+  it("is null for nothing", () => {
+    assert.equal(cleanVendor(null), null);
+    assert.equal(cleanVendor("   "), null);
+    assert.equal(cleanVendor("as Manufacturer Sentinel"), null);
+  });
+});
+
+describe("isGoodSmileGroup after cleaning", () => {
+  it("still recognises the group through the corrupted form", () => {
+    assert.equal(isGoodSmileGroup(`Good Smile Arts Shanghai${" "}as ManufacturerGood Smile Company`), true);
+  });
+
+  it("does not claim a maker that only appears in the discarded half", () => {
+    // "Max Factory as ManufacturerSentinel" is a Max Factory product; before
+    // cleaning, the whole string was searched and either name could match.
+    assert.equal(isGoodSmileGroup(`Chugai Mining${" "}as ManufacturerGood Smile Company`), false);
   });
 });
