@@ -1408,3 +1408,94 @@ describe("identifying by name alone needs the whole name", () => {
     );
   });
 });
+
+describe("a plush is not a scale figure", () => {
+  /**
+   * Nothing else in a plush listing says so: the character, series and maker
+   * all agree with the statue. 218 plush listings were attached across the
+   * catalogue and every one sat on a figure whose own name says nothing about
+   * plush -- nineteen apiece on the Madoka and Homura 1/8 statues.
+   */
+  const statue: MatchCandidate = {
+    id: "statue", name: "Hatsune Miku: 15th Anniversary Ver.", nameJa: null,
+    scale: "1/7", heightMm: 290, category: "SCALE",
+    manufacturerName: "Good Smile Company", seriesName: "Hatsune Miku",
+    characterNames: ["Hatsune Miku"],
+  };
+
+  it("refuses a plush", () => {
+    assert.equal(
+      bestMatch("Hatsune Miku GT Project 15th Anniversary Racing Miku 2018 ver. Plush", [statue]),
+      null,
+    );
+  });
+
+  it("still matches the statue itself", () => {
+    const hit = bestMatch("Good Smile Company Hatsune Miku 15th Anniversary Ver. 1/7 Figure", [statue]);
+    assert.ok(hit && hit.score > 0.7, `expected a match, got ${JSON.stringify(hit)}`);
+  });
+
+  it("lets a plush figure keep its own listings", () => {
+    // The catalogue holds six, all named for the line, and the line gate
+    // exempts a figure whose own name carries it.
+    const plush: MatchCandidate = {
+      ...statue, id: "plush", name: "Hatsune Miku Plush", scale: null,
+      heightMm: 200, category: "PLUSH",
+    };
+    assert.equal(bestMatch("Hatsune Miku Plush Good Smile Company", [plush])?.figureId, "plush");
+  });
+});
+
+describe("Racing Miku is its own family", () => {
+  const miku: MatchCandidate = {
+    id: "miku", name: "Hatsune Miku: 15th Anniversary Ver.", nameJa: null,
+    scale: "1/7", heightMm: 290, category: "SCALE",
+    manufacturerName: "Good Smile Company", seriesName: "Hatsune Miku",
+    characterNames: ["Hatsune Miku"],
+  };
+
+  it("does not put a Racing Miku on a plain Miku figure", () => {
+    // "race" was already a variant marker and did not cover it: nothing here
+    // is stemmed.
+    assert.equal(
+      bestMatch("Good Smile Company Racing Miku 2023 15th Anniversary Version Hatsune Miku", [miku]),
+      null,
+    );
+  });
+
+  it("never counts against a figure that is a Racing Miku", () => {
+    const racing: MatchCandidate = { ...miku, id: "racing", name: "Racing Miku 2023 Ver." };
+    const hit = bestMatch("Good Smile Company Racing Miku 2023 Ver. 1/7 Figure", [racing]);
+    assert.ok(hit && hit.score > 0.7, `expected a match, got ${JSON.stringify(hit)}`);
+  });
+});
+
+describe("SEGA's SPM line", () => {
+  it("does not reach a scale figure", () => {
+    const miku: MatchCandidate = {
+      id: "miku", name: "Hatsune Miku: 15th Anniversary Ver.", nameJa: null,
+      scale: "1/7", heightMm: 290, category: "SCALE",
+      manufacturerName: "Good Smile Company", seriesName: "Hatsune Miku",
+      characterNames: ["Hatsune Miku"],
+    };
+    assert.equal(
+      bestMatch("Hatsune Miku 15th Anniversary KEI Ver. SPM SEGA Prize Figure", [miku]),
+      null,
+    );
+  });
+});
+
+describe("acrylic stands, however spelled", () => {
+  it("catches the misspelling sellers actually use", () => {
+    assert.equal(isNotAFigure("3pc set Hatsune Miku 15th Anniversary Ver. acyclic anime stand"), true);
+    assert.equal(isNotAFigure("acrylic character stand Hatsune Miku"), true);
+  });
+
+  it("leaves a figure that merely ships with one", () => {
+    // IS_A_FIGURE overrides: the title says Figure and 1/7.
+    assert.equal(
+      isNotAFigure("Hatsune Miku 1/7 Scale Figure with acrylic display stand included"),
+      false,
+    );
+  });
+});

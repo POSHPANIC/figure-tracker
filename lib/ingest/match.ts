@@ -113,6 +113,12 @@ const VARIANT_MARKERS = new Set([
   "towel", "bath", "lingerie", "negligee", "tracksuit", "hoodie", "sweater",
   "casual", "school", "stage", "idol", "angel", "devil", "succubus", "armor",
   "armour", "battle", "party", "festival", "race", "queen", "cat", "bride",
+  // "Racing Miku" is its own product family, and "race" does not cover it --
+  // nothing here is stemmed. 73 of 400 sampled "racing" listings sat on plain
+  // Miku figures, 23 on POP UP PARADE Hatsune Miku alone. A genuine Racing
+  // Miku figure carries the word in its own name, so this never counts against
+  // one.
+  "racing",
   "police", "waitress", "cheerleader", "witch", "vampire", "kitsune", "miko",
 ]);
 
@@ -159,6 +165,19 @@ const PRODUCT_LINE_TOKENS = [
   // than move — we do not hold the products, and matching nothing is right.
   "mdlx",
   "dlx",
+  // A plush is not a scale figure, and nothing else about a title says so: the
+  // character, series and maker all agree. 218 plush listings were attached to
+  // figures across the catalogue and every one of them sat on a figure whose
+  // own name says nothing about plush -- 19 apiece on the Madoka and Homura
+  // 1/8 statues. The catalogue holds six plush figures, all named for it, and
+  // the gate below exempts a figure whose name carries the line.
+  "plush",
+  // SEGA's Super Premium prize line. Twenty listings, all on figures that are
+  // not SPM -- eight on a Jujutsu Kaisen scale figure, two on Miku's 15th
+  // Anniversary 1/7. SEGA itself is deliberately not a rival maker, because
+  // they are credited as often as licensor as manufacturer, but their line
+  // name is unambiguous.
+  "spm",
 ] as const;
 
 /**
@@ -189,6 +208,7 @@ const PRODUCT_LINE_PHRASES = [
 const CATEGORY_LINE: Partial<Record<string, string>> = {
   NENDOROID: "nendoroid",
   FIGMA: "figma",
+  PLUSH: "plush",
 };
 
 /** The line phrase a catalog category implies, if any. */
@@ -683,7 +703,7 @@ function unexplainedVariants(titleTokens: Set<string>, figure: MatchCandidate): 
  * of it is a figure.
  */
 const MERCHANDISE =
-  /\b(card sleeves?|sleeve collection|t[- ]?shirts?|parka|hoodie|sweatshirt|keychains?|key ?rings?|tote ?bags?|posters?|tapestr(?:y|ies)|badges?|pin ?backs?|stickers?|decals?|acrylic (?:stand|charm)|mouse ?pads?|towels?|mugs?|blankets?|cushions?|pillow ?cases?|dvds?|blu[- ]?rays?|\d+ disc|disc set|box ?set|complete (?:series|season|collection)|season \d|comics?|newsstand|graphic novel|manga vol|art ?book|light novel|paperback|trading cards?|tcg|booster (?:box|pack)|psa \d|nintendo switch|playstation|ps[45]|xbox|game cartridge|\bvol(?:ume)?s?\b|\bbooks?\b)\b/i;
+  /\b(card sleeves?|sleeve collection|t[- ]?shirts?|parka|hoodie|sweatshirt|keychains?|key ?rings?|tote ?bags?|posters?|tapestr(?:y|ies)|badges?|pin ?backs?|stickers?|decals?|ac[ry][cy]lic (?:\w+ )?(?:stand|charm)|mouse ?pads?|towels?|mugs?|blankets?|cushions?|pillow ?cases?|dvds?|blu[- ]?rays?|\d+ disc|disc set|box ?set|complete (?:series|season|collection)|season \d|comics?|newsstand|graphic novel|manga vol|art ?book|light novel|paperback|trading cards?|tcg|booster (?:box|pack)|psa \d|nintendo switch|playstation|ps[45]|xbox|game cartridge|\bvol(?:ume)?s?\b|\bbooks?\b)\b/i;
 
 /**
  * Signs that the listing is a figure after all.
