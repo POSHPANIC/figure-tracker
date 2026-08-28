@@ -29,7 +29,7 @@ import { safeHttpUrl } from "@/lib/safe-url";
 import { amiamiSearchUrl, withSovrn } from "@/lib/sovrn";
 import { getFigureIdBySlug, getFigureImagesBySlug, figureCacheTag, supersededTarget } from "@/lib/queries";
 import { formatCurrency, formatPercent, formatUsd, trendOf } from "@/lib/money";
-import { approxAt, formatMoney, type DisplayMoney } from "@/lib/currency";
+import { approx, approxAt, formatMoney, type DisplayMoney } from "@/lib/currency";
 import { getDisplayMoney, historicalMoney } from "@/lib/currency-server";
 import {
   CATEGORY_LABELS,
@@ -260,6 +260,25 @@ async function FigureView({
   const msrpConverted =
     msrp !== null && figure.msrpCurrency?.toUpperCase() !== money.currency
       ? approxAt(formatCurrency(msrp.amount, money.currency), msrp.basis)
+      : null;
+
+  // What the shop is charging, in the currency the reader picked.
+  //
+  // At today's rate, not the release month's, because unlike MSRP this is a
+  // live price: it is what they want for it now. So `when` is null, which is
+  // also what makes the basis "today".
+  const storePrice =
+    figure.storePriceAmount !== null && figure.storePriceCurrency
+      ? await historicalMoney(
+          Number(figure.storePriceAmount),
+          figure.storePriceCurrency,
+          null,
+          money.currency,
+        )
+      : null;
+  const storeConverted =
+    storePrice !== null && figure.storePriceCurrency?.toUpperCase() !== money.currency
+      ? approx(formatCurrency(storePrice.amount, money.currency))
       : null;
 
   // Whether the store link is the maker's own shop or a retailer's.
@@ -618,11 +637,20 @@ async function FigureView({
                   </span>
                 </span>
                 {figure.storePriceAmount !== null && figure.storePriceCurrency && (
-                  // Quoted in the currency the store quotes it in. Converting
-                  // it would misstate what they are charging, and this row
-                  // exists to say what they are charging.
-                  <span className="tabular shrink-0 text-sm font-medium">
-                    {formatCurrency(figure.storePriceAmount, figure.storePriceCurrency)}
+                  // The shop's own quote stays the headline, because that is
+                  // the number they will actually charge and this row exists to
+                  // say so. The reader's currency goes underneath, marked
+                  // approximate — the same arrangement the MSRP row uses, and
+                  // for the same reason: converting the quote away would
+                  // misstate the shop, and omitting the conversion entirely
+                  // left a price the currency switcher did not reach.
+                  <span className="shrink-0 text-right">
+                    <span className="tabular block text-sm font-medium">
+                      {formatCurrency(figure.storePriceAmount, figure.storePriceCurrency)}
+                    </span>
+                    {storeConverted && (
+                      <span className="tabular block text-xs text-muted">{storeConverted}</span>
+                    )}
                   </span>
                 )}
               </a>
