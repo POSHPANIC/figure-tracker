@@ -29,7 +29,7 @@ import { safeHttpUrl } from "@/lib/safe-url";
 import { amiamiSearchUrl, withSovrn } from "@/lib/sovrn";
 import { getFigureIdBySlug, getFigureImagesBySlug, figureCacheTag, supersededTarget } from "@/lib/queries";
 import { formatCurrency, formatPercent, formatUsd, trendOf } from "@/lib/money";
-import { approx, approxAt, formatMoney, type DisplayMoney } from "@/lib/currency";
+import { approxAt, formatMoney, type DisplayMoney } from "@/lib/currency";
 import { getDisplayMoney, historicalMoney } from "@/lib/currency-server";
 import {
   CATEGORY_LABELS,
@@ -276,10 +276,19 @@ async function FigureView({
           money.currency,
         )
       : null;
-  const storeConverted =
-    storePrice !== null && figure.storePriceCurrency?.toUpperCase() !== money.currency
-      ? approx(formatCurrency(storePrice.amount, money.currency))
-      : null;
+  // One price, in the currency the reader picked — the same single-value
+  // treatment the marketplace rows below get from formatMoney, and for the same
+  // reason: two numbers on one row is a comparison nobody asked for.
+  //
+  // The shop's own figure is shown when it is already that currency, so no
+  // round trip through a rate can shift it. If no rate exists, the shop's
+  // figure is shown as-is rather than nothing.
+  const storePriceLabel =
+    figure.storePriceAmount === null || !figure.storePriceCurrency
+      ? null
+      : figure.storePriceCurrency.toUpperCase() === money.currency || storePrice === null
+        ? formatCurrency(figure.storePriceAmount, figure.storePriceCurrency)
+        : formatCurrency(storePrice.amount, money.currency);
 
   // Whether the store link is the maker's own shop or a retailer's.
   const fromManufacturer = figure.storeUrl ? isManufacturerStore(figure.storeUrl) : true;
@@ -636,22 +645,8 @@ async function FigureView({
                     })}
                   </span>
                 </span>
-                {figure.storePriceAmount !== null && figure.storePriceCurrency && (
-                  // The shop's own quote stays the headline, because that is
-                  // the number they will actually charge and this row exists to
-                  // say so. The reader's currency goes underneath, marked
-                  // approximate — the same arrangement the MSRP row uses, and
-                  // for the same reason: converting the quote away would
-                  // misstate the shop, and omitting the conversion entirely
-                  // left a price the currency switcher did not reach.
-                  <span className="shrink-0 text-right">
-                    <span className="tabular block text-sm font-medium">
-                      {formatCurrency(figure.storePriceAmount, figure.storePriceCurrency)}
-                    </span>
-                    {storeConverted && (
-                      <span className="tabular block text-xs text-muted">{storeConverted}</span>
-                    )}
-                  </span>
+                {storePriceLabel && (
+                  <span className="tabular shrink-0 text-sm font-medium">{storePriceLabel}</span>
                 )}
               </a>
             )}
