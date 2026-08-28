@@ -636,7 +636,15 @@ async function FigureView({
                   <span
                     className={cn(
                       "block text-xs",
-                      figure.storeAvailable === true ? "text-up" : "text-muted",
+                      // Three states, not two. Red is for the shop saying no —
+                      // "Currently unavailable", or an order window that has
+                      // closed. Null is the shop saying nothing, which is not a
+                      // no and must not be dressed as one.
+                      figure.storeAvailable === true
+                        ? "text-up"
+                        : figure.storeAvailable === false
+                          ? "text-down"
+                          : "text-muted",
                     )}
                   >
                     {describeAvailability({
