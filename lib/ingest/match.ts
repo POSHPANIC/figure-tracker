@@ -1,4 +1,5 @@
 import type { ItemCondition } from "../generated/prisma/enums";
+import { readReleaseNumber as strictTitleNumber } from "./release-number";
 
 /**
  * Matching marketplace listings to catalog figures.
@@ -426,6 +427,15 @@ function memoized<T>(compute: (input: string) => T, cap = 8192): (input: string)
 function normalizeImpl(text: string): string {
   return text
     .toLowerCase()
+    // Fold Latin accents. Sellers type "Pokemon" and "SCATHACH" where the
+    // catalogue holds "Pokémon" and "Scáthach", and the two never met — 424
+    // correct listings sat unmatchable behind an acute accent.
+    //
+    // Latin only, and that restriction is the whole care of it: in Japanese a
+    // combining mark is part of the letter, so a blanket strip would turn ガ
+    // into カ and quietly break every Japanese title.
+    .normalize("NFD")
+    .replace(/(\p{Script=Latin})\p{Mn}+/gu, "$1")
     .normalize("NFKC")
     // Sellers run numbers into words — "1/7scale", "Nendoroid1935". Split them
     // so the parts tokenize separately. Runs before punctuation is stripped so
@@ -808,6 +818,25 @@ export function scoreMatch(
   // --- Gate 0b: and a product, not somebody's resin cast of one. ---
   if (isUnofficial(title)) return 0;
 
+  // The number printed on the box, read from both sides. Computed up here
+  // rather than beside Gate 5 because Gate 1 needs it too.
+  const figureLineNumber = canonicalLineNumber(figure.lineNumber);
+  const titleLineNumber = canonicalLineNumber(extractLineNumber(title));
+  const numberIdentifies = figureLineNumber !== null && titleLineNumber === figureLineNumber;
+
+  // Gate 1 below may waive the character requirement on the strength of that
+  // number, and identifying demands more of a reader than disqualifying does.
+  // The loose reader above is safe where a wrong number merely fails to agree
+  // with anything; here a wrong number *creates* a match, so the strict reader
+  // decides. It cost two bad matches to learn: "Hatsune Miku Nendoroid 15th
+  // Anniversary Ver" read as Nendoroid no. 15 and landed on Nendoroid
+  // Tachikoma, and "figma 69 Marisa Kirisame" on figma Rider.
+  const strictNumber = strictTitleNumber(title);
+  const numberIdentifiesStrictly =
+    numberIdentifies &&
+    strictNumber !== null &&
+    canonicalLineNumber(strictNumber.number) === figureLineNumber;
+
   // --- Gate 1: the character must be named, in some language. ---
   //
   // A figure with no characters recorded fails outright. This used to skip the
@@ -834,7 +863,15 @@ export function scoreMatch(
   const namedInJapanese = (figure.characterNamesJa ?? []).some(
     (ja) => ja.length > 1 && title.includes(ja),
   );
-  if (!namedInEnglish && !namedInJapanese) {
+  // Unless the title quotes the number printed on this figure's own box.
+  // Gate 4 already trusts that number to stand in for the distinguishing
+  // words, and Gate 5 trusts it to disqualify a figure outright; a number
+  // trusted to disqualify is trusted to identify. Gate 1 simply ran before
+  // it was read, so 71 listings quoting the exact number of the figure they
+  // were attached to were rejected for calling the character something
+  // else - "Nendoroid 1061 Sho Fu Kan" against Nendoroid Syou Fu Kan,
+  // "figma 414 Red Saber" against figma Saber of "Red".
+  if (!namedInEnglish && !namedInJapanese && !numberIdentifiesStrictly) {
     // Unless the product's own name is specific enough to stand in for one.
     //
     // Refusing outright cost more than it saved. 3,158 figures — 41.5% of the
@@ -917,10 +954,6 @@ export function scoreMatch(
       return 0;
     }
   }
-
-  const figureLineNumber = canonicalLineNumber(figure.lineNumber);
-  const titleLineNumber = canonicalLineNumber(extractLineNumber(title));
-  const numberIdentifies = figureLineNumber !== null && titleLineNumber === figureLineNumber;
 
   // --- Gate 3b: a maker named in the title has to be a plausible one. ---
   // The manufacturer equivalent of the line gate above. A title saying FuRyu

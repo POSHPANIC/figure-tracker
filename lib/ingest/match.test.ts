@@ -95,6 +95,20 @@ describe("tokenize", () => {
     assert.ok(tokens.has("marin"));
     assert.ok(tokens.has("kitagawa"));
   });
+
+  it("folds Latin accents, which sellers do not type", () => {
+    // 14 Kotobukiya listings were unmatchable because the catalogue says
+    // "Pokémon" and every seller says "Pokemon".
+    assert.deepEqual(tokenize("Pokémon Serena"), tokenize("Pokemon Serena"));
+    assert.deepEqual(tokenize("Scáthach"), tokenize("SCATHACH"));
+  });
+
+  it("leaves Japanese alone, where the mark is part of the letter", () => {
+    // Stripping combining marks wholesale turns ガ into カ.
+    assert.ok(tokenize("ガンダム").has("ガンダム"));
+    assert.notDeepEqual(tokenize("ガンダム"), tokenize("カンダム"));
+  });
+
 });
 
 describe("ties between a general and a specific figure", () => {
@@ -704,6 +718,54 @@ describe("extractLineNumber", () => {
 });
 
 describe("release numbers in matching", () => {
+  it("lets the box number stand in for a character the title renames", () => {
+    // 71 listings quoted the exact number of the figure they were attached to
+    // and were rejected anyway, because Gate 1 ran before the number was read.
+    const figure: MatchCandidate = {
+      ...marinNendo,
+      id: "syou-1061",
+      name: "Nendoroid Syou Fu Kan",
+      seriesName: null,
+      characterNames: ["Syou Fu Kan"],
+      lineNumber: "1061",
+    };
+    assert.ok(
+      scoreMatch("Good Smile Company Nendoroid 1061 Sho Fu Kan Figure", figure) >=
+        MATCH_ACCEPT_THRESHOLD,
+    );
+  });
+
+  it("will not take an anniversary or a measurement for a number", () => {
+    // Both real, both from the dry run that introduced the bypass. The loose
+    // reader is fine where a number can only disqualify; waiving Gate 1 on one
+    // means a misread number invents a match.
+    const tachikoma: MatchCandidate = {
+      ...marinNendo,
+      id: "tachikoma-15",
+      name: "Nendoroid Tachikoma",
+      seriesName: null,
+      characterNames: ["Tachikoma"],
+      lineNumber: "15",
+    };
+    assert.equal(
+      scoreMatch("Hatsune Miku Nendoroid 15th Anniversary Ver Good Smile Company", tachikoma),
+      0,
+    );
+    assert.equal(scoreMatch("Nendoroid 15cm Hatsune Miku Figure", tachikoma), 0);
+  });
+
+  it("still refuses when the number is the only thing agreeing and it disagrees", () => {
+    const figure: MatchCandidate = {
+      ...marinNendo,
+      id: "syou-1061",
+      name: "Nendoroid Syou Fu Kan",
+      seriesName: null,
+      characterNames: ["Syou Fu Kan"],
+      lineNumber: "1061",
+    };
+    assert.equal(scoreMatch("Good Smile Company Nendoroid 1999 Someone Else Figure", figure), 0);
+  });
+
   const withNumber: MatchCandidate = { ...marinNendo, id: "marin-1935", lineNumber: "1935" };
   const withoutNumber: MatchCandidate = { ...marinNendo, id: "marin-unknown", lineNumber: null };
 

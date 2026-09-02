@@ -294,6 +294,28 @@ async function uniqueSlug(base: string, productId: string): Promise<string> {
   return `${base}-${productId}`;
 }
 
+/**
+ * Nendoroid and figma numbers are how collectors actually refer to these.
+ * Kept per-line, since figma 100 and Nendoroid 100 are different products.
+ *
+ * The upsert does nothing when the number is already recorded - including
+ * when it sits on a different figure, which is a conflict this import is not
+ * the place to resolve.
+ */
+async function recordLineNumber(
+  figureId: string,
+  f: { lineNumber: string | null; category: string },
+): Promise<void> {
+  if (!f.lineNumber) return;
+  if (f.category !== "NENDOROID" && f.category !== "FIGMA") return;
+  const kind = f.category === "NENDOROID" ? "NENDOROID_NO" : "FIGMA_NO";
+  await prisma.figureIdentifier.upsert({
+    where: { kind_value: { kind, value: f.lineNumber } },
+    update: {},
+    create: { figureId, kind, value: f.lineNumber },
+  });
+}
+
 async function write(figures: ParsedFigure[]) {
   let created = 0;
   let updated = 0;
@@ -328,6 +350,12 @@ async function write(figures: ParsedFigure[]) {
 
     if (existing) {
       await prisma.figure.update({ where: { id: existing.figureId }, data });
+      // The number too, not only on the create path below. A figure that
+      // already existed - because another importer reached it first, or
+      // because this import ran twice - used to skip straight past the number
+      // block and never get one, which is how 141 numbered products ended up
+      // unable to match listings quoting their own number.
+      await recordLineNumber(existing.figureId, f);
       updated += 1;
       continue;
     }
@@ -338,16 +366,7 @@ async function write(figures: ParsedFigure[]) {
       data: { figureId: figure.id, kind: "GSC_PRODUCT", value: f.productId },
     });
 
-    // Nendoroid and figma numbers are how collectors actually refer to these.
-    // Kept per-line, since figma 100 and Nendoroid 100 are different products.
-    if (f.lineNumber && (f.category === "NENDOROID" || f.category === "FIGMA")) {
-      const kind = f.category === "NENDOROID" ? "NENDOROID_NO" : "FIGMA_NO";
-      await prisma.figureIdentifier.upsert({
-        where: { kind_value: { kind, value: f.lineNumber } },
-        update: {},
-        create: { figureId: figure.id, kind, value: f.lineNumber },
-      });
-    }
+    await recordLineNumber(figure.id, f);
     created += 1;
   }
 
