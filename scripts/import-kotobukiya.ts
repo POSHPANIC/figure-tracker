@@ -1,4 +1,5 @@
 import "dotenv/config";
+import { recordOffer } from "../lib/ingest/shop-offer";
 import { mkdirSync, readFileSync, writeFileSync, existsSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { join } from "node:path";
@@ -227,6 +228,13 @@ async function delist(productIds: string[]): Promise<number> {
   });
   if (rows.length === 0) return 0;
 
+  // The offer goes with the product. A row saying they sell it, kept after
+  // they stopped, is worse than no row: the figure page would send someone to
+  // a dead page rather than to the marketplace listings it falls back to.
+  await prisma.shopOffer.deleteMany({
+    where: { figureId: { in: rows.map((r) => r.figureId) }, source: "KOTOBUKIYA" },
+  });
+
   const { count } = await prisma.figure.updateMany({
     where: { id: { in: rows.map((r) => r.figureId) }, storeUrl: { not: null } },
     data: {
@@ -326,6 +334,12 @@ async function write(rows: Resolved[]) {
 
     if (existing) {
       await prisma.figure.update({ where: { id: existing.figureId }, data });
+      await recordOffer(existing.figureId, "KOTOBUKIYA", {
+        url: candidate.url,
+        priceAmount: candidate.priceUsd,
+        priceCurrency: "USD",
+        available: candidate.available,
+      });
       // Backfill identifiers a previous run may not have written.
       for (const key of keys) {
         await prisma.figureIdentifier.upsert({
@@ -353,6 +367,12 @@ async function write(rows: Resolved[]) {
         msrpCurrency: "USD",
         slug: await freeSlug(slugify(candidate.title), candidate.productId),
       },
+    });
+    await recordOffer(figure.id, "KOTOBUKIYA", {
+      url: candidate.url,
+      priceAmount: candidate.priceUsd,
+      priceCurrency: "USD",
+      available: candidate.available,
     });
     for (const key of keys) {
       await prisma.figureIdentifier.create({ data: { figureId: figure.id, ...key } });

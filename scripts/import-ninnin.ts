@@ -14,6 +14,7 @@ import {
 } from "../lib/ingest/ninnin";
 import { decide as decideNsfw } from "../lib/ingest/nsfw";
 import { findHeldProduct } from "../lib/ingest/held-product";
+import { fillMissing, recordOffer } from "../lib/ingest/shop-offer";
 
 /**
  * Import Nin-Nin Game's catalogue.
@@ -154,6 +155,30 @@ async function writeStore(figureId: string, p: NinNinProduct): Promise<boolean> 
   return true;
 }
 
+/**
+ * Their offer, and whatever specs the figure was missing.
+ *
+ * Separate from writeStore above, and unconditional where that is not. The
+ * figure-level store fields are one slot shared by every importer, so
+ * writeStore politely declines when another shop got there first -- which
+ * meant this shop's price and link were simply discarded. The offer row is
+ * ours alone and is always written.
+ */
+async function recordAndEnrich(figureId: string, p: NinNinProduct): Promise<string[]> {
+  await recordOffer(figureId, "NINNIN", {
+    url: p.url,
+    priceAmount: p.priceAmount,
+    priceCurrency: p.priceCurrency,
+    available: p.available,
+  });
+  return fillMissing(figureId, {
+    scale: p.scale,
+    heightMm: p.heightMm,
+    releaseDate: p.releaseDate,
+    manufacturerId: await ensureManufacturer(p.manufacturer),
+  });
+}
+
 async function handle(url: string): Promise<{ outcome: Outcome; detail: string }> {
   const productId = productIdFromUrl(url);
   if (!productId) return { outcome: "skipped", detail: url.slice(-52) };
@@ -165,7 +190,10 @@ async function handle(url: string): Promise<{ outcome: Outcome; detail: string }
       const fresh = await fetchPage(url);
       await new Promise((r) => setTimeout(r, PAGE_DELAY_MS));
       const p = fresh ? parseProductPage(fresh, url) : null;
-      if (p) await writeStore(known, p);
+      if (p) {
+        await writeStore(known, p);
+        await recordAndEnrich(known, p);
+      }
     }
     return { outcome: "refreshed", detail: url.slice(-52) };
   }
@@ -184,14 +212,19 @@ async function handle(url: string): Promise<{ outcome: Outcome; detail: string }
     const match = await heldBy("JAN", product.jan);
     if (match) {
       let linked = false;
+      let filled: string[] = [];
       if (APPLY) {
         linked = await writeStore(match, product);
+        filled = await recordAndEnrich(match, product);
         await recordIdentifiers(match, product);
       }
       const slug = (await prisma.figure.findUnique({ where: { id: match }, select: { slug: true } }))?.slug;
       return {
         outcome: "attached",
-        detail: `JAN ${product.jan} → ${slug}${APPLY && !linked ? " (kept its existing shop link)" : ""}`,
+        detail:
+          `JAN ${product.jan} → ${slug}` +
+          `${filled.length ? ` +${filled.join(",")}` : ""}` +
+          `${APPLY && !linked ? " (kept its existing shop link)" : ""}`,
       };
     }
   }
@@ -207,13 +240,18 @@ async function handle(url: string): Promise<{ outcome: Outcome; detail: string }
   });
   if (held) {
     let linked = false;
+    let filled: string[] = [];
     if (APPLY) {
       linked = await writeStore(held.id, product);
+      filled = await recordAndEnrich(held.id, product);
       await recordIdentifiers(held.id, product);
     }
     return {
       outcome: "attached",
-      detail: `same product as ${held.name.slice(0, 36)}${APPLY && !linked ? " (kept its shop link)" : ""}`,
+      detail:
+        `same product as ${held.name.slice(0, 36)}` +
+        `${filled.length ? ` +${filled.join(",")}` : ""}` +
+        `${APPLY && !linked ? " (kept its shop link)" : ""}`,
     };
   }
 
@@ -256,6 +294,12 @@ async function handle(url: string): Promise<{ outcome: Outcome; detail: string }
     select: { id: true, slug: true },
   });
 
+  await recordOffer(figure.id, "NINNIN", {
+    url: product.url,
+    priceAmount: product.priceAmount,
+    priceCurrency: product.priceCurrency,
+    available: product.available,
+  });
   await recordIdentifiers(figure.id, product);
   return { outcome: "created", detail: figure.slug };
 }

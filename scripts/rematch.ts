@@ -12,6 +12,7 @@
  *   npm run rematch -- --yes               # apply everything
  *   npm run rematch -- --yes --no-moves    # apply only unmatches and new matches
  *   npm run rematch -- --all           # list every change, not the first six
+ *   npm run rematch -- --yes --safe-moves  # moves, minus the doubtful ones
  *
  * --no-moves exists because the two kinds of change carry very different risk.
  * Dropping a listing that no longer matches only ever removes a claim. Moving
@@ -22,15 +23,17 @@
 import "dotenv/config";
 import { prisma } from "../lib/prisma";
 import { loadCandidates } from "../lib/ingest/candidates";
-import { bestMatch } from "../lib/ingest/match";
+import { bestMatch, descriptorTokens, tokenize } from "../lib/ingest/match";
 import { recomputeFigureStatsFor } from "../lib/ingest/aggregate";
 
 const APPLY = process.argv.includes("--yes");
 const SKIP_MOVES = process.argv.includes("--no-moves");
 const ALL = process.argv.includes("--all");
+const SAFE_MOVES = process.argv.includes("--safe-moves");
 
 async function main() {
   const candidates = await loadCandidates(true);
+  const byId = new Map(candidates.map((c) => [c.id, c]));
   const listings = await prisma.listing.findMany({
     select: { id: true, title: true, figureId: true, matchScore: true },
   });
@@ -108,6 +111,28 @@ async function main() {
       continue;
     }
 
+    // --safe-moves applies only the moves that cannot be the scoring fault
+    // this catalogue is known to have: the score is a ratio, so a one-word
+    // name matching completely outscores a four-word name matching completely.
+    // "Megumi Kato" beats "Megumi Kato: First Meeting Outfit Ver." at 0.870 to
+    // 0.750 on a title that says First Meeting Outfit.
+    //
+    // So a move is taken only when the destination accounts for at least as
+    // much of the title as the source did. Moves between two entries sharing a
+    // name are held back as well: those are the catalogue's duplicates, and
+    // shuffling a listing between them settles nothing.
+    if (isMove && SAFE_MOVES) {
+      const from = byId.get(l.figureId!);
+      const to = byId.get(next!);
+      const titleTokens = tokenize(l.title);
+      const accountedFor = (c: typeof from) =>
+        c ? [...descriptorTokens(c)].filter((t) => titleTokens.has(t)).length : 0;
+      if (!from || !to || from.name === to.name || accountedFor(to) < accountedFor(from)) {
+        skippedMoves += 1;
+        continue;
+      }
+    }
+
     if (l.figureId) touched.add(l.figureId);
     if (next) touched.add(next);
 
@@ -118,7 +143,14 @@ async function main() {
   console.log(`listings examined : ${listings.length}`);
   console.log(`newly matched     : ${gained.length}`);
   console.log(`no longer matched : ${lost.length}`);
-  console.log(`moved figure      : ${moved.length}${SKIP_MOVES ? " (left alone)" : ""}`);
+  // skippedMoves is counted during the scan whether or not this is a dry
+  // run, so the report says how many a filter holds back before anything
+  // is written - which is the number worth seeing beforehand.
+  const heldBack = SKIP_MOVES ? moved.length : skippedMoves;
+  console.log(
+    `moved figure      : ${moved.length}` +
+      (heldBack ? ` (${moved.length - heldBack} to apply, ${heldBack} held back)` : ""),
+  );
 
   // Which figure a listing came from or went to is the whole question on a
   // move, and the reason a loss is or is not a mistake. Printing the title

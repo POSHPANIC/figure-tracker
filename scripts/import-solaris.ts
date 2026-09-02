@@ -11,6 +11,7 @@ import {
 import { parseProductPage, tidyName, type SolarisSpecs } from "../lib/ingest/solaris-product";
 import { decide as decideNsfw, fromRetailerTags as nsfwFromTags } from "../lib/ingest/nsfw";
 import { findHeldProduct } from "../lib/ingest/held-product";
+import { fillMissing, recordOffer } from "../lib/ingest/shop-offer";
 
 /**
  * Import Solaris Japan's catalogue directly.
@@ -216,13 +217,36 @@ async function attach(
   c: SolarisCandidate,
   jan: string | null,
   how: string,
+  specs?: SolarisSpecs | null,
 ): Promise<{ outcome: Outcome; detail: string }> {
+  let filled: string[] = [];
   if (APPLY) {
     await prisma.figure.update({ where: { id: figureId }, data: storeFields(c) });
+    // Their offer, on its own row. The figure-level store fields above are a
+    // single slot that every importer writes, so whoever runs last owns them;
+    // this is the copy that survives tonight's Nin-Nin run.
+    await recordOffer(figureId, "SOLARIS", {
+      url: c.url,
+      priceAmount: c.priceUsd,
+      priceCurrency: c.priceUsd === null ? null : "USD",
+      available: c.available,
+    });
+    // A shop that already had the page open knows things the source this
+    // figure came from did not. Only what is missing, and never what somebody
+    // has locked — see lib/ingest/enrich.ts.
+    if (specs) {
+      filled = await fillMissing(figureId, {
+        scale: specs.scale,
+        heightMm: specs.heightMm,
+        releaseDate: specs.releaseDate,
+        manufacturerId: await ensureManufacturer(specs.manufacturer ?? c.vendor),
+      });
+    }
     await recordIdentifiers(figureId, c, jan);
     await closeStaleCandidate(c.productId, figureId);
   }
-  return { outcome: "attached", detail: `${how} → ${await slugOf(figureId)}` };
+  const added = filled.length ? ` +${filled.join(",")}` : "";
+  return { outcome: "attached", detail: `${how}${added} → ${await slugOf(figureId)}` };
 }
 
 async function handle(c: SolarisCandidate): Promise<{ outcome: Outcome; detail: string }> {
@@ -231,6 +255,12 @@ async function handle(c: SolarisCandidate): Promise<{ outcome: Outcome; detail: 
   if (known) {
     if (APPLY) {
       await prisma.figure.update({ where: { id: known }, data: storeFields(c) });
+      await recordOffer(known, "SOLARIS", {
+        url: c.url,
+        priceAmount: c.priceUsd,
+        priceCurrency: c.priceUsd === null ? null : "USD",
+        available: c.available,
+      });
       // Barcode too, if it still has none. A figure imported before this
       // script recorded barcodes would otherwise never get one: every later
       // run recognises the product and stops here, so "known" quietly meant
@@ -277,7 +307,7 @@ async function handle(c: SolarisCandidate): Promise<{ outcome: Outcome; detail: 
 
   if (specs.jan) {
     const match = await heldBy("JAN", specs.jan);
-    if (match) return attach(match, c, specs.jan, `JAN ${specs.jan}`);
+    if (match) return attach(match, c, specs.jan, `JAN ${specs.jan}`, specs);
   }
 
   if (!specs.name) return { outcome: "skipped", detail: "no product name on the page" };
@@ -293,7 +323,7 @@ async function handle(c: SolarisCandidate): Promise<{ outcome: Outcome; detail: 
     manufacturer: specs.manufacturer ?? c.vendor,
     category: categoryFor(specs),
   });
-  if (held) return attach(held.id, c, specs.jan, `same product as ${held.name.slice(0, 40)}`);
+  if (held) return attach(held.id, c, specs.jan, `same product as ${held.name.slice(0, 40)}`, specs);
   if (!APPLY) return { outcome: "created", detail: name.slice(0, 58) };
 
   const base = slugify(name);
@@ -339,6 +369,12 @@ async function handle(c: SolarisCandidate): Promise<{ outcome: Outcome; detail: 
     select: { id: true, slug: true },
   });
 
+  await recordOffer(figure.id, "SOLARIS", {
+    url: c.url,
+    priceAmount: c.priceUsd,
+    priceCurrency: c.priceUsd === null ? null : "USD",
+    available: c.available,
+  });
   await recordIdentifiers(figure.id, c, specs.jan);
   await closeStaleCandidate(c.productId, figure.id);
   return { outcome: "created", detail: figure.slug };

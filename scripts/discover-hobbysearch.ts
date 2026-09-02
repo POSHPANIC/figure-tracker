@@ -1,4 +1,5 @@
 import "dotenv/config";
+import { recordOffer } from "../lib/ingest/shop-offer";
 import { prisma } from "../lib/prisma";
 import { USER_AGENT } from "../lib/site";
 import {
@@ -158,7 +159,7 @@ async function handle(product: HobbySearchProduct): Promise<Outcome> {
     slug = `${base}-${n}`;
   }
 
-  await prisma.figure.create({
+  const created = await prisma.figure.create({
     data: {
       name: product.name,
       slug,
@@ -183,6 +184,12 @@ async function handle(product: HobbySearchProduct): Promise<Outcome> {
 
       identifiers: { create: { kind: "JAN", value: product.jan } },
     },
+    select: { id: true },
+  });
+  await recordOffer(created.id, "HOBBYSEARCH", {
+    url: product.url,
+    priceAmount: product.salesPriceJpy,
+    priceCurrency: product.salesPriceJpy ? "JPY" : null,
   });
   return "created";
 }

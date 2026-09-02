@@ -306,6 +306,8 @@ model Figure {
   /// the import kept choosing the costume -- so the costume gets named here
   /// and `series` stays the character's own.
   collabFranchises Franchise[]      @relation("FigureCollabFranchise")
+  /// Every shop we know sells this, one row each.
+  shopOffers       ShopOffer[]
 
   @@index([slug])
   @@index([manufacturerId])
@@ -327,6 +329,50 @@ model Figure {
 /// So provenance is stored alongside the URL rather than assumed. If someone
 /// later asks under what terms an image is being used, the answer is a row in
 /// this table, not a memory of an email.
+/// A shop that sells a figure, and what it last said about it.
+///
+/// One row per shop per figure, which is the whole point. The same six fields
+/// used to live on Figure itself -- one storeUrl, one storePriceAmount -- and
+/// five importers wrote to them: Kotobukiya, Solaris, Nin-Nin, HobbySearch and
+/// the correction form. Whichever ran last won, so 110 figures known to more
+/// than one shop had a link thrown away nightly. The catalogue was not
+/// recording where to buy a figure; it was recording who asked most recently.
+///
+/// `source` is the shop, not the URL's host, because a shop can move domains
+/// and because it is what the importer knows about itself. Paired with figureId
+/// it is unique, so an importer upserts its own row and cannot touch anyone
+/// else's.
+model ShopOffer {
+  id       String @id @default(cuid())
+  figureId String
+  figure   Figure @relation(fields: [figureId], references: [id], onDelete: Cascade)
+
+  /// SOLARIS, NINNIN, KOTOBUKIYA, GOODSMILE, HOBBYSEARCH, MANUAL.
+  source String @db.VarChar(24)
+  /// Clean, untagged. Affiliate ids are applied when the page renders, so they
+  /// live in one environment variable rather than baked into thousands of rows.
+  url    String
+
+  /// What the shop lists it at, in the currency the shop lists it in. Never
+  /// converted on the way in -- see the money rule at the top of this file.
+  priceAmount   Decimal? @db.Decimal(12, 2)
+  priceCurrency String?  @db.VarChar(3)
+
+  /// Nullable on purpose. "We could not tell" and "you cannot buy it" are
+  /// different answers, and showing the second when we mean the first costs
+  /// somebody a purchase.
+  available Boolean?
+  /// When pre-orders close, where the shop publishes it. Most do not.
+  closesAt  DateTime?
+  checkedAt DateTime  @default(now())
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([figureId, source])
+  @@index([figureId])
+}
+
 model FigureImage {
   id        String @id @default(cuid())
   figureId  String

@@ -223,6 +223,12 @@ export async function getFigureBySlug(slug: string, condition?: ItemCondition) {
       // The franchises a collab piece borrows from. Ordered by name so the
       // info box does not reshuffle between requests.
       collabFranchises: { select: { name: true, slug: true }, orderBy: { name: "asc" } },
+      // Every shop we know sells it. Available first, then cheapest — the
+      // reader is looking for somewhere to buy it, and a shop that will not
+      // take an order is not that, whatever it charges.
+      shopOffers: {
+        orderBy: [{ available: "desc" }, { priceAmount: "asc" }],
+      },
       characters: { include: { series: { select: { name: true, slug: true } } } },
       images: { orderBy: { sortOrder: "asc" } },
       // The archive id, which links back to the manufacturer's entry for the

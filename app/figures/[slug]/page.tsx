@@ -200,10 +200,6 @@ async function FigureView({
   // be picked out by kind rather than taken as the first one.
   const archiveId = figure.identifiers.find((i) => i.kind === "GSC_PRODUCT");
 
-  // The shop link as it will be published, tagged if we have a tag for that
-  // shop. Computed once so the markup can tell a paid link from a plain one.
-  const storeHref = figure.storeUrl ? withSolarisAffiliate(figure.storeUrl) : null;
-
   // Its own franchise first, then any it only borrows from, with duplicates
   // dropped — a collab whose costume comes from its own franchise would
   // otherwise print the same name twice.
@@ -262,36 +258,75 @@ async function FigureView({
       ? approxAt(formatCurrency(msrp.amount, money.currency), msrp.basis)
       : null;
 
-  // What the shop is charging, in the currency the reader picked.
+  // Every shop we know sells this, as one list.
   //
-  // At today's rate, not the release month's, because unlike MSRP this is a
-  // live price: it is what they want for it now. So `when` is null, which is
-  // also what makes the basis "today".
-  const storePrice =
-    figure.storePriceAmount !== null && figure.storePriceCurrency
-      ? await historicalMoney(
-          Number(figure.storePriceAmount),
-          figure.storePriceCurrency,
-          null,
-          money.currency,
-        )
-      : null;
-  // One price, in the currency the reader picked — the same single-value
-  // treatment the marketplace rows below get from formatMoney, and for the same
-  // reason: two numbers on one row is a comparison nobody asked for.
-  //
-  // The shop's own figure is shown when it is already that currency, so no
-  // round trip through a rate can shift it. If no rate exists, the shop's
-  // figure is shown as-is rather than nothing.
-  const storePriceLabel =
-    figure.storePriceAmount === null || !figure.storePriceCurrency
-      ? null
-      : figure.storePriceCurrency.toUpperCase() === money.currency || storePrice === null
-        ? formatCurrency(figure.storePriceAmount, figure.storePriceCurrency)
-        : formatCurrency(storePrice.amount, money.currency);
+  // figure.storeUrl is the older single slot that every importer wrote, so it
+  // holds whichever shop ran last. It is included when no offer row carries the
+  // same link, which covers a figure whose shop has not come round again since
+  // the offer rows were introduced.
+  const offerRows: {
+    id: string;
+    url: string;
+    priceAmount: Parameters<typeof formatCurrency>[0] | null;
+    priceCurrency: string | null;
+    available: boolean | null;
+    closesAt: Date | null;
+  }[] = [
+    ...figure.shopOffers.map((o) => ({
+      id: o.id,
+      url: o.url,
+      priceAmount: o.priceAmount,
+      priceCurrency: o.priceCurrency,
+      available: o.available,
+      closesAt: o.closesAt,
+    })),
+    ...(figure.storeUrl && !figure.shopOffers.some((o) => o.url === figure.storeUrl)
+      ? [
+          {
+            id: "figure-store-slot",
+            url: figure.storeUrl,
+            priceAmount: figure.storePriceAmount,
+            priceCurrency: figure.storePriceCurrency,
+            available: figure.storeAvailable,
+            closesAt: figure.storeClosesAt,
+          },
+        ]
+      : []),
+  ];
 
-  // Whether the store link is the maker's own shop or a retailer's.
-  const fromManufacturer = figure.storeUrl ? isManufacturerStore(figure.storeUrl) : true;
+  // One price each, in the currency the reader picked — the same single-value
+  // treatment the marketplace rows below get, and for the same reason: two
+  // numbers on one row is a comparison nobody asked for.
+  //
+  // At today's rate, not the release month's, because unlike MSRP these are
+  // live prices: they are what the shop wants for it now. So `when` is null,
+  // which is also what makes the basis "today". The shop's own figure is shown
+  // when it is already that currency, so no round trip through a rate can
+  // shift it, and again when no rate exists — as-is beats nothing.
+  const offers = await Promise.all(
+    offerRows.map(async (o) => {
+      const converted =
+        o.priceAmount !== null && o.priceCurrency
+          ? await historicalMoney(Number(o.priceAmount), o.priceCurrency, null, money.currency)
+          : null;
+      const priceLabel =
+        o.priceAmount === null || !o.priceCurrency
+          ? null
+          : o.priceCurrency.toUpperCase() === money.currency || converted === null
+            ? formatCurrency(o.priceAmount, o.priceCurrency)
+            : formatCurrency(converted.amount, money.currency);
+      // Tagged if we have a tag for that shop. Derived rather than assumed, so
+      // the markup can tell a paid link from a plain one.
+      const href = withSolarisAffiliate(o.url);
+      return { ...o, priceLabel, href, sponsored: href !== o.url };
+    }),
+  );
+
+  // Whether every shop listed is the maker's own. With a retailer in the list
+  // the note below has to be the retailer one, because the caveat it carries —
+  // that this is their price and not the manufacturer's — is the one that
+  // matters.
+  const fromManufacturer = offers.length > 0 && offers.every((o) => isManufacturerStore(o.url));
 
   // Wrapped for Sovrn when a key is configured, and a plain link to their
   // search when it is not — the reader gets somewhere useful either way.
@@ -301,7 +336,7 @@ async function FigureView({
   // Only where there is no live way to buy it. A figure still on sale should
   // send the reader to the shop, not to the used market.
   const secondhand =
-    !figure.storeUrl || figure.storeAvailable === false ? proxyLinks(figure) : [];
+    offers.length === 0 || offers.every((o) => o.available === false) ? proxyLinks(figure) : [];
 
   // The one number this page can honestly state, and what it rests on.
   const value = figureValue(figure);
@@ -611,26 +646,31 @@ async function FigureView({
             <p className="mt-1 text-xs text-muted">
               {fromManufacturer
                 ? "Their store carries what is currently in production. Older figures are usually not listed — the marketplace prices below are the ones that matter for those."
-                : "A shop that stocks this figure. Their price is what they charge, not the manufacturer's — the marketplace prices below are what it changes hands for."}
+                : offers.length > 1
+                  ? "Shops that stock this figure. Their prices are what they charge, not the manufacturer's — the marketplace prices below are what it changes hands for."
+                  : "A shop that stocks this figure. Their price is what they charge, not the manufacturer's — the marketplace prices below are what it changes hands for."}
             </p>
 
-            {figure.storeUrl && (
-              // The product itself, when somebody has supplied the link — the
-              // one row on this page that is not a guess about whose listing is
-              // whose. Whether it can still be ordered is shown either way: a
-              // closed preorder is why the marketplace prices below exist, and
-              // hiding it would leave the reader wondering.
+            {offers.map((offer) => (
+              // One row per shop. Whether it can still be ordered is shown
+              // either way: a closed preorder is why the marketplace prices
+              // below exist, and hiding it would leave the reader wondering.
               <a
-                href={storeHref ?? figure.storeUrl}
+                key={offer.id}
+                href={offer.href}
                 target="_blank"
                 // "sponsored" only when the link actually earns something —
                 // which is why it is derived from the tag rather than assumed.
-                // Google asks for it on monetised links, and this one is
+                // Google asks for it on monetised links, and these are
                 // monetised for Solaris and not for anybody else's store.
-                rel={storeHref === figure.storeUrl ? "noopener noreferrer" : "sponsored nofollow noopener noreferrer"}
+                rel={
+                  offer.sponsored
+                    ? "sponsored nofollow noopener noreferrer"
+                    : "noopener noreferrer"
+                }
                 className="mt-3 flex items-center gap-3 rounded-lg border border-border p-3 transition hover:border-foreground"
               >
-                <StoreMark url={figure.storeUrl} className="shrink-0 text-sm" />
+                <StoreMark url={offer.url} className="shrink-0 text-sm" />
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-sm">{figure.name}</span>
                   <span
@@ -640,24 +680,24 @@ async function FigureView({
                       // "Currently unavailable", or an order window that has
                       // closed. Null is the shop saying nothing, which is not a
                       // no and must not be dressed as one.
-                      figure.storeAvailable === true
+                      offer.available === true
                         ? "text-up"
-                        : figure.storeAvailable === false
+                        : offer.available === false
                           ? "text-down"
                           : "text-muted",
                     )}
                   >
                     {describeAvailability({
-                      orderClosesAt: figure.storeClosesAt,
-                      available: figure.storeAvailable,
+                      orderClosesAt: offer.closesAt,
+                      available: offer.available,
                     })}
                   </span>
                 </span>
-                {storePriceLabel && (
-                  <span className="tabular shrink-0 text-sm font-medium">{storePriceLabel}</span>
+                {offer.priceLabel && (
+                  <span className="tabular shrink-0 text-sm font-medium">{offer.priceLabel}</span>
                 )}
               </a>
-            )}
+            ))}
             {archiveId && (
               /* Their search rather than the product, because the product cannot
                  be linked. goodsmile.com has no sitemap and its only index sits
