@@ -317,6 +317,8 @@ model Figure {
   collabFranchises Franchise[]      @relation("FigureCollabFranchise")
   /// Every shop we know sells this, one row each.
   shopOffers       ShopOffer[]
+  /// Products a source described before we could name them.
+  sourceProducts   SourceProduct[]
 
   @@index([slug])
   @@index([manufacturerId])
@@ -1001,6 +1003,69 @@ model FigureCandidate {
   reviewedAt  DateTime?
 
   @@index([status, listingCount])
+}
+
+/// A product a source told us about that we could not turn into a figure yet.
+///
+/// Alter is why this exists. Their site publishes an MSRP, a scale, a height
+/// and a release month for 633 products, and an English name for only 153 of
+/// them. The other 480 could not be created -- a Japanese name in an English
+/// catalogue can be neither searched for by the people reading it nor matched
+/// against an English marketplace title -- but throwing the facts away was
+/// worse, because those products do reach us later under English names, from a
+/// retailer that stocks them or a seller that lists one.
+///
+/// So the facts are kept here, keyed by the source that gave them, and a later
+/// pass links them to whichever figure turns out to be the same product. What
+/// it gains is the manufacturer's own price on a figure the catalogue would
+/// otherwise only have a retailer's number for.
+///
+/// This is not the old FigureCandidate queue. That parked products for a person
+/// to review and nobody ever did; nothing here waits on a human.
+model SourceProduct {
+  id String @id @default(cuid())
+
+  /// "ALTER:512". Unique, so a nightly re-walk updates rather than stacks.
+  key    String @unique
+  source String @db.VarChar(24)
+  url    String
+
+  /// Whatever names the source gave. The English one is usually the missing
+  /// half -- that is the whole reason the row is here rather than a figure.
+  name   String?
+  nameJa String?
+
+  seriesEn String?
+  seriesJa String?
+
+  /// The maker as the source names it, unresolved. Linking happens later and
+  /// may never happen, so this does not earn a Manufacturer row.
+  manufacturerName String?
+
+  /// The number on the box, in the currency the maker states it in.
+  msrpAmount   Decimal? @db.Decimal(12, 2)
+  msrpCurrency String?  @db.VarChar(3)
+
+  scale       String?
+  heightMm    Int?
+  releaseDate DateTime?
+  /// The barcode, where a source publishes one. Alter do not; others might,
+  /// and it is the only key here that needs no corroboration.
+  jan         String?
+
+  /// Set once this is known to be the same product as a figure we hold, so it
+  /// is never linked twice and the evidence stays auditable.
+  figureId String?
+  figure   Figure? @relation(fields: [figureId], references: [id], onDelete: SetNull)
+  /// How the link was decided, in a word: "jan", "nameJa", "specs".
+  linkedBy String?
+  linkedAt DateTime?
+
+  firstSeenAt DateTime @default(now())
+  lastSeenAt  DateTime @updatedAt
+
+  @@index([source, figureId])
+  @@index([nameJa])
 }
 
 /// Small pieces of operational state that belong to no one row.

@@ -149,6 +149,29 @@ async function saveCursor(next: number) {
   });
 }
 
+/** Keep what they told us about a product we cannot name yet. */
+async function remember(product: AlterProduct): Promise<void> {
+  const data = {
+    source: "ALTER",
+    url: product.url,
+    name: product.name,
+    nameJa: product.nameJa,
+    seriesEn: product.seriesEn,
+    seriesJa: product.seriesJa,
+    manufacturerName: "Alter",
+    msrpAmount: product.msrpAmount,
+    msrpCurrency: product.msrpAmount === null ? null : "JPY",
+    scale: product.scale,
+    heightMm: product.heightMm,
+    releaseDate: product.releaseDate,
+  };
+  await prisma.sourceProduct.upsert({
+    where: { key: `ALTER:${product.productId}` },
+    create: { key: `ALTER:${product.productId}`, ...data },
+    update: data,
+  });
+}
+
 type Outcome = "refreshed" | "attached" | "created" | "skipped" | "untitled" | "missing";
 
 async function handle(product: AlterProduct, makerId: string): Promise<Outcome> {
@@ -303,10 +326,16 @@ async function main() {
     }
     // Counted apart from "skipped", because these are figures we would want
     // and cannot name — the English row is empty on their older products. It
-    // is a gap in the source, not a decision about the product, and lumping
-    // the two together would hide how much is being left behind.
+    // is a gap in the source, not a decision about the product.
+    //
+    // The facts are kept rather than dropped. Alter state a price, a scale, a
+    // height and a month for these, and the products do reach the catalogue
+    // later under English names from a shop that stocks them; link-source-
+    // products then puts the maker's own price on a figure that would
+    // otherwise carry only a retailer's number.
     if (!product.name) {
       tally.untitled += 1;
+      if (APPLY) await remember(product);
       continue;
     }
     tally[await handle(product, makerId)] += 1;
@@ -318,7 +347,8 @@ async function main() {
   );
   if (tally.untitled) {
     console.log(
-      `  ${tally.untitled} product(s) left alone: Alter state no English name for them.`,
+      `  ${tally.untitled} product(s) kept but not created: Alter state no English name` +
+        ` for them. Their price and specs are stored for a later match.`,
     );
   }
 

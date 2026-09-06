@@ -28,6 +28,7 @@
     "reindex": "tsx scripts/reindex.ts",
     "suggest:figures": "tsx scripts/suggest-figures.ts",
     "import:alter": "tsx scripts/import-alter.ts",
+    "link:source-products": "tsx scripts/link-source-products.ts",
     "import:gsc": "tsx scripts/import-gsc.ts",
     "import:kotobukiya": "tsx scripts/import-kotobukiya.ts",
     "derive:characters": "tsx scripts/derive-characters.ts",

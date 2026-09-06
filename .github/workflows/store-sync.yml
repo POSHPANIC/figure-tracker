@@ -172,6 +172,18 @@ jobs:
       # list has never seen, and browsing is by franchise, so a series without
       # one is unreachable. Once at the end rather than after each source: it is
       # a full pass over the catalogue and twice a night buys nothing.
+      # Products a source described but could not name. Alter publish a price
+      # and specs for 480 they give no English name for; these arrive later
+      # under English names from a shop that stocks them, and this is the pass
+      # that notices. After the importers, because every import is a chance
+      # that the figure a stored row was waiting for now exists.
+      - name: Link stored products
+        if: always()
+        env:
+          DIRECT_DATABASE_URL: ${{ secrets.DIRECT_DATABASE_URL }}
+          DATABASE_URL: ${{ secrets.DIRECT_DATABASE_URL }}
+        run: npm run link:source-products -- --write
+
       - name: File any new series
         if: always()
         env:
