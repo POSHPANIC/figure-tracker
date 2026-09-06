@@ -13,7 +13,7 @@ import {
 } from "../lib/ingest/hlj";
 import { decide as decideNsfw } from "../lib/ingest/nsfw";
 import { findHeldProduct } from "../lib/ingest/held-product";
-import { fillMissing, recordOffer } from "../lib/ingest/shop-offer";
+import { fillMissing, forgetOffer, recordOffer, staleOffers } from "../lib/ingest/shop-offer";
 
 /**
  * Import HobbyLink Japan's catalogue.
@@ -62,10 +62,21 @@ function intArg(name: string, fallback: number): number {
 
 const MAX = intArg("max", 60);
 const PAGES = intArg("pages", 2);
+/** How many of the least recently checked offers to re-read. */
+const REFRESH = intArg("refresh", 40);
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-async function fetchPage(url: string): Promise<string | null> {
+/**
+ * A page, or why there is not one.
+ *
+ * "gone" and "could not look" have to be told apart: the refresh below deletes
+ * an offer when the product page has gone, and a network blip or a 503 must
+ * never be read as the shop dropping a product.
+ */
+type Fetched = { html: string } | { gone: true } | { failed: true };
+
+async function fetchPage(url: string): Promise<Fetched> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 30_000);
   try {
@@ -73,13 +84,19 @@ async function fetchPage(url: string): Promise<string | null> {
       headers: { "user-agent": USER_AGENT },
       signal: controller.signal,
     });
-    if (!res.ok) return null;
-    return await res.text();
+    if (res.status === 404 || res.status === 410) return { gone: true };
+    if (!res.ok) return { failed: true };
+    return { html: await res.text() };
   } catch {
-    return null;
+    return { failed: true };
   } finally {
     clearTimeout(timer);
   }
+}
+
+/** The html, or null — for the callers that do not care why. */
+function htmlOf(f: Fetched): string | null {
+  return "html" in f ? f.html : null;
 }
 
 /** Every product slug the searched pages link to, each one once. */
@@ -87,7 +104,7 @@ async function readListings(): Promise<string[]> {
   const slugs = new Set<string>();
   for (const term of TERMS) {
     for (let page = 1; page <= PAGES; page += 1) {
-      const html = await fetchPage(searchUrl(term, page));
+      const html = htmlOf(await fetchPage(searchUrl(term, page)));
       await sleep(PAGE_DELAY_MS);
       if (!html) continue;
       const found = parseListing(html);
@@ -192,7 +209,7 @@ async function handle(slug: string): Promise<{ outcome: Outcome; detail: string 
   const known = await heldBy(IDENTIFIER_KIND, id);
   if (known) {
     if (APPLY) {
-      const html = await fetchPage(url);
+      const html = htmlOf(await fetchPage(url));
       await sleep(PAGE_DELAY_MS);
       const p = html ? parseProductPage(html, url) : null;
       if (p) await recordAndEnrich(known, p);
@@ -200,7 +217,7 @@ async function handle(slug: string): Promise<{ outcome: Outcome; detail: string 
     return { outcome: "refreshed", detail: slug.slice(0, 52) };
   }
 
-  const html = await fetchPage(url);
+  const html = htmlOf(await fetchPage(url));
   await sleep(PAGE_DELAY_MS);
   if (!html) return { outcome: "unreadable", detail: slug.slice(0, 52) };
 
@@ -297,6 +314,57 @@ async function handle(slug: string): Promise<{ outcome: Outcome; detail: string 
   return { outcome: "created", detail: figure.slug };
 }
 
+/**
+ * Re-read the offers the listing walk did not reach.
+ *
+ * The walk only ever sees what the shop chooses to show: four searches, two
+ * pages each, about 190 products. Everything imported before that window moved
+ * on would otherwise keep publishing whatever price and stock it had on the day
+ * it was found, with nothing on the page saying how old that is.
+ *
+ * Oldest first, so the queue drains evenly rather than re-reading the same
+ * products every night, and skipping what this run has already handled.
+ */
+async function refreshStale(alreadyDone: readonly string[]): Promise<{
+  checked: number;
+  changed: number;
+  gone: number;
+  unreachable: number;
+}> {
+  const due = await staleOffers("HLJ", REFRESH, alreadyDone);
+  let changed = 0;
+  let gone = 0;
+  let unreachable = 0;
+
+  for (const offer of due) {
+    const fetched = await fetchPage(offer.url);
+    await sleep(PAGE_DELAY_MS);
+
+    if ("gone" in fetched) {
+      // They told us the product is not there. That is a fact about the shop,
+      // unlike a timeout, so the offer goes.
+      gone += 1;
+      if (APPLY) await forgetOffer(offer.id);
+      console.log(`  gone       ${offer.url.slice(-52)}`);
+      continue;
+    }
+    if ("failed" in fetched) {
+      unreachable += 1;
+      continue;
+    }
+
+    const product = parseProductPage(fetched.html, offer.url);
+    if (!product) {
+      unreachable += 1;
+      continue;
+    }
+    if (APPLY) await recordAndEnrich(offer.figureId, product);
+    changed += 1;
+  }
+
+  return { checked: due.length, changed, gone, unreachable };
+}
+
 async function main() {
   const host = new URL(process.env.DATABASE_URL ?? "postgres://unset").hostname;
   console.log(`\n  ${APPLY ? "Writing to" : "Dry run against"} ${host}`);
@@ -345,6 +413,14 @@ async function main() {
   console.log(
     `\n  refreshed ${tally.refreshed}  attached ${tally.attached}  created ${tally.created}` +
       `  unreadable ${tally.unreadable}  skipped ${tally.skipped}`,
+  );
+
+  // Then the ones the walk could not see.
+  const walked = batch.map((slug) => productUrl(slug));
+  const stale = await refreshStale(walked);
+  console.log(
+    `  re-read ${stale.checked} stale offer(s): ${stale.changed} updated, ` +
+      `${stale.gone} no longer sold, ${stale.unreachable} unreachable`,
   );
   if (!APPLY) console.log("  Dry run — pass --yes to write.\n");
   await prisma.$disconnect();

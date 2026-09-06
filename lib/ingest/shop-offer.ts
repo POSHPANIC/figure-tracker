@@ -104,3 +104,53 @@ export async function fillMissing(
   });
   return keys;
 }
+
+export type StaleOffer = { id: string; figureId: string; url: string; checkedAt: Date };
+
+/**
+ * The offers this shop has left unchecked longest.
+ *
+ * A rolling queue ordered by staleness, because a listing walk is the wrong
+ * thing to drive a refresh from. Kotobukiya can enumerate its whole catalogue
+ * each night so every stored product is seen; Nin-Nin cannot -- its robots.txt
+ * disallows PrestaShop's `?p=` pagination, so only the first page of each
+ * category is readable -- and HLJ's search window holds about 190 products,
+ * which its stored set will outgrow. Left to the walk, 191 of Nin-Nin's 398
+ * offers were already more than two days old and one was a fortnight stale.
+ *
+ * Staleness matters here more than it sounds. An offer that is not re-read
+ * keeps publishing a price and an in-stock badge that may be weeks wrong, and
+ * nothing on the page says when it was last true.
+ *
+ * `exclude` is what the caller has already refreshed in this run, so the
+ * budget is spent on products the walk did not reach.
+ */
+export async function staleOffers(
+  source: ShopSource,
+  limit: number,
+  exclude: readonly string[] = [],
+): Promise<StaleOffer[]> {
+  if (limit <= 0) return [];
+  const skip = new Set(exclude);
+  const rows = await prisma.shopOffer.findMany({
+    where: { source },
+    orderBy: { checkedAt: "asc" },
+    // Over-fetch a little, since some of the oldest may be ones the walk just
+    // handled, and filtering in SQL would need the whole exclude list as
+    // parameters.
+    take: limit + skip.size,
+    select: { id: true, figureId: true, url: true, checkedAt: true },
+  });
+  return rows.filter((r) => !skip.has(r.url)).slice(0, limit);
+}
+
+/**
+ * Forget an offer, because the shop no longer has the product.
+ *
+ * Only ever called on a definite 404 or 410. A network failure or a 503 means
+ * we could not look, which is not the same as being told no -- deleting on
+ * those would drop a live offer every time a shop had a bad minute.
+ */
+export async function forgetOffer(id: string): Promise<void> {
+  await prisma.shopOffer.delete({ where: { id } });
+}

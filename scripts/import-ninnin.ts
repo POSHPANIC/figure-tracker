@@ -14,7 +14,7 @@ import {
 } from "../lib/ingest/ninnin";
 import { decide as decideNsfw } from "../lib/ingest/nsfw";
 import { findHeldProduct } from "../lib/ingest/held-product";
-import { fillMissing, recordOffer } from "../lib/ingest/shop-offer";
+import { fillMissing, forgetOffer, recordOffer, staleOffers } from "../lib/ingest/shop-offer";
 
 /**
  * Import Nin-Nin Game's catalogue.
@@ -53,10 +53,21 @@ function intArg(name: string, fallback: number): number {
 }
 
 const MAX = intArg("max", 60);
+/** How many of the least recently checked offers to re-read. */
+const REFRESH = intArg("refresh", 40);
 
 type Outcome = "refreshed" | "attached" | "created" | "unreadable" | "skipped";
 
-async function fetchPage(url: string): Promise<string | null> {
+/**
+ * A page, or why there is not one.
+ *
+ * "Gone" and "could not look" have to be told apart, because the refresh below
+ * deletes an offer when the product page has gone and a timeout must never be
+ * read as the shop dropping a product.
+ */
+type Fetched = { html: string } | { gone: true } | { failed: true };
+
+async function fetchStatus(url: string): Promise<Fetched> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 30_000);
   try {
@@ -64,13 +75,69 @@ async function fetchPage(url: string): Promise<string | null> {
       headers: { "user-agent": USER_AGENT },
       signal: controller.signal,
     });
-    if (!res.ok) return null;
-    return await res.text();
+    if (res.status === 404 || res.status === 410) return { gone: true };
+    if (!res.ok) return { failed: true };
+    return { html: await res.text() };
   } catch {
-    return null;
+    return { failed: true };
   } finally {
     clearTimeout(timer);
   }
+}
+
+async function fetchPage(url: string): Promise<string | null> {
+  const f = await fetchStatus(url);
+  return "html" in f ? f.html : null;
+}
+
+/**
+ * Re-read the offers the listing walk did not reach.
+ *
+ * Their robots.txt disallows PrestaShop's `?p=` pagination, so only the first
+ * page of each category is readable and the walk sees a rolling subset. Left to
+ * it, 191 of 398 offers were more than two days old and one was a fortnight
+ * stale -- each publishing a price and an in-stock badge with nothing on the
+ * page saying when it was last true.
+ *
+ * Oldest first, so the queue drains evenly instead of re-reading the same
+ * products nightly, and skipping whatever this run already handled.
+ */
+async function refreshStale(alreadyDone: readonly string[]): Promise<{
+  checked: number;
+  changed: number;
+  gone: number;
+  unreachable: number;
+}> {
+  const due = await staleOffers("NINNIN", REFRESH, alreadyDone);
+  let changed = 0;
+  let gone = 0;
+  let unreachable = 0;
+
+  for (const offer of due) {
+    const fetched = await fetchStatus(offer.url);
+    await new Promise((r) => setTimeout(r, PAGE_DELAY_MS));
+
+    if ("gone" in fetched) {
+      gone += 1;
+      if (APPLY) await forgetOffer(offer.id);
+      console.log(`  gone       ${offer.url.slice(-52)}`);
+      continue;
+    }
+    if ("failed" in fetched) {
+      unreachable += 1;
+      continue;
+    }
+
+    const product = parseProductPage(fetched.html, offer.url);
+    if (!product) {
+      unreachable += 1;
+      continue;
+    }
+    if (APPLY) await recordAndEnrich(offer.figureId, product);
+    changed += 1;
+  }
+
+  return { checked: due.length, changed, gone, unreachable };
 }
 
 /** Every product the seeded listings link to, each one once. */
@@ -349,6 +416,13 @@ async function main() {
   console.log(
     `\n  refreshed ${tally.refreshed}  attached ${tally.attached}  created ${tally.created}` +
       `  unreadable ${tally.unreadable}  skipped ${tally.skipped}`,
+  );
+
+  // Then the ones the walk could not see.
+  const stale = await refreshStale(batch);
+  console.log(
+    `  re-read ${stale.checked} stale offer(s): ${stale.changed} updated, ` +
+      `${stale.gone} no longer sold, ${stale.unreachable} unreachable`,
   );
   if (!APPLY) console.log("\n  Dry run. Re-run with --yes to apply.");
   console.log("");

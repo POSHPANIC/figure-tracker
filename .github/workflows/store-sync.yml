@@ -89,12 +89,18 @@ jobs:
       # Store links only fill a gap: they run no affiliate programme, so
       # overwriting a tagged Solaris link with one that cannot earn would
       # cost money on every figure both shops stock.
+      # --refresh re-reads the offers the listing walk cannot reach. Neither of
+      # these two shops can enumerate itself -- Nin-Nin's robots.txt disallows
+      # PrestaShop's ?p= pagination, and HLJ has no sitemap, so both see only a
+      # rolling subset. Without it, 191 of Nin-Nin's 398 offers were already
+      # more than two days stale, publishing prices and stock badges with
+      # nothing saying how old they were.
       - name: Sync Nin-Nin Game
         if: always()
         env:
           DIRECT_DATABASE_URL: ${{ secrets.DIRECT_DATABASE_URL }}
           DATABASE_URL: ${{ secrets.DIRECT_DATABASE_URL }}
-        run: npm run import:ninnin -- --yes --max 60
+        run: npm run import:ninnin -- --yes --max 60 --refresh 40
 
       # HobbyLink Japan. The most cooperative of the retailers: robots.txt
       # allows everything but accounts, they answer a plain request rather than
@@ -109,7 +115,7 @@ jobs:
         env:
           DIRECT_DATABASE_URL: ${{ secrets.DIRECT_DATABASE_URL }}
           DATABASE_URL: ${{ secrets.DIRECT_DATABASE_URL }}
-        run: npm run import:hlj -- --yes --pages 2 --max 50
+        run: npm run import:hlj -- --yes --pages 2 --max 50 --refresh 40
 
       # A slice of Good Smile's shop, for barcodes.
       #
