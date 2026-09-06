@@ -207,7 +207,24 @@ async function main() {
 
   const listing = await fetchPage(listingUrl(categoryId, page));
   if ("refused" in listing) {
-    console.log("  They asked us to slow down. Stopping — nothing was read.\n");
+    // Loudly, because quiet was the real problem. This printed one tidy line
+    // and exited 0, so the nightly reported the step a success every night
+    // from at least 29 August while importing nothing at all -- and this is
+    // the only source of manufacturer list prices in yen.
+    //
+    // ::warning:: puts it in the run's annotations, where a step that did
+    // nothing is visible without reading the log.
+    console.log(
+      "::warning title=HobbySearch unavailable::Refused before any page was read. " +
+        "No products imported.",
+    );
+    console.log("\n  They asked us to slow down. Stopping — nothing was read.");
+    console.log(
+      "  Their robots.txt permits this path and the same request succeeds from a\n" +
+        "  residential address, so this is their bot protection answering a\n" +
+        "  datacenter one, not something to fix here. Run it locally to take a\n" +
+        "  slice by hand; do not retry harder from CI.\n",
+    );
     await prisma.$disconnect();
     return;
   }

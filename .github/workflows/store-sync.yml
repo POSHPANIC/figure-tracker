@@ -37,7 +37,10 @@ jobs:
     # Measured at well under five minutes when nothing is new. The ceiling is
     # for the case where they add a lot at once and every new product needs its
     # page read at ~0.7s each.
-    timeout-minutes: 30
+    # 30 killed the run twice in September once the shop-offer writes were
+    # added. The work itself is ~22 minutes; this is margin, not headroom to
+    # grow into.
+    timeout-minutes: 45
 
     steps:
       - uses: actions/checkout@v4
@@ -111,7 +114,11 @@ jobs:
         env:
           DIRECT_DATABASE_URL: ${{ secrets.DIRECT_DATABASE_URL }}
           DATABASE_URL: ${{ secrets.DIRECT_DATABASE_URL }}
-        run: npm run backfill:goodsmile -- --write --max 400
+        # 200, not 400. The sweep finished weeks ago and this is now only
+        # watching the tail for new releases: the cursor rewinds 120 ids behind
+        # the last live product, so 200 covers it with headroom and the rest was
+        # fifteen minutes of walking empty ids for nothing.
+        run: npm run backfill:goodsmile -- --write --max 200
 
       # One slice of HobbySearch. Unlike the other sources this creates figures
       # directly, because it has what a review queue exists to establish: a JAN
