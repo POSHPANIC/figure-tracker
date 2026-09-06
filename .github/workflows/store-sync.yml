@@ -60,6 +60,18 @@ jobs:
       # for anything the store no longer lists. Refuses to delist when the index
       # comes back empty, since that is far more likely to be a failed fetch
       # than every product vanishing at once.
+      # Alter, walked by id like the Good Smile archive was. A manufacturer,
+      # so this one writes MSRP -- the number on the box, excluding tax --
+      # which no retailer import may do. A slice a night; the cursor rewinds
+      # behind the last live product on reaching the end, which is what catches
+      # new releases.
+      - name: Sync Alter
+        if: always()
+        env:
+          DIRECT_DATABASE_URL: ${{ secrets.DIRECT_DATABASE_URL }}
+          DATABASE_URL: ${{ secrets.DIRECT_DATABASE_URL }}
+        run: npm run import:alter -- --yes --max 60
+
       - name: Sync Kotobukiya
         env:
           DIRECT_DATABASE_URL: ${{ secrets.DIRECT_DATABASE_URL }}
