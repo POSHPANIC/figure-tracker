@@ -1,6 +1,7 @@
 import { prisma } from "../prisma";
 import { pruneRateLimits } from "../rate-limit-store";
 import { toUsd } from "./fx";
+import { releasedBefore } from "./release-status";
 import { rebuildAllSearchText } from "./search-index";
 import type { ItemCondition } from "../generated/prisma/enums";
 
@@ -550,4 +551,43 @@ export async function recomputeMsrpUsd(
   });
 
   return { written, cleared, unconvertible };
+}
+
+/**
+ * Move figures whose release date has passed out of PREORDER.
+ *
+ * Importers set status once, from the date they saw, and never look again -- so
+ * 42 figures were still advertised as preorders months after they shipped. The
+ * date is the fact; the status is a summary of it, and a summary nothing
+ * refreshes goes stale by construction.
+ *
+ * DELAYED and CANCELLED are left alone deliberately. Both mean somebody knows
+ * something the date does not: a delayed figure's date is precisely the one
+ * that turned out to be wrong, and a cancelled figure never shipped at all.
+ * Reading a passed date as "released" would overwrite the better information
+ * with the worse.
+ */
+export async function markReleased(now = new Date()): Promise<number> {
+  const cutoff = releasedBefore(now);
+  const waiting = ["PREORDER", "ANNOUNCED"] as const;
+
+  const dayGrained = await prisma.figure.updateMany({
+    where: {
+      status: { in: waiting as unknown as never[] },
+      releaseDatePrecision: "DAY",
+      releaseDate: { lt: cutoff.day },
+    },
+    data: { status: "RELEASED" as never },
+  });
+
+  const monthGrained = await prisma.figure.updateMany({
+    where: {
+      status: { in: waiting as unknown as never[] },
+      releaseDatePrecision: { not: "DAY" },
+      releaseDate: { lt: cutoff.month },
+    },
+    data: { status: "RELEASED" as never },
+  });
+
+  return dayGrained.count + monthGrained.count;
 }

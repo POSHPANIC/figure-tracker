@@ -8,7 +8,7 @@
 import "dotenv/config";
 import { prisma } from "../lib/prisma";
 import { runIngestion } from "../lib/ingest/run";
-import { recomputeMsrpUsd, runAggregation } from "../lib/ingest/aggregate";
+import { markReleased, recomputeMsrpUsd, runAggregation } from "../lib/ingest/aggregate";
 
 function flag(name: string): string | undefined {
   const i = process.argv.indexOf(`--${name}`);
@@ -41,6 +41,12 @@ async function main() {
   console.log(
     `  ${result.snapshotsWritten} snapshots written, ${result.figuresUpdated} figures updated`,
   );
+
+  // Before the MSRP pass, though the two do not depend on each other: both
+  // read the release date rather than the status, precisely so that neither
+  // can be wrong because the other has not run.
+  const released = await markReleased();
+  console.log(`  ${released} figure(s) left preorder`);
 
   // After aggregation, because an importer earlier in this run may have set an
   // MSRP the dollar column has never seen.
