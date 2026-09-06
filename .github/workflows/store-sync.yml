@@ -96,6 +96,21 @@ jobs:
           DATABASE_URL: ${{ secrets.DIRECT_DATABASE_URL }}
         run: npm run import:ninnin -- --yes --max 60
 
+      # HobbyLink Japan. The most cooperative of the retailers: robots.txt
+      # allows everything but accounts, they answer a plain request rather than
+      # a browser fingerprint, and every product carries a JAN. The first real
+      # run attached 44 of 50 to figures already held on that barcode alone.
+      #
+      # Their price is in yen and is their own, discounted, so it goes to a
+      # ShopOffer and never to msrpAmount. They run an affiliate programme at
+      # hlj.com/affiliate-program; links are stored clean either way.
+      - name: Sync HobbyLink Japan
+        if: always()
+        env:
+          DIRECT_DATABASE_URL: ${{ secrets.DIRECT_DATABASE_URL }}
+          DATABASE_URL: ${{ secrets.DIRECT_DATABASE_URL }}
+        run: npm run import:hlj -- --yes --pages 2 --max 50
+
       # A slice of Good Smile's shop, for barcodes.
       #
       # Their archive built most of this catalogue and publishes no barcode at

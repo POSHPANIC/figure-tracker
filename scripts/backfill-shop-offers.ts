@@ -25,6 +25,7 @@ const SOURCE_BY_HOST: [RegExp, ShopSource][] = [
   [/(^|\.)kotobukiya-us\.com$/i, "KOTOBUKIYA"],
   [/(^|\.)solarisjapan\.com$/i, "SOLARIS"],
   [/(^|\.)nin-nin-game\.com$/i, "NINNIN"],
+  [/(^|\.)hlj\.com$/i, "HLJ"],
   [/(^|\.)goodsmile\.com$/i, "GOODSMILE"],
   [/(^|\.)1999\.co\.jp$/i, "HOBBYSEARCH"],
 ];

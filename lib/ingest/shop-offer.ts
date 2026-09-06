@@ -17,6 +17,7 @@ import { fieldsToFill, type Fillable } from "./enrich";
 export const SHOP_SOURCES = [
   "SOLARIS",
   "NINNIN",
+  "HLJ",
   "KOTOBUKIYA",
   "GOODSMILE",
   "HOBBYSEARCH",

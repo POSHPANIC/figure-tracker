@@ -35,6 +35,7 @@
     "discover:figures": "tsx scripts/discover-figures.ts",
     "backfill:goodsmile": "tsx scripts/backfill-goodsmile.ts",
     "import:ninnin": "tsx scripts/import-ninnin.ts",
+    "import:hlj": "tsx scripts/import-hlj.ts",
     "import:solaris": "tsx scripts/import-solaris.ts",
     "discover:hobbysearch": "tsx scripts/discover-hobbysearch.ts",
     "process:candidates": "tsx scripts/process-candidates.ts",
