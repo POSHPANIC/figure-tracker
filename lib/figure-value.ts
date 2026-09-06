@@ -21,7 +21,7 @@ import { toNumber } from "./money";
  * uses this follows without being touched.
  */
 
-export type ValueBasis = "sold" | "asking";
+export type ValueBasis = "sold" | "asking" | "msrp";
 
 export type FigureValue = {
   amountUsd: number;
@@ -34,7 +34,33 @@ type Valuable = {
   marketValueUsd: unknown;
   askMedianUsd?: unknown;
   askListings?: number | null;
+  /** The maker's price in dollars, for a figure nobody can have bought yet. */
+  msrpUsd?: unknown;
+  /**
+   * A Date from Prisma, or the string it becomes on the way out of a cache.
+   *
+   * getFigureBySlug sits behind "use cache", which serialises what it returns,
+   * so by the time the page reads this it is an ISO string. An earlier version
+   * tested `instanceof Date` and was therefore false on every cached page --
+   * correct in a script, silently inert in the product.
+   */
+  releaseDate?: Date | string | null;
 };
+
+/**
+ * Whether the figure has not come out yet.
+ *
+ * Read off the release date rather than `status`, which importers set once from
+ * the date they saw and never revisit -- 42 figures are still marked PREORDER
+ * with a release date in the past. A date compared against today cannot go
+ * stale that way.
+ */
+function unreleased(figure: Valuable, now = new Date()): boolean {
+  const raw = figure.releaseDate;
+  if (!raw) return false;
+  const at = raw instanceof Date ? raw.getTime() : Date.parse(raw);
+  return Number.isFinite(at) && at > now.getTime();
+}
 
 /**
  * The best-supported value for one figure, or null when there is neither.
@@ -42,9 +68,23 @@ type Valuable = {
  * A sold price always wins. It is a record of a completed transaction and an
  * asking price is a hope.
  */
-export function figureValue(figure: Valuable): FigureValue | null {
+export function figureValue(figure: Valuable, now = new Date()): FigureValue | null {
   const sold = toNumber(figure.marketValueUsd as never);
   if (sold !== null) return { amountUsd: sold, basis: "sold", listings: 0 };
+
+  // Before release, the maker's price beats what sellers are asking.
+  //
+  // Nothing has changed hands yet, so an asking price here is not a weak
+  // reading of a market -- there is no market to read. It is somebody quoting a
+  // number for a thing they do not have, and on a preorder those run well above
+  // the price the shop will take today. The list price is the one figure that
+  // is actually true before release, and it is what the reader can pay.
+  //
+  // Only ahead of asking, never ahead of a completed sale.
+  if (unreleased(figure, now)) {
+    const msrp = toNumber(figure.msrpUsd as never);
+    if (msrp !== null) return { amountUsd: msrp, basis: "msrp", listings: 0 };
+  }
 
   const asking = toNumber(figure.askMedianUsd as never);
   if (asking !== null) {
@@ -56,12 +96,17 @@ export function figureValue(figure: Valuable): FigureValue | null {
 /** "Market value" or "Typical asking price" — the label that fits the basis. */
 export function valueLabel(basis: ValueBasis, short = false): string {
   if (basis === "sold") return short ? "Market value" : "Market value";
+  // Named for what it is. Calling a list price a "market value" would be the
+  // exact confusion this module exists to prevent, and it is not an asking
+  // price either -- nobody is asking it, the maker set it.
+  if (basis === "msrp") return short ? "Retail price" : "Retail price";
   return short ? "Asking price" : "Typical asking price";
 }
 
 /** "median of 14 listings", for showing what an asking price rests on. */
 export function valueNote(value: FigureValue): string | null {
   if (value.basis === "sold") return null;
+  if (value.basis === "msrp") return "the maker's price — not yet released";
   return `median of ${value.listings} listing${value.listings === 1 ? "" : "s"}`;
 }
 
@@ -70,6 +115,8 @@ export type PortfolioValue = {
   /** How many items contributed, and on what basis. */
   fromSold: number;
   fromAsking: number;
+  /** Unreleased items counted at the maker's price. */
+  fromMsrp: number;
   /** Items with no value available at all, so the total understates. */
   unvalued: number;
 };
@@ -87,6 +134,7 @@ export function sumValues(
   let totalUsd = 0;
   let fromSold = 0;
   let fromAsking = 0;
+  let fromMsrp = 0;
   let unvalued = 0;
 
   for (const row of rows) {
@@ -96,11 +144,15 @@ export function sumValues(
       continue;
     }
     totalUsd += value.amountUsd * row.quantity;
+    // Counted apart rather than folded into asking. A preorder valued at the
+    // maker's price is a different kind of number again, and a total that
+    // cannot say what it is made of is what this breakdown exists to prevent.
     if (value.basis === "sold") fromSold += row.quantity;
+    else if (value.basis === "msrp") fromMsrp += row.quantity;
     else fromAsking += row.quantity;
   }
 
-  return { totalUsd: Math.round(totalUsd * 100) / 100, fromSold, fromAsking, unvalued };
+  return { totalUsd: Math.round(totalUsd * 100) / 100, fromSold, fromAsking, fromMsrp, unvalued };
 }
 
 /**
@@ -112,8 +164,13 @@ export function sumValues(
  * median of listings does not have.
  */
 export function portfolioBasis(value: PortfolioValue): ValueBasis | null {
-  if (value.fromSold === 0 && value.fromAsking === 0) return null;
-  return value.fromAsking > value.fromSold ? "asking" : "sold";
+  const counts: [ValueBasis, number][] = [
+    ["sold", value.fromSold],
+    ["asking", value.fromAsking],
+    ["msrp", value.fromMsrp ?? 0],
+  ];
+  const best = counts.reduce((a, b) => (b[1] > a[1] ? b : a));
+  return best[1] === 0 ? null : best[0];
 }
 
 /** One day of PriceSnapshot, as much of it as the decision needs. */

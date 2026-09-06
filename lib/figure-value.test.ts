@@ -26,6 +26,77 @@ describe("figureValue", () => {
   it("returns nothing when there is neither", () => {
     assert.equal(figureValue({ marketValueUsd: null, askMedianUsd: null }), null);
   });
+
+  const NOW = new Date("2026-09-06T00:00:00Z");
+  const ahead = new Date("2026-12-01T00:00:00Z");
+  const behind = new Date("2025-12-01T00:00:00Z");
+
+  it("prefers the maker's price before release, over what sellers ask", () => {
+    // Nothing has changed hands, so an asking price is not a weak reading of a
+    // market -- there is no market. Preorder asks run above what the shop will
+    // take today.
+    const v = figureValue(
+      { marketValueUsd: null, askMedianUsd: 210, askListings: 3, msrpUsd: 130, releaseDate: ahead },
+      NOW,
+    )!;
+    assert.equal(v.basis, "msrp");
+    assert.equal(v.amountUsd, 130);
+  });
+
+  it("never puts the maker's price ahead of a completed sale", () => {
+    const v = figureValue(
+      { marketValueUsd: 175, askMedianUsd: 210, msrpUsd: 130, releaseDate: ahead },
+      NOW,
+    )!;
+    assert.equal(v.basis, "sold");
+  });
+
+  it("stops once the figure is out, whatever status says", () => {
+    // 42 figures are still marked PREORDER with a release date in the past, so
+    // the date decides rather than the field.
+    const v = figureValue(
+      { marketValueUsd: null, askMedianUsd: 210, askListings: 3, msrpUsd: 130, releaseDate: behind },
+      NOW,
+    )!;
+    assert.equal(v.basis, "asking");
+    assert.equal(v.amountUsd, 210);
+  });
+
+  it("falls through to asking when an unreleased figure has no list price", () => {
+    const v = figureValue(
+      { marketValueUsd: null, askMedianUsd: 210, askListings: 3, msrpUsd: null, releaseDate: ahead },
+      NOW,
+    )!;
+    assert.equal(v.basis, "asking");
+  });
+
+  it("reads a release date that a cache turned into a string", () => {
+    // getFigureBySlug sits behind "use cache", which serialises what it
+    // returns. Testing `instanceof Date` made this correct in a script and
+    // inert on every actual page.
+    const v = figureValue(
+      {
+        marketValueUsd: null,
+        askMedianUsd: 210,
+        askListings: 3,
+        msrpUsd: "130",
+        releaseDate: "2026-12-01T00:00:00.000Z",
+      },
+      NOW,
+    )!;
+    assert.equal(v.basis, "msrp");
+    assert.equal(v.amountUsd, 130);
+  });
+
+  it("gives an unreleased figure with only a list price a value at all", () => {
+    // 677 preorders have neither, and 111 have an MSRP and nothing else. Those
+    // showed a dash before this.
+    const v = figureValue(
+      { marketValueUsd: null, askMedianUsd: null, msrpUsd: 130, releaseDate: ahead },
+      NOW,
+    )!;
+    assert.equal(v.basis, "msrp");
+  });
 });
 
 describe("valueLabel and valueNote", () => {
@@ -41,6 +112,11 @@ describe("valueLabel and valueNote", () => {
 
   it("adds no note to a sold price, which needs no caveat", () => {
     assert.equal(valueNote({ amountUsd: 1, basis: "sold", listings: 0 }), null);
+  });
+
+  it("names a list price as one rather than calling it a market value", () => {
+    assert.equal(valueLabel("msrp"), "Retail price");
+    assert.equal(valueNote({ amountUsd: 1, basis: "msrp", listings: 0 }), "the maker's price — not yet released");
   });
 });
 
@@ -66,18 +142,18 @@ describe("sumValues", () => {
   });
 
   it("handles an empty collection", () => {
-    assert.deepEqual(sumValues([]), { totalUsd: 0, fromSold: 0, fromAsking: 0, unvalued: 0 });
+    assert.deepEqual(sumValues([]), { totalUsd: 0, fromSold: 0, fromAsking: 0, fromMsrp: 0, unvalued: 0 });
   });
 });
 
 describe("portfolioBasis", () => {
   it("describes a total by what most of it rests on", () => {
-    assert.equal(portfolioBasis({ totalUsd: 1, fromSold: 1, fromAsking: 9, unvalued: 0 }), "asking");
-    assert.equal(portfolioBasis({ totalUsd: 1, fromSold: 9, fromAsking: 1, unvalued: 0 }), "sold");
+    assert.equal(portfolioBasis({ totalUsd: 1, fromSold: 1, fromAsking: 9, fromMsrp: 0, unvalued: 0 }), "asking");
+    assert.equal(portfolioBasis({ totalUsd: 1, fromSold: 9, fromAsking: 1, fromMsrp: 0, unvalued: 0 }), "sold");
   });
 
   it("says nothing about a total with nothing in it", () => {
-    assert.equal(portfolioBasis({ totalUsd: 0, fromSold: 0, fromAsking: 0, unvalued: 4 }), null);
+    assert.equal(portfolioBasis({ totalUsd: 0, fromSold: 0, fromAsking: 0, fromMsrp: 0, unvalued: 4 }), null);
   });
 });
 

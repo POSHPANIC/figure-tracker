@@ -1,5 +1,6 @@
 import { prisma } from "../prisma";
 import { pruneRateLimits } from "../rate-limit-store";
+import { toUsd } from "./fx";
 import { rebuildAllSearchText } from "./search-index";
 import type { ItemCondition } from "../generated/prisma/enums";
 
@@ -471,4 +472,82 @@ export async function expireStaleListings(olderThanDays = 3): Promise<number> {
     data: { isActive: false },
   });
   return result.count;
+}
+
+/**
+ * Keep msrpUsd in step with the price the maker announced.
+ *
+ * The dollar figure is derived, so it is rebuilt rather than edited: an
+ * importer that corrects an MSRP writes the amount and the currency and knows
+ * nothing about this column.
+ *
+ * Only for figures that have not come out yet, which is the only place
+ * figureValue() reads it. That bound is what makes the job cheap and stable.
+ * 6,971 of the 7,510 recorded MSRPs are in yen, so converting all of them at
+ * today's rate would rewrite most of the catalogue every night as JPY drifts,
+ * to keep a column nothing reads. Bounded to the unreleased, it is a few
+ * hundred rows that mostly do not move.
+ *
+ * Converted at today's rate rather than the release month's -- the opposite of
+ * the MSRP row on a figure page, and deliberately. There is no release month to
+ * look up for something that has not been released, and the question this
+ * number answers is what it costs now.
+ *
+ * A currency with no rate is left alone rather than guessed at. Silence is
+ * recoverable; a wrong rate misprices a figure on every screen at once.
+ */
+export async function recomputeMsrpUsd(
+  now = new Date(),
+): Promise<{ written: number; cleared: number; unconvertible: number }> {
+  const rows = await prisma.figure.findMany({
+    where: {
+      msrpAmount: { not: null },
+      msrpCurrency: { not: null },
+      releaseDate: { gt: now },
+    },
+    select: { id: true, msrpAmount: true, msrpCurrency: true, msrpUsd: true },
+  });
+
+  let unconvertible = 0;
+  // Grouped by the value to write, so this is a handful of statements rather
+  // than one per figure. Most figures in a line share a list price.
+  const byValue = new Map<number, string[]>();
+
+  for (const r of rows) {
+    const amount = Number(String(r.msrpAmount));
+    if (!Number.isFinite(amount) || amount <= 0) continue;
+
+    let usd: number;
+    try {
+      usd = (await toUsd(amount, r.msrpCurrency!)).amountUsd;
+    } catch {
+      unconvertible += 1;
+      continue;
+    }
+
+    // Only when it actually moved, or updatedAt churns for nothing.
+    const held = r.msrpUsd === null ? null : Number(String(r.msrpUsd));
+    if (held !== null && Math.abs(held - usd) < 0.005) continue;
+
+    byValue.set(usd, [...(byValue.get(usd) ?? []), r.id]);
+  }
+
+  let written = 0;
+  for (const [usd, ids] of byValue) {
+    for (let i = 0; i < ids.length; i += 500) {
+      const slice = ids.slice(i, i + 500);
+      await prisma.figure.updateMany({ where: { id: { in: slice } }, data: { msrpUsd: usd } });
+      written += slice.length;
+    }
+  }
+
+  // And drop it everywhere it is no longer read, so the column keeps meaning
+  // "the list price of something you cannot buy yet". A run of this job that
+  // was not bounded to the unreleased left 5,301 of these behind.
+  const { count: cleared } = await prisma.figure.updateMany({
+    where: { msrpUsd: { not: null }, OR: [{ releaseDate: null }, { releaseDate: { lte: now } }] },
+    data: { msrpUsd: null },
+  });
+
+  return { written, cleared, unconvertible };
 }

@@ -8,7 +8,7 @@
 import "dotenv/config";
 import { prisma } from "../lib/prisma";
 import { runIngestion } from "../lib/ingest/run";
-import { runAggregation } from "../lib/ingest/aggregate";
+import { recomputeMsrpUsd, runAggregation } from "../lib/ingest/aggregate";
 
 function flag(name: string): string | undefined {
   const i = process.argv.indexOf(`--${name}`);
@@ -40,6 +40,14 @@ async function main() {
   const result = await runAggregation();
   console.log(
     `  ${result.snapshotsWritten} snapshots written, ${result.figuresUpdated} figures updated`,
+  );
+
+  // After aggregation, because an importer earlier in this run may have set an
+  // MSRP the dollar column has never seen.
+  const msrp = await recomputeMsrpUsd();
+  console.log(
+    `  ${msrp.written} unreleased MSRP(s) converted to USD, ${msrp.cleared} cleared on release` +
+      `${msrp.unconvertible ? `, ${msrp.unconvertible} in a currency with no rate` : ""}`,
   );
 }
 

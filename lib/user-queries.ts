@@ -85,6 +85,7 @@ export function computeTotals(items: CollectionRow[]): PortfolioTotals {
 
   let fromSold = 0;
   let fromAsking = 0;
+  let fromMsrp = 0;
   let itemsWithoutValue = 0;
 
   for (const item of items) {
@@ -95,6 +96,7 @@ export function computeTotals(items: CollectionRow[]): PortfolioTotals {
 
     if (!best) itemsWithoutValue += qty;
     else if (best.basis === "sold") fromSold += qty;
+    else if (best.basis === "msrp") fromMsrp += qty;
     else fromAsking += qty;
 
     itemCount += qty;
@@ -118,6 +120,7 @@ export function computeTotals(items: CollectionRow[]): PortfolioTotals {
       totalUsd: marketValueUsd,
       fromSold,
       fromAsking,
+      fromMsrp,
       unvalued: itemsWithoutValue,
     }),
     itemsWithoutValue,

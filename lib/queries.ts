@@ -28,6 +28,9 @@ export const figureCardSelect = {
   // Shown when there is no market value, which is currently every figure.
   askMedianUsd: true,
   askListings: true,
+  // Before release this beats the asking median, so every screen that values a
+  // figure has to select it or it silently never applies.
+  msrpUsd: true,
   manufacturer: { select: { name: true, slug: true } },
   // The card shows the franchise, but the series is still selected and still
   // stored — nothing about this grouping is destructive, and showing the series
@@ -195,6 +198,9 @@ export async function quickSearch(q: string, limit = 8) {
       // median is the number a suggestion actually shows.
       askMedianUsd: true,
       askListings: true,
+      // And the list price, which wins on anything not yet released.
+      msrpUsd: true,
+      releaseDate: true,
       // The franchise, because that is what browsing is by now — a result
       // labelled "Evangelion: 2.0" points at a filter the site no longer
       // offers.

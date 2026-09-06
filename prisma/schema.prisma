@@ -202,6 +202,15 @@ model Figure {
   /// Manufacturer's suggested retail price, as originally announced.
   msrpAmount   Decimal? @db.Decimal(12, 2)
   msrpCurrency String?  @db.VarChar(3)
+  /// The same price in dollars, carried alongside rather than converted where
+  /// it is read.
+  ///
+  /// Derived, exactly as marketValueUsd and askMedianUsd are, and for the same
+  /// reason: figureValue() has to answer synchronously in eight places -- cards,
+  /// search suggestions, collection rows -- and none of them can await a rate.
+  /// The original amount and currency above stay authoritative; this is a
+  /// convenience and is recomputed, never edited.
+  msrpUsd      Decimal? @db.Decimal(12, 2)
 
   primaryImageUrl String?
 
