@@ -101,7 +101,10 @@ export default async function AboutPage() {
             marketplace hosting them.
           </li>
           <li>
-            <strong>Not affiliated</strong> with any manufacturer or retailer.
+            <strong>Not owned or endorsed</strong> by any manufacturer or retailer. Some
+            outbound links are affiliate links -- we earn a commission if you buy through
+            them, at no cost to you, and it never changes what is listed or the order it
+            appears in.
           </li>
         </List>
       </Section>
