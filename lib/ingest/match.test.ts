@@ -541,6 +541,70 @@ describe("normalizeCondition", () => {
   });
 });
 
+describe("a maker whose name is an ordinary word", () => {
+  /**
+   * "Alter" is a Fate character suffix before it is a company. 3,498 listing
+   * titles contain the word and 313 belong to that maker.
+   */
+  const alterPlain: MatchCandidate = {
+    id: "alter-plain",
+    name: "Saber/Altria Pendragon 1/7 Alter Ver.",
+    nameJa: null,
+    scale: "1/7",
+    heightMm: 235,
+    category: "SCALE",
+    manufacturerName: "Alter",
+    seriesName: "Fate/Grand Order",
+    characterNames: ["Altria Pendragon"],
+  };
+
+  const gscVariant: MatchCandidate = {
+    id: "gsc-heroic",
+    name: "Saber/Altria Pendragon (Alter): Heroic Spirit Traveling Outfit Ver.",
+    nameJa: null,
+    scale: "1/7",
+    heightMm: 230,
+    category: "SCALE",
+    manufacturerName: "Good Smile Company",
+    seriesName: "Fate/Grand Order",
+    characterNames: ["Altria Pendragon"],
+  };
+
+  const title = "Saber/Altria Pendragon Alter Heroic Spirit Traveling Outfit Ver Fate/Grand Order";
+
+  it("does not pay the maker bonus for the character's name", () => {
+    // The listing names a variant Good Smile made. Reading "Alter" as the
+    // manufacturer put it on Alter's plain figure at 0.870 against 0.720 --
+    // the bonus exactly -- so the entry matching one word beat the entry
+    // matching all six of its own.
+    assert.equal(scoreMatch(title, alterPlain), scoreMatch(title, gscVariant));
+  });
+
+  it("and the tiebreak then picks the figure that explains more of the title", () => {
+    // Removing the bonus leaves them level, because the name score is a ratio
+    // and both match all of their own words. bestMatch is what separates them:
+    // six matched tokens against one.
+    const result = bestMatch(title, [alterPlain, gscVariant]);
+    assert.equal(result?.figureId, "gsc-heroic");
+  });
+
+  it("still pays it for a maker whose name is not a word", () => {
+    const koto: MatchCandidate = { ...gscVariant, id: "koto", manufacturerName: "Kotobukiya" };
+    const withName = scoreMatch(`${title} Kotobukiya`, koto);
+    const without = scoreMatch(title, koto);
+    assert.ok(withName > without, "naming Kotobukiya should still count for something");
+  });
+
+  it("refuses the bonus for a manufacturer called Other", () => {
+    // 1,714 titles contain "other" and none of them were that maker's.
+    const other: MatchCandidate = { ...alterPlain, id: "o", manufacturerName: "Other" };
+    assert.equal(
+      scoreMatch("Saber Altria Pendragon and other figures", other),
+      scoreMatch("Saber Altria Pendragon and assorted figures", other),
+    );
+  });
+});
+
 describe("a maker named in the title", () => {
   const scaleFigure = (maker: string): MatchCandidate => ({
     id: "rem",

@@ -381,6 +381,50 @@ function tokensPresent(titleTokens: Set<string>, phrase: string): boolean {
 }
 
 /** Manufacturer nicknames sellers actually type. */
+/**
+ * Maker names that are also ordinary words, and so prove nothing on their own.
+ *
+ * The manufacturer bonus is awarded on a whole-token match, which is fine for
+ * "kotobukiya" and useless for a company called Alter. Measured against the
+ * listing table:
+ *
+ *   other    1,714 titles contain the word,     0 belong to that maker  (0%)
+ *   native     176                              0                       (0%)
+ *   plum        32                              0                       (0%)
+ *   wave       102                              2                       (2%)
+ *   alter    3,498                            313                       (9%)
+ *   gift     1,638                            174                      (11%)
+ *
+ * Alter is the expensive one because they have 160 figures and "Alter" is a
+ * Fate character suffix -- Saber Alter, Jeanne Alter, Rider Alter -- so nine
+ * titles in ten mean the character. It cost a real page: a listing for
+ * "Saber/Altria Pendragon Alter Heroic Spirit Traveling Outfit Ver" scored
+ * 0.870 against Alter's plain "Saber/Altria Pendragon 1/7 Alter Ver.",
+ * matching its one distinguishing word, and 0.720 against Good Smile's
+ * "Saber/Altria Pendragon (Alter): Heroic Spirit Traveling Outfit Ver", which
+ * matched all six of its own. The gap was this bonus exactly.
+ *
+ * "Gift" did the same on the same page, reaching a 235mm statue from a $38.99
+ * listing ending "PVC Figure Model Toy Gift".
+ *
+ * Only bare single-word forms are refused. A form of more than one token is
+ * evidence again -- nobody writes "good smile" by accident -- so an alias like
+ * "alter japan" would still count if one were listed.
+ *
+ * This is the same fault the WING note below records, caught once as a
+ * substring bug and now as a whole word. The lesson did not generalise then;
+ * this list is the generalisation.
+ */
+const AMBIGUOUS_MAKER_WORDS = new Set([
+  "alter",
+  "gift",
+  "native",
+  "plum",
+  "wave",
+  "wing",
+  "other",
+]);
+
 const MAKER_ALIASES: Record<string, string[]> = {
   "good smile company": ["gsc", "goodsmile", "good smile"],
   "max factory": ["maxfactory"],
@@ -1087,7 +1131,11 @@ export function scoreMatch(
     const forms = [canonical, ...(MAKER_ALIASES[canonical] ?? [])];
     const named = forms.some((form) => {
       const formTokens = tokenize(form);
-      return formTokens.size > 0 && [...formTokens].every((t) => titleTokens.has(t));
+      if (formTokens.size === 0) return false;
+      // A single ordinary word is not evidence that this maker made it. See
+      // AMBIGUOUS_MAKER_WORDS above.
+      if (formTokens.size === 1 && AMBIGUOUS_MAKER_WORDS.has([...formTokens][0])) return false;
+      return [...formTokens].every((t) => titleTokens.has(t));
     });
     if (named) score += 0.15;
   }
