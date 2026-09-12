@@ -2,10 +2,17 @@ name: Daily listing refresh
 
 # Refresh eBay listings across the catalogue, once a day.
 #
-# This does not run on Vercel because it cannot: a sweep of the catalogue is
-# about ninety minutes and a serverless function is capped at minutes. The
-# site's own cron still runs a small batch at 04:00 UTC; this is the bulk pass
-# an hour later, once that has had its turn and the daily quota has reset.
+# This does not run on Vercel because it cannot: a sweep is far longer than a
+# serverless function may live. The site's own cron still runs a small batch at
+# 04:00 UTC; this is the bulk pass an hour later, once that has had its turn and
+# the daily quota has reset.
+#
+# 2,000 figures a run, not the whole catalogue. Polling everything daily was
+# costing 150 minutes and being killed before it finished, and it was never
+# necessary: lib/ingest/poll-priority.ts ranks figures by who owns, wants and
+# reads them, so the ones anybody is watching still come round every day and the
+# long tail comes round slower. A shorter sweep that completes beats a longer
+# one that does not.
 #
 # Listings genuinely go stale — they sell, expire, get relisted — so a figure
 # page showing last week's prices is showing the wrong thing. That is the
@@ -27,7 +34,7 @@ on:
       total:
         description: "How many figures to poll"
         required: false
-        default: "4800"
+        default: "2000"
 
 concurrency:
   # Never two sweeps at once. They would spend double the quota and race each
@@ -39,10 +46,14 @@ concurrency:
 jobs:
   refresh:
     runs-on: ubuntu-latest
-    # The measured run is ~90 minutes at 4,800 figures. This is a backstop
-    # against a hang, not a target — a job killed here has still marked every
-    # figure it finished, so the next run carries on from there.
-    timeout-minutes: 150
+    # Sized to finish, not to be survived. At ~12 minutes per 500 figures a
+    # 2,000-figure sweep is around 50 minutes; 75 leaves room for a slow night
+    # and still fails fast instead of billing 150 minutes before being killed.
+    #
+    # It used to be 150 against a 4,800-figure sweep that the comment called
+    # ninety minutes. The catalogue outgrew that, and six of ten runs were
+    # killed mid-sweep — maximum cost for incomplete work.
+    timeout-minutes: 75
 
     steps:
       - uses: actions/checkout@v4
@@ -75,5 +86,5 @@ jobs:
         run: |
           npm run backfill:listings -- \
             --production \
-            --total "${{ github.event.inputs.total || '4800' }}" \
+            --total "${{ github.event.inputs.total || '2000' }}" \
             --batch 500
