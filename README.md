@@ -266,9 +266,11 @@ Two kinds, with opposite rules:
 
 Moderators add catalog images from the figure's own page. The form requires a
 credit and asks who granted permission and when, because "we have permission" is
-worth nothing if nobody can say who gave it. See
-**[docs/PRESS_IMAGES.md](docs/PRESS_IMAGES.md)** for who to contact and a
-message you can send.
+worth nothing if nobody can say who gave it.
+
+Who to contact, and the message to send them, is kept out of this repository:
+it is correspondence with named companies, and some of it summarises replies
+sent in confidence.
 
 ## Deploying
 

@@ -59,3 +59,12 @@ next-env.d.ts
 
 # Character export produced by "npm run sync:characters"
 characters.json
+
+# Correspondence with companies, and what we plan to send them.
+#
+# Applications, replies and negotiating strategy for eBay, AmiAmi, Kotobukiya,
+# Good Smile, Buyee and ZenMarket. None of it is a credential; all of it is a
+# position we would rather the counterparty did not read before we send it, and
+# some of it summarises replies sent to us in confidence. It lives on disk and
+# never in a repository the world can read.
+private/

@@ -15,7 +15,7 @@
  * one: the URL formats below are **unverified**. Every automated request we
  * made to both hosts was refused by their edge, so they were assembled from
  * documentation rather than observed. Confirm them by hand before switching
- * this on — see docs/PROXY_PARTNERSHIPS.md.
+ * this on — see private/PROXY_PARTNERSHIPS.md.
  */
 
 export type ProxyService = "buyee" | "zenmarket";

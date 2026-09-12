@@ -71,14 +71,16 @@ There is no point applying while using 4% of the current allowance.
 Applied 2026-08-19 through the Application Growth Check, with the site live,
 7,068 products catalogued and API usage at about 4,840 calls a day against the
 5,000 default — which is the bar eBay's own form sets. Refused six minutes
-later:
-
-(Their reply is kept outside this repository.)
+later, on the grounds that the API requires approval of a business use case and
+is reserved for approved partners.
 
 The ticket was closed on reply. Nothing in the answer engaged with the
 application, and the turnaround makes clear nothing was going to. This is a
 category decision, not a judgement on the site, so improving the site does not
 by itself change it.
+
+(The correspondence itself, and the ticket reference, are kept out of this
+repository. See the note in .gitignore.)
 
 What follows from that:
 
@@ -86,7 +88,7 @@ What follows from that:
   Hub interface whose programmatic access was folded into this same API, so it
   is closed for the same reason.
 - **The invitation to ask about alternatives was taken up, and answered with
-  nothing.** The reply in a reply kept outside this repository was sent on 2026-08-19 asking three
+  nothing.** A reply was sent on 2026-08-19 asking three
   questions: is there any sold-data endpoint at any tier, what are the criteria
   for approved-partner status, and does eBay Partner Network membership count
   toward it.
@@ -240,7 +242,7 @@ bots to leave alone.
 So the nightly job maintains the Good Smile links we already have and cannot
 discover new ones. New Good Smile products reach the catalogue through Solaris
 discovery, which carries them as long as they have a release number, and would
-arrive far more directly through an AmiAmi feed (docs/AMIAMI_APPLICATION.md).
+arrive far more directly through an AmiAmi feed (private/AMIAMI_APPLICATION.md).
 
 ### What replaced it
 
@@ -382,7 +384,7 @@ that reads Good Smile's dataLayer.
 `products.json` carries every product image URL, and none of them are imported.
 A public CDN URL grants no licence, exactly as with Good Smile. Kotobukiya is a
 separate ask from Good Smile, and to a separate company from Takara Tomy and
-PeariA. See docs/PRESS_IMAGES.md.
+PeariA. See private/PRESS_IMAGES.md.
 
 ### Identity
 
@@ -529,7 +531,7 @@ Worth asking for explicitly:
 2. What it contains — do prices and stock status update, and how often?
 3. Whether MSRP / list price is included.
 
-Same conversation as the press-image request in docs/PRESS_IMAGES.md, and worth
+Same conversation as the press-image request in private/PRESS_IMAGES.md, and worth
 combining: you're asking to send buyers to their store.
 
 ## Japanese secondary market: checked, and closed

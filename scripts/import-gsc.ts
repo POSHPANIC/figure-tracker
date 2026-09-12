@@ -18,7 +18,7 @@
  * What it takes. Facts only: name, manufacturer, series, category, retail
  * price, release date, scale, height. Not the marketing description, and not
  * the images — those are Good Smile's, and catalogue images go through the
- * permission process in docs/PRESS_IMAGES.md. Image URLs appear in the report
+ * permission process in private/PRESS_IMAGES.md. Image URLs appear in the report
  * so you can see what exists; --write does not store them.
  */
 import "dotenv/config";

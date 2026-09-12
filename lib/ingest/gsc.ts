@@ -24,7 +24,7 @@ import type { FigureCategory } from "../generated/prisma/enums";
  * are the entire point of a price reference. It deliberately does not take the
  * marketing description, and while it records the image URL for reporting, the
  * import must not publish it: catalogue images go through the permission
- * process in docs/PRESS_IMAGES.md like every other press image.
+ * process in private/PRESS_IMAGES.md like every other press image.
  */
 
 export const GSC_ARCHIVE_ORIGIN = "https://www.goodsmile.info";

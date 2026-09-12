@@ -3,7 +3,7 @@
  *
  * Only catalog photos remain — the picture that represents a product, used
  * under permission from the manufacturer and carrying attribution. See
- * docs/PRESS_IMAGES.md.
+ * private/PRESS_IMAGES.md.
  *
  * Marketplace listing photos are deliberately NOT displayed. Hotlinking them
  * was permitted and worked, but it meant every visitor's browser contacted eBay
