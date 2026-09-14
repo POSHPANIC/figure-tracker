@@ -37,10 +37,11 @@ jobs:
     # Measured at well under five minutes when nothing is new. The ceiling is
     # for the case where they add a lot at once and every new product needs its
     # page read at ~0.7s each.
-    # 30 killed the run twice in September once the shop-offer writes were
-    # added. The work itself is ~22 minutes; this is margin, not headroom to
-    # grow into.
-    timeout-minutes: 45
+    # 90. It was a cost control: at 45 the sources added in September -- Alter,
+    # HobbyLink and two staleness refreshes -- ran it to ~54 minutes and the
+    # last five steps stopped running. The repository is public now, which makes
+    # Actions minutes free, so the cap only has to catch a hang, not ration time.
+    timeout-minutes: 90
 
     steps:
       - uses: actions/checkout@v4

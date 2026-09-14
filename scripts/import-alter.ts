@@ -43,8 +43,14 @@ import { fillMissing } from "../lib/ingest/shop-offer";
 const APPLY = process.argv.includes("--yes");
 const DELAY_MS = 1500;
 const CURSOR_KEY = "alter:productCursor";
-/** Consecutive 404s that mean the end of the range rather than a gap. */
-const DRY_RUN_LENGTH = 40;
+/**
+ * Consecutive 404s that mean the end of the range rather than a gap.
+ *
+ * 15, down from 40. Alter's ids are dense -- the walk found 62 missing across
+ * 1 to 696, never many in a row -- and every one of these is a request to a
+ * server in Japan that can take six seconds to answer from a US runner.
+ */
+const DRY_RUN_LENGTH = 15;
 /** How far behind the last live product to rewind, to catch new releases. */
 const TAIL_REWIND = 30;
 /** A backstop only. The walk normally ends on a dry stretch. */
@@ -57,6 +63,18 @@ function intArg(name: string, fallback: number): number {
 }
 
 const MAX = intArg("max", 120);
+/**
+ * Re-read products already held. Off by default, and that default is most of
+ * this script's nightly cost.
+ *
+ * A known Alter product only ever gains missing fields on a re-read, and those
+ * were filled the first time. So re-downloading it is a request that changes
+ * nothing -- and the tail rewind put roughly thirty of them in every other
+ * night's window, at 1.5s plus the fetch each, from a server that answered in
+ * six seconds. The step went from under two minutes to twelve, which is most
+ * of why the nightly job overran its timeout.
+ */
+const REFRESH_KNOWN = process.argv.includes("--refresh-known");
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 type Fetched = { html: string } | { gone: true } | { failed: true };
@@ -172,7 +190,7 @@ async function remember(product: AlterProduct): Promise<void> {
   });
 }
 
-type Outcome = "refreshed" | "attached" | "created" | "skipped" | "untitled" | "missing";
+type Outcome = "refreshed" | "attached" | "created" | "skipped" | "untitled" | "missing" | "alreadyHeld";
 
 async function handle(product: AlterProduct, makerId: string): Promise<Outcome> {
   // --- Known product: fill any gaps, and stop ------------------------------
@@ -290,6 +308,7 @@ async function main() {
     skipped: 0,
     untitled: 0,
     missing: 0,
+    alreadyHeld: 0,
   };
 
   let dry = 0;
@@ -297,8 +316,33 @@ async function main() {
   let scanned = from - 1;
   let hitTheEnd = false;
 
+  // Everything already accounted for, loaded once: the ids that became
+  // figures, and the ones stored because they had no English name.
+  const known = new Set<string>();
+  if (!REFRESH_KNOWN) {
+    for (const r of await prisma.figureIdentifier.findMany({
+      where: { kind: IDENTIFIER_KIND },
+      select: { value: true },
+    })) known.add(r.value);
+    for (const r of await prisma.sourceProduct.findMany({
+      where: { source: "ALTER" },
+      select: { key: true },
+    })) known.add(r.key.replace(/^ALTER:/, ""));
+  }
+
   for (let id = from; id <= to; id += 1) {
     scanned = id;
+
+    // A product we already hold is a live id -- it moves the frontier and
+    // breaks a dry run exactly as a fetched one would -- but it costs no
+    // request. The rewind logic depends on the first half of that.
+    if (known.has(String(id))) {
+      tally.alreadyHeld += 1;
+      dry = 0;
+      frontier = id;
+      continue;
+    }
+
     await sleep(DELAY_MS);
     const fetched = await fetchPage(productUrl(id));
 
@@ -343,7 +387,7 @@ async function main() {
 
   console.log(
     `\n  refreshed ${tally.refreshed}  attached ${tally.attached}  created ${tally.created}` +
-      `  skipped ${tally.skipped}  nothing there ${tally.missing}`,
+      `  skipped ${tally.skipped}  nothing there ${tally.missing}  already held ${tally.alreadyHeld}`,
   );
   if (tally.untitled) {
     console.log(
