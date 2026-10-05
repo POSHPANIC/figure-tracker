@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Suspense } from "react";
 import { cacheLife, cacheTag } from "next/cache";
-import { notFound, redirect } from "next/navigation";
+import { notFound, permanentRedirect, redirect } from "next/navigation";
 import { after } from "next/server";
 import { headers } from "next/headers";
 import type { Metadata } from "next";
@@ -27,7 +27,7 @@ import { getFigureUserState } from "@/lib/user-queries";
 import { SITE_URL } from "@/lib/site";
 import { safeHttpUrl } from "@/lib/safe-url";
 import { amiamiSearchUrl, withSovrn } from "@/lib/sovrn";
-import { getFigureIdBySlug, getFigureImagesBySlug, figureCacheTag, supersededTarget } from "@/lib/queries";
+import { figureRoute, getFigureIdBySlug, getFigureImagesBySlug, figureCacheTag, supersededTarget } from "@/lib/queries";
 import { formatCurrency, formatPercent, formatUsd, trendOf } from "@/lib/money";
 import { approxAt, formatMoney, type DisplayMoney } from "@/lib/currency";
 import { getDisplayMoney, historicalMoney } from "@/lib/currency-server";
@@ -76,14 +76,33 @@ export async function generateMetadata({
  * pass through the cache without becoming part of its key.
  */
 /**
- * A static frame, so the route prerenders and navigation into it is instant.
+ * This route is allowed to block, briefly, on one lookup.
  *
- * Everything below reads something request-scoped — the condition from the
- * query string, the display currency from a cookie — and any of those above a
- * Suspense boundary stops the whole route from being prerendered. They happen
- * inside the boundary instead.
+ * It used to be a static frame -- a single Suspense boundary around the whole
+ * page -- so the route prerendered and navigation into it was instant. The
+ * cost was that the response committed to 200 the moment that fallback was
+ * sent, so a missing figure was a "not found" page served as a success, and a
+ * folded reissue's redirect became a client-side jump crawlers never follow.
+ * Every removed figure and every mistyped slug answered 200.
+ *
+ * The frame bought very little: its fallback was an empty box, because no
+ * figure's content can be known before its slug is. So the route now checks
+ * the slug first and answers with the real status, then streams the rest
+ * exactly as before. See node_modules/next/dist/docs/01-app/02-guides/
+ * streaming.md, "Status codes".
  */
-export default function FigurePage(props: PageProps<"/figures/[slug]">) {
+export const instant = false;
+
+export default async function FigurePage(props: PageProps<"/figures/[slug]">) {
+  const { slug } = await props.params;
+
+  // Before the boundary, while the status can still be chosen.
+  const route = await figureRoute(slug);
+  if (route.kind === "missing") notFound();
+  // Permanent, because a folded reissue never comes back as its own page, and
+  // a 308 is what tells a search engine to move what it has indexed.
+  if (route.kind === "moved") permanentRedirect(`/figures/${route.to}`);
+
   return (
     <Suspense fallback={<FigurePageFallback />}>
       <FigurePageBody {...props} />

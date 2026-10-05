@@ -1,5 +1,5 @@
 import "server-only";
-import { cacheLife } from "next/cache";
+import { cacheLife, cacheTag } from "next/cache";
 import { prisma } from "./prisma";
 import { dayValue, type ValueBasis } from "./figure-value";
 import { filterOptions } from "./filter-options";
@@ -449,6 +449,36 @@ export async function getFigureImagesBySlug(slug: string) {
       },
     },
   });
+}
+
+export type FigureRoute = { kind: "missing" } | { kind: "moved"; to: string } | { kind: "ok" };
+
+/**
+ * What a request for this slug should get, before any of the page renders.
+ *
+ * The figure page streams: it commits to a 200 the moment its Suspense
+ * fallback is sent, and after that neither a 404 nor a 301 can be expressed in
+ * the response -- notFound() becomes a "not found" page served as a success,
+ * and redirect() becomes a client-side jump that a crawler does not follow.
+ * Answering these three cases first, before the boundary, is what lets the
+ * response carry the real status.
+ *
+ * One indexed lookup, cached under the figure's own tag so it is invalidated
+ * with the rest of the page. The lifetime is short because "missing" is cached
+ * too: a slug that 404s today may be a figure an importer creates tonight.
+ */
+export async function figureRoute(slug: string): Promise<FigureRoute> {
+  "use cache";
+  cacheLife({ stale: 60, revalidate: 300, expire: 3600 });
+  cacheTag(figureCacheTag(slug));
+
+  const row = await prisma.figure.findUnique({
+    where: { slug },
+    select: { supersededBy: { select: { slug: true } } },
+  });
+  if (!row) return { kind: "missing" };
+  if (row.supersededBy) return { kind: "moved", to: row.supersededBy.slug };
+  return { kind: "ok" };
 }
 
 /**
