@@ -93,6 +93,24 @@ export async function generateMetadata({
  */
 export const instant = false;
 
+/**
+ * One placeholder, which makes the slug a value the page renders with rather
+ * than runtime data it must wait for.
+ *
+ * Without generateStaticParams, Cache Components treats params as request-time
+ * input: awaiting them suspends the page, the layout's prerendered shell is
+ * sent, and the response is a 200 before the check below has run -- which is
+ * exactly what the first version of this fix shipped. With it, each slug is
+ * rendered with its value on its first request and that result is kept, so the
+ * check runs while the status is still open. The placeholder itself is not a
+ * figure and answers 404. See node_modules/next/dist/docs/01-app/
+ * 03-api-reference/03-file-conventions/dynamic-routes.md, "With Cache
+ * Components".
+ */
+export async function generateStaticParams() {
+  return [{ slug: "__placeholder__" }];
+}
+
 export default async function FigurePage(props: PageProps<"/figures/[slug]">) {
   const { slug } = await props.params;
 
