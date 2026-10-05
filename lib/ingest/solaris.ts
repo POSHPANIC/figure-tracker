@@ -24,6 +24,7 @@
  * still someone else's shorthand for a product we would then be describing.
  */
 
+import { isAccessory } from "./accessory";
 export const STORE_ORIGIN = "https://solarisjapan.com";
 
 export type SolarisProduct = {
@@ -126,6 +127,10 @@ export function classify(
   if (type !== "Figure") {
     return { ok: false, reason: type ? `product_type ${type}` : "no product_type" };
   }
+
+  // A decal sheet, parts set or pair of earrings sold beside the figures it
+  // goes with, under the same line name and product type. See accessory.ts.
+  if (isAccessory(product.title)) return { ok: false, reason: "accessory" };
 
   const vendor = cleanVendor(product.vendor);
   const release = readReleaseNumber(product.title);

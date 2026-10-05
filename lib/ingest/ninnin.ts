@@ -14,6 +14,7 @@
  * many categories rather than paging through a few.
  */
 
+import { isAccessory } from "./accessory";
 export const STORE_ORIGIN = "https://www.nin-nin-game.com";
 
 /**
@@ -267,6 +268,9 @@ export function categoryFor(product: NinNinProduct): string {
  */
 export function isFigure(product: NinNinProduct): boolean {
   if (!product.name) return false;
+  // A decal sheet, parts set or pair of earrings sold beside the figures it
+  // goes with, under the same line name and product type. See accessory.ts.
+  if (isAccessory(product.name)) return false;
   const n = product.name.toLowerCase();
   return !NOT_A_PRODUCT_WE_LIST.test(n) && !SECOND_HAND.test(n);
 }

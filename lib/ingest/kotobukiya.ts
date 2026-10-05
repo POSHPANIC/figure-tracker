@@ -17,6 +17,7 @@
  * See docs/DATA_SOURCES.md.
  */
 
+import { isAccessory } from "./accessory";
 export const STORE_ORIGIN = "https://kotobukiya-us.com";
 
 /** The parts of Shopify's product JSON this cares about. */
@@ -104,6 +105,10 @@ export function classify(product: StoreProduct, characterKitIds?: ReadonlySet<st
   if (tags.some((t) => BONUS_TAG.test(t.trim()))) {
     return { ok: false, reason: "bonus item" };
   }
+
+  // A decal sheet, parts set or pair of earrings sold beside the figures it
+  // goes with, under the same line name and product type. See accessory.ts.
+  if (isAccessory(product.title)) return { ok: false, reason: "accessory" };
 
   const type = (product.product_type ?? "").trim();
   const isCharacterKit =

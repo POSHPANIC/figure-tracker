@@ -1,5 +1,6 @@
 import "dotenv/config";
 import { recordOffer } from "../lib/ingest/shop-offer";
+import { isAccessory } from "../lib/ingest/accessory";
 import { prisma } from "../lib/prisma";
 import { USER_AGENT } from "../lib/site";
 import {
@@ -129,9 +130,10 @@ function slugify(name: string): string {
   return name.toLowerCase().normalize("NFKD").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 }
 
-type Outcome = "created" | "held" | "no-jan" | "unreadable";
+type Outcome = "created" | "held" | "no-jan" | "unreadable" | "accessory";
 
 async function handle(product: HobbySearchProduct): Promise<Outcome> {
+  if (isAccessory(product.name)) return "accessory";
   if (!product.jan) return "no-jan";
 
   const held = await prisma.figureIdentifier.findUnique({
@@ -239,7 +241,7 @@ async function main() {
     return;
   }
 
-  const tally: Record<Outcome, number> = { created: 0, held: 0, "no-jan": 0, unreadable: 0 };
+  const tally: Record<Outcome, number> = { created: 0, held: 0, "no-jan": 0, unreadable: 0, accessory: 0 };
   const created: string[] = [];
 
   for (const id of ids) {
@@ -269,7 +271,7 @@ async function main() {
     }
   }
 
-  console.log(`\n  created ${tally.created}  already held ${tally.held}  no barcode ${tally["no-jan"]}  unreadable ${tally.unreadable}`);
+  console.log(`\n  created ${tally.created}  already held ${tally.held}  no barcode ${tally["no-jan"]}  unreadable ${tally.unreadable}  accessories ${tally.accessory}`);
   if (created.length > 0) {
     console.log("\n  new:");
     for (const line of created.slice(0, 12)) console.log(`    ${line}`);

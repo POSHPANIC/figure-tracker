@@ -1,3 +1,4 @@
+import { isAccessory } from "./accessory";
 import type { FigureCategory } from "../generated/prisma/enums";
 
 /**
@@ -556,7 +557,14 @@ export function classify(item: GscListItem, product: GscProduct | null): Classif
     };
   }
 
-  const accessory = ACCESSORY_NAME_PATTERNS.find((p) => p.test(item.name));
+  // Two lists, deliberately. ACCESSORY_NAME_PATTERNS is tuned to this
+  // archive's names; across the wider catalogue it also catches real figures
+  // sold with a display base ("Special Edition with LED Acrylic Stand"), so it
+  // is not shared. The shared rule in accessory.ts is the narrow one every
+  // importer applies.
+  const accessory =
+    ACCESSORY_NAME_PATTERNS.find((p) => p.test(item.name)) ??
+    (isAccessory(item.name) ? "accessory.ts" : undefined);
   if (accessory) {
     return { ok: false, reason: "accessory name", detail: String(accessory) };
   }

@@ -30,6 +30,7 @@
  * catalogue keeps them.
  */
 
+import { isAccessory } from "./accessory";
 export const ORIGIN = "https://alter-web.jp";
 
 export type AlterProduct = {
@@ -201,6 +202,9 @@ export function parseProductPage(html: string, url: string): AlterProduct | null
  * says otherwise is checked too.
  */
 export function isFigure(product: AlterProduct): boolean {
+  // A decal sheet, parts set or pair of earrings sold beside the figures it
+  // goes with, under the same line name and product type. See accessory.ts.
+  if (isAccessory(product.name)) return false;
   const n = `${product.name ?? ""} ${product.nameJa ?? ""}`.toLowerCase();
   if (/プラモデル|組立キット|model kit|garage kit/.test(n)) return false;
   return product.scale !== null || product.heightMm !== null;

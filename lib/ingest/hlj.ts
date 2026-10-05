@@ -27,6 +27,7 @@
  * robots.txt permits, 24 to a page.
  */
 
+import { isAccessory } from "./accessory";
 export const STORE_ORIGIN = "https://www.hlj.com";
 
 export type HljProduct = {
@@ -160,6 +161,9 @@ const NOT_A_PRODUCT_WE_LIST =
  */
 export function isFigure(product: HljProduct): boolean {
   if (!product.name) return false;
+  // A decal sheet, parts set or pair of earrings sold beside the figures it
+  // goes with, under the same line name and product type. See accessory.ts.
+  if (isAccessory(product.name)) return false;
   const category = (product.category ?? "").toLowerCase();
   if (!category.includes("action & toy figures") && !category.includes("dolls")) return false;
   const n = product.name.toLowerCase();
