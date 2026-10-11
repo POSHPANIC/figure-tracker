@@ -35,6 +35,17 @@ describe("isAccessory", () => {
     }
   });
 
+  it("refuses a line that is never a figure, however the shop words it", () => {
+    for (const name of [
+      "Attack on Titan: Armin Arlert - Oyasumi Tapinui Mascot Vol.1",
+      "Promare: Galo & Lio - Kurumi Tapinui (Set of 2)",
+      "Frieren Beyond Journey's End: Tapinui Mascot Accessory Collection (7 Pack Box)",
+      "xxxHolic: Yuko Ichihara - Nyanko Tapinui Plush Mascot",
+    ]) {
+      assert.equal(isAccessory(name), true, name);
+    }
+  });
+
   it("does not take a necklace worn by a figure for a necklace sold alone", () => {
     assert.equal(isAccessory("Rem: Necklace Ver. 1/7"), false);
   });

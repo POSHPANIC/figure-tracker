@@ -39,7 +39,21 @@ const ACCESSORY: RegExp[] = [
   /\bchopstick\s+rests?\b/i,
 ];
 
+/**
+ * Whole product lines that are never figures, by their brand name.
+ *
+ * Not accessories, but refused at the same gate for the same reason: they are
+ * sold beside figures, by the same shops, and nothing else in an import tells
+ * them apart. A line's own name is the one thing every listing of it carries,
+ * and unlike a generic noun it cannot turn up in a real figure's title.
+ *
+ *   Tapinui -- Tapioca's plush mascots ("Oyasumi Tapinui Mascot Vol.1",
+ *   "Kurumi Tapinui (Set of 2)"). 45 had reached the catalogue by October 2026,
+ *   typed Other because the shops call them mascots, not plush.
+ */
+const NOT_FIGURE_LINES: RegExp[] = [/\btapinui\b/i];
+
 export function isAccessory(name: string | null | undefined): boolean {
   if (!name) return false;
-  return ACCESSORY.some((re) => re.test(name));
+  return ACCESSORY.some((re) => re.test(name)) || NOT_FIGURE_LINES.some((re) => re.test(name));
 }
