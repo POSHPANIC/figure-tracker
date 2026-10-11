@@ -12,7 +12,7 @@ export default function PrivacyPage() {
     <ProsePage
       title="Privacy"
       intro="What's stored, why, and for how long. Written to be read, not to be survived."
-      updated="2026-08-15"
+      updated="2026-10-11"
     >
       <Section>
         <Callout>
@@ -113,12 +113,17 @@ export default function PrivacyPage() {
           <li>
             <strong>Discord</strong> — only if you sign in with it, and only what you approve.
           </li>
+          <li>
+            <strong>eBay</strong> — figure photos. See below.
+          </li>
         </List>
         <Callout>
-          <strong>No third party is contacted by your browser while you read this site.</strong>{" "}
-          Every page loads entirely from us. There are no embedded images, fonts, scripts or
-          widgets from anywhere else, so nobody except the companies above learns that you were
-          here or what you looked at.
+          <strong>Figure photos load from eBay.</strong> Many figures are pictured with a photo
+          from one of their current eBay listings, and your browser fetches it directly from
+          eBay&apos;s image server (i.ebayimg.com). That means eBay receives your IP address and
+          browser details, the same as visiting any site. It is not told which page here you were
+          on. Everything else — pages, fonts, scripts — loads from us, and there are no trackers,
+          ads or widgets from anyone.
         </Callout>
       </Section>
 

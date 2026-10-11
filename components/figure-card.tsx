@@ -6,6 +6,7 @@ import { getDisplayMoney } from "@/lib/currency-server";
 import { CATEGORY_LABELS } from "@/lib/labels";
 import { cn } from "@/lib/utils";
 import { figureValue, valueLabel } from "@/lib/figure-value";
+import { figurePhoto } from "@/lib/images";
 import { FigureThumb } from "./figure-thumb";
 
 export async function FigureCard({ figure }: { figure: FigureCardData }) {
@@ -41,7 +42,7 @@ export async function FigureCard({ figure }: { figure: FigureCardData }) {
       <div className="relative aspect-[3/4] overflow-hidden bg-surface-2">
         <FigureThumb
           name={figure.name}
-          src={figure.primaryImageUrl}
+          src={figurePhoto(figure)?.src}
           className="transition duration-300 group-hover:scale-[1.03]"
         />
 

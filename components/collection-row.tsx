@@ -24,7 +24,7 @@ export type CollectionRowData = {
   figure: {
     slug: string;
     name: string;
-    primaryImageUrl: string | null;
+    imageUrl: string | null;
     seriesName: string | null;
     manufacturerName: string | null;
     marketValueUsd: string | null;
@@ -76,7 +76,7 @@ export function CollectionRow({
         >
           <FigureThumb
             name={item.figure.name}
-            src={item.figure.primaryImageUrl}
+            src={item.figure.imageUrl}
           />
         </Link>
 

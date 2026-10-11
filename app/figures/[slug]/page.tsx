@@ -22,7 +22,8 @@ import { archiveProductUrl } from "@/lib/ingest/gsc";
 import { affiliateEnabled, withAffiliate } from "@/lib/ebay-affiliate";
 import { ebaySearchUrl } from "@/lib/ebay-search";
 import { goodsmileSearchUrl } from "@/lib/goodsmile-search";
-import { getFigureBySlug, getFigureStats, getPriceHistory } from "@/lib/queries";
+import { getFigureBySlug, getFigureListingPhoto, getFigureStats, getPriceHistory } from "@/lib/queries";
+import { figurePhoto } from "@/lib/images";
 import { getFigureUserState } from "@/lib/user-queries";
 import { SITE_URL } from "@/lib/site";
 import { safeHttpUrl } from "@/lib/safe-url";
@@ -233,6 +234,14 @@ async function FigureView({
   const figure = await getFigureBySlug(slug, condition);
   if (!figure) notFound();
 
+  // A catalog photo when there is one; until then a live listing's, credited
+  // to that listing beside it (lib/images.ts).
+  const photoListing = figure.primaryImageUrl ? null : await getFigureListingPhoto(figure.id);
+  const photo = figurePhoto({
+    primaryImageUrl: figure.primaryImageUrl,
+    listings: photoListing ? [photoListing] : [],
+  });
+
   // The identifiers now carry release numbers as well, so the archive id has to
   // be picked out by kind rather than taken as the first one.
   const archiveId = figure.identifiers.find((i) => i.kind === "GSC_PRODUCT");
@@ -410,8 +419,24 @@ async function FigureView({
         <div className="space-y-4">
           <div>
             <div className="aspect-[3/4] overflow-hidden rounded-xl border border-border bg-surface-2">
-              <FigureThumb name={figure.name} src={figure.primaryImageUrl} />
+              <FigureThumb name={figure.name} src={photo?.src} />
             </div>
+
+            {/* The photo is a seller's, from one listing, so it says whose and
+                goes to that listing -- and the reader knows the picture may not
+                be the exact copy they would be buying. */}
+            {photo?.listingUrl && (
+              <p className="mt-1.5 text-[11px] text-muted">
+                <a
+                  href={withAffiliate(photo.listingUrl, "figure-photo")}
+                  target="_blank"
+                  rel="noopener noreferrer nofollow"
+                  className="hover:text-foreground hover:underline"
+                >
+                  Photo from an <EbayMark /> listing
+                </a>
+              </p>
+            )}
 
             {/* Attribution is normally a condition of using a press image, so
                 it sits with the image rather than buried in a credits page. */}

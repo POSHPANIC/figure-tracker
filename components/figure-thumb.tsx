@@ -3,10 +3,9 @@ import { cn } from "@/lib/utils";
 /**
  * Figure artwork, or a placeholder when we have no image.
  *
- * We deliberately don't ship stock product photos with the seed data — real
- * images arrive from marketplace APIs, which license them for display alongside
- * the listing. Until then this draws an empty slot so the grid still looks
- * intentional rather than broken.
+ * The picture is a catalog photo or a live eBay listing's photo (see
+ * lib/images.ts); with neither, this draws an empty slot so the grid still
+ * looks intentional rather than broken.
  *
  * The slot carries no colour of its own: it is the page's own recessed-panel
  * tone, with the initials and frame in the same muted ink as any other
@@ -38,6 +37,8 @@ export function FigureThumb({
         src={src}
         alt={name}
         loading="lazy"
+        // eBay is told an image was asked for, not which page here asked.
+        referrerPolicy="no-referrer"
         className={cn("h-full w-full object-cover", className)}
       />
     );

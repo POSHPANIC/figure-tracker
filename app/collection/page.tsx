@@ -11,6 +11,7 @@ import { formatMoney } from "@/lib/currency";
 import { getDisplayMoney } from "@/lib/currency-server";
 import { cn } from "@/lib/utils";
 import { SITE_NAME } from "@/lib/site";
+import { figurePhoto } from "@/lib/images";
 
 export const metadata: Metadata = {
   title: "My collection",
@@ -140,7 +141,8 @@ function serialize(item: Awaited<ReturnType<typeof getCollection>>["items"][numb
     figure: {
       slug: item.figure.slug,
       name: item.figure.name,
-      primaryImageUrl: item.figure.primaryImageUrl,
+      // Catalog photo, else a live listing's (lib/images.ts).
+      imageUrl: figurePhoto(item.figure)?.src ?? null,
       seriesName: item.figure.series?.name ?? null,
       manufacturerName: item.figure.manufacturer?.name ?? null,
       marketValueUsd: item.figure.marketValueUsd?.toString() ?? null,

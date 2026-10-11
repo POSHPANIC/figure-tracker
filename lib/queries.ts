@@ -3,6 +3,7 @@ import { cacheLife, cacheTag } from "next/cache";
 import { prisma } from "./prisma";
 import { dayValue, type ValueBasis } from "./figure-value";
 import { filterOptions } from "./filter-options";
+import { listingPhotoSelect } from "./images";
 import { normalizeQuery, queryTokens } from "./search-text";
 import type { Prisma } from "./generated/prisma/client";
 import type { FigureCategory, ItemCondition } from "./generated/prisma/enums";
@@ -22,6 +23,8 @@ export const figureCardSelect = {
   scale: true,
   releaseDate: true,
   primaryImageUrl: true,
+  // The live listing whose photo stands in until a catalog photo exists.
+  listings: listingPhotoSelect,
   marketValueUsd: true,
   change30dPct: true,
   salesVolume90d: true,
@@ -219,6 +222,15 @@ export async function quickSearch(q: string, limit = 8) {
  * priced against a used chart. Everything in that column answers the same
  * question now.
  */
+/** The live listing whose photo pictures a figure that has no catalog photo. */
+export async function getFigureListingPhoto(figureId: string) {
+  return prisma.listing.findFirst({
+    where: { figureId, ...listingPhotoSelect.where },
+    orderBy: listingPhotoSelect.orderBy,
+    select: listingPhotoSelect.select,
+  });
+}
+
 export async function getFigureBySlug(slug: string, condition?: ItemCondition) {
   return prisma.figure.findUnique({
     where: { slug },
