@@ -50,7 +50,13 @@ export async function generateMetadata({
   const figure = await getFigureBySlug(slug);
   if (!figure) return { title: "Figure not found" };
 
-  const value = figure.marketValueUsd ? formatUsd(figure.marketValueUsd) : "unpriced";
+  // The same number, on the same basis, as the page itself. This used to read
+  // marketValueUsd alone, which no figure has, so every snippet in search
+  // results said "unpriced" above a page showing a retail or asking price.
+  const valued = figureValue(figure);
+  const priced = valued
+    ? `${valueLabel(valued.basis)} ${formatUsd(valued.amountUsd)}`
+    : "Not yet priced";
 
   // A folded reissue points at the entry it was folded into.
   //
@@ -63,7 +69,7 @@ export async function generateMetadata({
 
   return {
     title: `${figure.name} — price history`,
-    description: `${figure.name} by ${figure.manufacturer?.name ?? "unknown maker"}. Current market value ${value}, with full price history and live listings.`,
+    description: `${figure.name} by ${figure.manufacturer?.name ?? "unknown maker"}. ${priced}, with full price history and live listings.`,
     alternates: { canonical: `${SITE_URL}/figures/${canonicalSlug}` },
   };
 }
