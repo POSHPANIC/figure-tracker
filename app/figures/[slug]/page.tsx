@@ -5,7 +5,7 @@ import { notFound, permanentRedirect, redirect } from "next/navigation";
 import { after } from "next/server";
 import { headers } from "next/headers";
 import type { Metadata } from "next";
-import { ExternalLink, Flag, PencilLine, Receipt } from "lucide-react";
+import { Flag, PencilLine, Receipt } from "lucide-react";
 import { currentUser } from "@/auth";
 import { recordFigureView } from "@/lib/views";
 import { EbayMark } from "@/components/ebay-mark";
@@ -14,6 +14,7 @@ import { FigureImagesAdmin } from "@/components/figure-images-admin";
 import { FigureThumb } from "@/components/figure-thumb";
 import { PriceChart } from "@/components/price-chart";
 import { StoreMark, isManufacturerStore } from "@/components/store-mark";
+import { SourceGroup, SourceList, SourcePrice, SourceRow } from "@/components/source-row";
 import { proxyLinks, proxyLinkDisclaimer } from "@/lib/proxy-links";
 import { figureValue, valueLabel, valueNote } from "@/lib/figure-value";
 import { withSolarisAffiliate } from "@/lib/solaris-affiliate";
@@ -719,85 +720,106 @@ async function FigureView({
                   : "A shop that stocks this figure. Their price is what they charge, not the manufacturer's — the marketplace prices below are what it changes hands for."}
             </p>
 
-            {offers.map((offer) => (
-              // One row per shop. Whether it can still be ordered is shown
-              // either way: a closed preorder is why the marketplace prices
-              // below exist, and hiding it would leave the reader wondering.
-              <a
-                key={offer.id}
-                href={offer.href}
-                target="_blank"
-                // "sponsored" only when the link actually earns something —
-                // which is why it is derived from the tag rather than assumed.
-                // Google asks for it on monetised links, and these are
-                // monetised for Solaris and not for anybody else's store.
-                rel={
-                  offer.sponsored
-                    ? "sponsored nofollow noopener noreferrer"
-                    : "noopener noreferrer"
-                }
-                className="mt-3 flex items-center gap-3 rounded-lg border border-border p-3 transition hover:border-foreground"
-              >
-                <StoreMark url={offer.url} className="shrink-0 text-sm" />
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate text-sm">{figure.name}</span>
-                  <span
-                    className={cn(
-                      "block text-xs",
-                      // Three states, not two. Red is for the shop saying no —
-                      // "Currently unavailable", or an order window that has
-                      // closed. Null is the shop saying nothing, which is not a
-                      // no and must not be dressed as one.
-                      offer.available === true
-                        ? "text-up"
-                        : offer.available === false
-                          ? "text-down"
-                          : "text-muted",
-                    )}
-                  >
-                    {describeAvailability({
-                      orderClosesAt: offer.closesAt,
-                      available: offer.available,
-                    })}
-                  </span>
-                </span>
-                {offer.priceLabel && (
-                  <span className="tabular shrink-0 text-sm font-medium">{offer.priceLabel}</span>
-                )}
-              </a>
-            ))}
-            {archiveId && (
-              /* Their search rather than the product, because the product cannot
-                 be linked. goodsmile.com has no sitemap and its only index sits
-                 under a path robots.txt asks bots to stay out of, so there is
-                 nothing to map our figures onto. nofollow keeps crawlers off it,
-                 which is what that rule is there for — a person clicking is not
-                 what they are guarding against.
+            <SourceList>
+              {offers.map((offer) => (
+                // One row per shop. Whether it can still be ordered is shown
+                // either way: a closed preorder is why the marketplace prices
+                // below exist, and hiding it would leave the reader wondering.
+                <SourceRow
+                  key={offer.id}
+                  href={offer.href}
+                  // "sponsored" only when the link actually earns something —
+                  // which is why it is derived from the tag rather than
+                  // assumed. Google asks for it on monetised links, and these
+                  // are monetised for Solaris and not for anybody else's store.
+                  rel={
+                    offer.sponsored
+                      ? "sponsored nofollow noopener noreferrer"
+                      : "noopener noreferrer"
+                  }
+                  mark={<StoreMark url={offer.url} className="text-sm" />}
+                  title={figure.name}
+                  titleAttr={figure.name}
+                  meta={
+                    <span
+                      className={cn(
+                        // Three states, not two. Red is for the shop saying
+                        // no — "Currently unavailable", or an order window that
+                        // has closed. Null is the shop saying nothing, which is
+                        // not a no and must not be dressed as one.
+                        offer.available === true
+                          ? "text-up"
+                          : offer.available === false
+                            ? "text-down"
+                            : undefined,
+                      )}
+                    >
+                      {describeAvailability({
+                        orderClosesAt: offer.closesAt,
+                        available: offer.available,
+                      })}
+                    </span>
+                  }
+                  trailing={
+                    offer.priceLabel ? <SourcePrice>{offer.priceLabel}</SourcePrice> : undefined
+                  }
+                />
+              ))}
+            </SourceList>
 
-                 Labelled as a search, not as the product. Their store sells
-                 current stock only: "Nendoroid 2534" puts that figure first,
-                 while "Nendoroid 280" — Santa Miku, 2012 — cannot find it
-                 because it is not for sale anywhere on the site.
-
-                 Only for figures that came from Good Smile's archive. Sending
-                 someone to search goodsmile.com for a Kotobukiya figure wastes
-                 their click on a shop that never sold it — and now that the
-                 catalogue has a second source, "search the manufacturer" has to
-                 mean the manufacturer this figure actually came from. */
-              <a
-                href={goodsmileSearchUrl(figure)}
-                target="_blank"
-                rel="nofollow noopener noreferrer"
-                className="mt-3 inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs font-medium transition hover:border-foreground"
+            {(archiveId || amiami) && (
+              /* Searches, grouped and labelled as such rather than mixed in
+                 among the offers above. Neither can say more than "look for it
+                 here" — we hold no product ids for either shop — and a row
+                 sitting under a price reads as "for sale, at that price" unless
+                 it is told otherwise. The heading says it once so the rows do
+                 not each have to. */
+              <SourceGroup
+                label="Look for it"
+                note="Searches, not listings — we have not checked whether either shop has this figure."
               >
-                Search Good Smile Company <ExternalLink className="size-3 text-muted" />
-              </a>
+                <SourceList>
+                  {archiveId && (
+                    /* Their search rather than the product, because the product
+                       cannot be linked: goodsmile.com has no sitemap, and its
+                       only index sits under a path robots.txt asks bots to stay
+                       out of, so there is nothing to map our figures onto.
+                       nofollow keeps crawlers off it, which is what that rule is
+                       there for — a person clicking is not what it guards
+                       against.
+
+                       Only for figures that came from Good Smile's archive.
+                       Sending someone to search goodsmile.com for a Kotobukiya
+                       figure wastes their click on a shop that never sold it. */
+                    <SourceRow
+                      href={goodsmileSearchUrl(figure)}
+                      rel="nofollow noopener noreferrer"
+                      title="Search Good Smile Company"
+                      meta="Their store carries current stock only"
+                    />
+                  )}
+                  {amiami && (
+                    /* AmiAmi carries essentially every Japanese release, and
+                       unlike the manufacturer stores it keeps selling them after
+                       the preorder window closes — so this is worth offering on
+                       every figure rather than only the ones whose store link is
+                       already dead. */
+                    <SourceRow
+                      href={amiami}
+                      rel="nofollow noopener noreferrer"
+                      title="Search AmiAmi"
+                      meta="Stocks most Japanese releases, including after preorder closes"
+                    />
+                  )}
+                </SourceList>
+              </SourceGroup>
             )}
+
             {archiveId && (
-              // The archive entry the specifications came from. Not a shop —
-              // it stopped publishing in February 2024 — but it is the exact
+              // The archive entry the specifications came from. Not a shop — it
+              // stopped publishing in February 2024 — but it is the exact
               // product, and it says where this page's numbers come from.
-              <p className="mt-2 text-xs text-muted">
+              <p className="mt-3 text-xs text-muted">
                 Specifications from{" "}
                 <a
                   href={archiveProductUrl(archiveId.value)}
@@ -810,55 +832,33 @@ async function FigureView({
                 .
               </p>
             )}
-            {amiami && (
-              /* AmiAmi carries essentially every Japanese release, and unlike
-                 the manufacturer stores it keeps selling them after the
-                 preorder window closes — so this is worth offering on every
-                 figure rather than only the ones with a dead store link.
 
-                 A search, and labelled as one. We hold no AmiAmi product ids
-                 — that is the feed this site has been asking them for — so
-                 what this can honestly say is "look for it here", not "it is
-                 in stock". */
-              <a
-                href={amiami}
-                target="_blank"
-                rel="nofollow noopener noreferrer"
-                className="mt-3 inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs font-medium transition hover:border-foreground"
-              >
-                Search AmiAmi <ExternalLink className="size-3 text-muted" />
-              </a>
-            )}
             {secondhand.length > 0 && (
               /* For the 96% of the catalogue no shop sells any more. A proxy
                  service is the only route an overseas collector has to the
-                 Japanese secondhand market, and until now these pages sent them
-                 nowhere at all.
+                 Japanese secondhand market, and until recently these pages sent
+                 them nowhere at all.
 
                  Deliberately not shown next to a figure that can still be
                  ordered: sending someone to the used market for something in
                  production is worse advice than showing nothing.
 
-                 Labelled as a search, and said out loud, because a link sitting
-                 under a price reads as "for sale, at that price" unless it is
-                 told not to. We have not checked either half. */
-              <div className="mt-4 border-t border-border pt-3">
-                <p className="term-label">Buy secondhand</p>
-                <div className="mt-2 flex flex-wrap gap-2">
+                 The disclaimer sits above the rows rather than under them,
+                 because it is worth reading before the click rather than after
+                 it. We have checked neither the price nor the stock. */
+              <SourceGroup label="Buy secondhand" note={proxyLinkDisclaimer}>
+                <SourceList>
                   {secondhand.map((link) => (
-                    <a
+                    <SourceRow
                       key={link.service}
                       href={link.url}
-                      target="_blank"
                       rel="nofollow noopener noreferrer"
-                      className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs font-medium transition hover:border-foreground"
-                    >
-                      Search {link.label} <ExternalLink className="size-3 text-muted" />
-                    </a>
+                      title={`Search ${link.label}`}
+                      meta="Japanese secondhand market, through a proxy"
+                    />
                   ))}
-                </div>
-                <p className="mt-2 text-xs text-muted">{proxyLinkDisclaimer}</p>
-              </div>
+                </SourceList>
+              </SourceGroup>
             )}
           </section>
 
@@ -883,105 +883,90 @@ async function FigureView({
             </div>
 
             {/*
-              At the top, because the rows below now open the listings
-              themselves. Whatever we matched is a guess about someone else's
-              title; this is the unfiltered thing, and it should be reachable
-              without reading the list first.
+              The search leads the list rather than floating above it as a link.
+              Whatever we matched is a guess about someone else's title, so the
+              unfiltered thing has to be reachable without reading the list
+              first — but it is the same kind of object as the rows under it,
+              somewhere to go, and it should look like one. Carrying no price is
+              what keeps it from reading as one of the listings.
             */}
-            <a
-              href={ebaySearchUrl(figure, condition)}
-              target="_blank"
-              rel="noopener noreferrer nofollow"
-              // Set at the same size as a listing title. It is an alternative
-              // to the list below it, not a footnote on it, and at text-xs it
-              // read as small print next to the thing it competes with.
-              className="mb-3 inline-flex items-baseline gap-1.5 text-sm term-link"
-            >
-              Search <EbayMark className="text-[0.95em]" /> for this figure
-            </a>
+            <SourceList>
+              <SourceRow
+                href={ebaySearchUrl(figure, condition)}
+                rel="noopener noreferrer nofollow"
+                title={
+                  <>
+                    Search <EbayMark className="text-[0.95em]" /> for this figure
+                  </>
+                }
+                meta={`Every ${CONDITION_LABELS[condition].toLowerCase()} listing, unfiltered`}
+              />
+
+              {figure.listings.map((l) => {
+                const isEbay = l.source.key === "ebay";
+                return (
+                  <SourceRow
+                    key={l.id}
+                    href={withAffiliate(l.url, "figure-listing")}
+                    rel="noopener noreferrer nofollow"
+                    title={l.title}
+                    // The match is automatic, so "check the title before
+                    // buying" is advice the reader has to be able to follow —
+                    // and in the row these are truncated.
+                    titleAttr={l.title}
+                    meta={
+                      <>
+                        {isEbay ? <EbayMark /> : l.source.name} ·{" "}
+                        {CONDITION_LABELS[l.condition]}
+                        {l.shippingUsd ? ` · +${formatMoney(l.shippingUsd, money)} shipping` : ""}
+                      </>
+                    }
+                    trailing={
+                      <SourcePrice>
+                        {formatMoney(l.amountUsd, money, {
+                          // The seller's own price, when it's already in the
+                          // currency being shown — no round trip through USD.
+                          original: { amount: l.amount, currency: l.currency },
+                        })}
+                      </SourcePrice>
+                    }
+                  />
+                );
+              })}
+            </SourceList>
 
             {figure.listings.length === 0 ? (
               // "None found" and "not looked yet" are different facts, and a
               // catalogue this much larger than its marketplace quota will
               // always have figures in the second state. Saying so beats an
               // empty panel that implies we checked.
-              <div className="py-6 text-center">
-                <p className="text-sm text-muted">
-                  {figure.lastPolledAt
-                    ? `No ${CONDITION_LABELS[condition].toLowerCase()} listings tracked right now — try the other condition, or the search above.`
-                    : "Not checked for prices yet — this figure is queued."}
-                </p>
-              </div>
+              <p className="py-4 text-center text-sm text-muted">
+                {figure.lastPolledAt
+                  ? `No ${CONDITION_LABELS[condition].toLowerCase()} listings tracked right now — try the other condition, or the search above.`
+                  : "Not checked for prices yet — this figure is queued."}
+              </p>
             ) : (
-              <>
-                <ul className="divide-y divide-border">
-                  {figure.listings.map((l) => {
-                    const isEbay = l.source.key === "ebay";
-                    return (
-                      <li key={l.id} className="flex items-center gap-3 py-2.5">
-                        <span className="min-w-0 flex-1">
-                          {/*
-                            The title is the link. It is also the thing a reader
-                            has to check before buying, since the match is
-                            automatic — so the words to read and the thing to
-                            click should be the same object rather than a title
-                            and a separate icon at the far end of the row.
-
-                            title= carries the full text, because these are
-                            truncated and "check the title" is not advice you
-                            can follow on a title you cannot see.
-                          */}
-                          <a
-                            href={withAffiliate(l.url, "figure-listing")}
-                            target="_blank"
-                            rel="noopener noreferrer nofollow"
-                            title={l.title}
-                            className="block truncate text-sm hover:underline"
-                          >
-                            {l.title}
-                          </a>
-                          <span className="flex items-baseline gap-1 text-xs text-muted">
-                            {isEbay ? <EbayMark /> : l.source.name} ·{" "}
-                            {CONDITION_LABELS[l.condition]}
-                            {l.shippingUsd
-                              ? ` · +${formatMoney(l.shippingUsd, money)} shipping`
-                              : ""}
-                          </span>
-                        </span>
-                        <span className="tabular shrink-0 text-sm font-medium">
-                          {formatMoney(l.amountUsd, money, {
-                            // The seller's own price, when it's already in the
-                            // currency being shown — no round trip through USD.
-                            original: { amount: l.amount, currency: l.currency },
-                          })}
-                        </span>
-                      </li>
-                    );
-                  })}
-                </ul>
-
-                {figure.listings.some((l) => l.source.key === "ebay") && (
-                  // The caveat stays even though the link moved to the top: a
-                  // row opening a specific item is a stronger claim than a row
-                  // opening a search, so saying that the matching is automatic
-                  // matters more now, not less.
-                  <p className="mt-3 border-t border-border pt-3 text-xs text-muted">
-                    Listings are matched to this figure automatically and can include similar
-                    releases. Check the title before buying.
-                    {affiliateEnabled() && (
-                      // Said here, next to the links it applies to, rather than
-                      // only in a policy page nobody opens. It also has to be
-                      // true that it changes nothing: these are ordered by
-                      // price, and a commission never moves one up.
-                      <>
-                        {" "}
-                        We earn a small commission if you buy through them, at no cost to you. It
-                        does not affect what is listed or the order it appears in.
-                      </>
-                    )}
-                  </p>
-                )}
-              </>
+              figure.listings.some((l) => l.source.key === "ebay") && (
+                // The caveat stays even though the link moved into the list: a
+                // row opening a specific item is a stronger claim than a row
+                // opening a search, so saying that the matching is automatic
+                // matters more now, not less.
+                <p className="mt-3 border-t border-border pt-3 text-xs text-muted">
+                  Listings are matched to this figure automatically and can include similar
+                  releases. Check the title before buying.
+                  {affiliateEnabled() && (
+                    // Said here, next to the links it applies to, rather than
+                    // only in a policy page nobody opens. It also has to be
+                    // true that it changes nothing: these are ordered by price,
+                    // and a commission never moves one up.
+                    <>
+                      {" "}
+                      We earn a small commission if you buy through them, at no cost to you. It
+                      does not affect what is listed or the order it appears in.
+                    </>
+                  )}
+                </p>
+              )
             )}
           </section>
 
