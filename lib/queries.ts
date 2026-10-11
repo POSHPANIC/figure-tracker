@@ -52,7 +52,11 @@ export type SortKey = "trending" | "value-desc" | "value-asc" | "newest" | "name
 // number the card shows is the one it sorts by, which is the only arrangement
 // where the order matches what a person is reading.
 const ORDER_BY: Record<SortKey, Prisma.FigureOrderByWithRelationInput[]> = {
-  trending: [{ change30dPct: "desc" }, { salesVolume90d: "desc" }],
+  // askListings breaks the tie, and nearly everything ties: with no sales data
+  // the first two keys are empty on almost every figure, so the default page
+  // was an arbitrary slice of the catalogue, mostly placeholders. Figures that
+  // are actually on sale come first -- and they are the ones with a photo.
+  trending: [{ change30dPct: "desc" }, { salesVolume90d: "desc" }, { askListings: "desc" }],
   "value-desc": [
     { marketValueUsd: { sort: "desc", nulls: "last" } },
     { askMedianUsd: { sort: "desc", nulls: "last" } },
@@ -385,7 +389,8 @@ export async function getMostTracked(take = 8) {
   return prisma.figure.findMany({
     where: { supersededById: null },
     select: figureCardSelect,
-    orderBy: { salesVolume90d: "desc" },
+    // Listings as the tiebreak, for the same reason as "trending" above.
+    orderBy: [{ salesVolume90d: "desc" }, { askListings: "desc" }],
     take,
   });
 }

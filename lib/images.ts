@@ -41,12 +41,17 @@ export function isDisplayableImageUrl(url: string): boolean {
 /**
  * How sure the matcher must be before a listing's photo stands for the figure.
  *
- * Higher than the 0.72 an asking price needs (lib/ingest/aggregate.ts). One
- * wrong listing moves a median a little; one wrong photo is the first thing a
- * reader sees, and says plainly that the page is about something else. At 0.8
- * about 4,400 of 11,300 figures had a photo in October 2026; at 0.72, 5,100.
+ * The same 0.72 an asking price needs (lib/ingest/aggregate.ts), which also
+ * makes Figure.askListings a fair stand-in for "has a photo" when sorting.
+ *
+ * It started at 0.8, on the argument that one wrong listing moves a median a
+ * little while one wrong photo is the first thing a reader sees. That left
+ * 4,400 of 11,300 figures pictured and the browse pages mostly placeholders,
+ * and 0.72 is where the asking-price work found 13 of 14 excluded matches were
+ * right. 5,100 figures at 0.72, October 2026. If wrong photos turn up, this is
+ * the number to raise.
  */
-export const PHOTO_MIN_MATCH_SCORE = 0.8;
+export const PHOTO_MIN_MATCH_SCORE = 0.72;
 
 /** eBay's image host. Nothing else is loaded into a visitor's browser. */
 const EBAY_IMAGE_PREFIX = "https://i.ebayimg.com/";
