@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { isAuthorizedCron } from "@/lib/cron-auth";
-import { purgeExpiredSales, runAggregation } from "@/lib/ingest/aggregate";
+import { markReleased, purgeExpiredSales, recomputeMsrpUsd, runAggregation } from "@/lib/ingest/aggregate";
 
 export const maxDuration = 60;
 
@@ -19,8 +19,15 @@ export async function GET(request: Request) {
 
   try {
     const result = await runAggregation();
+    // Both of these lived only in scripts/ingest.ts, which nothing runs on a
+    // schedule, so from September to October 2026 a preorder imported after
+    // the one manual run never showed its retail price, and figures past
+    // their release date still said Preorder. They belong to the nightly pass.
+    // Neither depends on the other: both read the release date, not the status.
+    const released = await markReleased();
+    const msrp = await recomputeMsrpUsd();
     const purged = await purgeExpiredSales();
-    return NextResponse.json({ ok: true, ...result, salesPurged: purged });
+    return NextResponse.json({ ok: true, ...result, released, msrp, salesPurged: purged });
   } catch (err) {
     console.error("[cron/aggregate] failed:", err);
     return NextResponse.json(
