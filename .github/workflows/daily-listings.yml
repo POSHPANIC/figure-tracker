@@ -46,14 +46,18 @@ concurrency:
 jobs:
   refresh:
     runs-on: ubuntu-latest
-    # Sized to finish, not to be survived. At ~12 minutes per 500 figures a
-    # 2,000-figure sweep is around 50 minutes; 75 leaves room for a slow night
-    # and still fails fast instead of billing 150 minutes before being killed.
+    # Sized to finish, not to be survived. eBay's pace varies a lot from night
+    # to night -- 14 minutes per 500 figures on a quick one, 21 on a slow one --
+    # so a 2,000-figure sweep takes anywhere from under an hour to 75 minutes or
+    # more. 75 was being reached on slow nights; 90 matches store-sync.yml and
+    # still stops well short of the old 150.
     #
     # It used to be 150 against a 4,800-figure sweep that the comment called
     # ninety minutes. The catalogue outgrew that, and six of ten runs were
-    # killed mid-sweep — maximum cost for incomplete work.
-    timeout-minutes: 75
+    # killed mid-sweep — maximum cost for incomplete work. Minutes are no longer
+    # billed (the repository is public), but a run that cannot finish is still
+    # the thing to avoid.
+    timeout-minutes: 90
 
     steps:
       - uses: actions/checkout@v4

@@ -99,6 +99,11 @@ async function main() {
     if (ebay?.error) {
       console.log(`  batch failed: ${ebay.error}`);
       console.log("  stopping — rerun to continue from here.");
+      // On the run's summary page, where a short sweep is otherwise invisible:
+      // the work already done is kept, so the run itself still succeeds.
+      if (process.env["GITHUB_ACTIONS"]) {
+        console.log(`::warning::eBay batch failed after ${done} of ${TOTAL} figures (${ebay.error}). The next run resumes from here.`);
+      }
       break;
     }
 
@@ -126,10 +131,20 @@ async function main() {
   console.log(`  Figures with listings: ${before.length} -> ${after.length}`);
   console.log("");
 
-  await prisma.$disconnect();
+  // Bounded, because a failed batch can leave a connection checked out by work
+  // that was abandoned mid-flight, and $disconnect then waits for it forever.
+  // On 10 October a sweep printed "Done" and sat for five minutes until the job
+  // limit killed it, turning finished work into a cancelled run.
+  await Promise.race([prisma.$disconnect(), new Promise((r) => setTimeout(r, 10_000).unref())]);
 }
 
-main().catch((err) => {
-  console.error(err);
-  process.exit(1);
-});
+// Exit explicitly rather than when the event loop drains. Anything a failed
+// batch left behind -- an open socket, a pending retry -- would otherwise keep
+// the process alive after its work is done.
+main().then(
+  () => process.exit(0),
+  (err) => {
+    console.error(err);
+    process.exit(1);
+  },
+);
