@@ -349,7 +349,22 @@ async function write(figures: ParsedFigure[]) {
     });
 
     if (existing) {
-      await prisma.figure.update({ where: { id: existing.figureId }, data });
+      // A locked field is one a person checked, and the archive does not get
+      // to undo it. The archive named GSC's 1/4 Bakugo plainly "Katsuki
+      // Bakugo", which caught every Bakugo prize figure on eBay; the box says
+      // "Metallic Ver.", and a re-run of this import used to put it back.
+      const locks = new Set(
+        (await prisma.figureFieldLock.findMany({ where: { figureId: existing.figureId }, select: { field: true } }))
+          .map((l) => l.field),
+      );
+      const lockOf: Partial<Record<keyof typeof data, string>> = {
+        name: "name", nameJa: "name", scale: "scale", heightMm: "heightMm", releaseDate: "releaseDate",
+        msrpAmount: "msrp", msrpCurrency: "msrp", manufacturerId: "manufacturer", seriesId: "series",
+      };
+      const allowed = Object.fromEntries(
+        Object.entries(data).filter(([key]) => !locks.has(lockOf[key as keyof typeof data] ?? "")),
+      ) as Partial<typeof data>;
+      await prisma.figure.update({ where: { id: existing.figureId }, data: allowed });
       // The number too, not only on the create path below. A figure that
       // already existed - because another importer reached it first, or
       // because this import ran twice - used to skip straight past the number

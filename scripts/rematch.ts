@@ -14,6 +14,7 @@
  *   npm run rematch -- --all           # list every change, not the first six
  *   npm run rematch -- --yes --safe-moves  # moves, minus the doubtful ones
  *   npm run rematch -- --yes --only-unmatches  # take wrong matches away, add none
+ *   npm run rematch -- --figure some-slug  # only the listings on one figure
  *
  * --no-moves exists because the two kinds of change carry very different risk.
  * Dropping a listing that no longer matches only ever removes a claim. Moving
@@ -36,11 +37,23 @@ const SAFE_MOVES = process.argv.includes("--safe-moves");
 // than it should add -- in October 2026, 864 listings off a figure called MM
 // -- and its new matches still need reading before they are trusted.
 const ONLY_UNMATCHES = process.argv.includes("--only-unmatches");
+// One figure's listings, for when a person has just corrected that figure --
+// renamed it, folded a duplicate into it -- and wants its page right now rather
+// than after an hour's pass over every listing.
+const FIGURE_SLUG = (() => {
+  const i = process.argv.indexOf("--figure");
+  return i === -1 ? null : process.argv[i + 1] ?? null;
+})();
 
 async function main() {
   const candidates = await loadCandidates(true);
   const byId = new Map(candidates.map((c) => [c.id, c]));
+  const only = FIGURE_SLUG
+    ? await prisma.figure.findUnique({ where: { slug: FIGURE_SLUG }, select: { id: true } })
+    : null;
+  if (FIGURE_SLUG && !only) throw new Error(`no figure with slug ${FIGURE_SLUG}`);
   const listings = await prisma.listing.findMany({
+    where: only ? { figureId: only.id } : undefined,
     select: { id: true, title: true, figureId: true, matchScore: true },
   });
 

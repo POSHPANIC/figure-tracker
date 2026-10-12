@@ -97,6 +97,11 @@ const SYNONYMS: Record<string, string> = {
   xmas: "christmas",
   qipao: "cheongsam",
   chinadress: "cheongsam",
+  // So the plush line rule catches the way sellers usually write it.
+  plushie: "plush",
+  plushies: "plush",
+  // "Ichibankuji" as one word, so the Ichiban line rule still sees it.
+  ichibankuji: "ichiban",
 };
 
 /**
@@ -155,6 +160,26 @@ const PRODUCT_LINE_TOKENS = [
   "nendoroid",
   "figma",
   "parade",
+  // Bandai's prize and mass lines, and Good Smile's kits. Good Smile's 1/4
+  // Katsuki Bakugo is catalogued as plainly "Katsuki Bakugo", and in October
+  // 2026 all 76 of its listings were MAXIMATIC, Grandista, Ichiban Kuji
+  // MASTERLISE, Figuno and MODEROID -- $20 prizes on a ¥33,000 statue.
+  //
+  // Measured before adding, as active listings each would take off a figure
+  // whose own name does not carry the word: maximatic 61, grandista 39,
+  // masterlise 25, figuno 6, ichibansho 9, moderoid 29, figuarts 161, ichiban
+  // 131 -- almost all on scale figures, and none on a prize entry, because the
+  // catalogue's prize entries are named for their line and so are exempt.
+  // "banpresto" was measured too and left out: it is a maker, and 330 of the
+  // 476 listings it would have removed were correct prize matches.
+  "maximatic",
+  "grandista",
+  "masterlise",
+  "figuno",
+  "ichibansho",
+  "moderoid",
+  "figuarts",
+  "ichiban",
   // threezero's two Transformers lines. Their large "Premium Scale" figures are
   // catalogued under bare character names — STARSCREAM, OPTIMUS PRIME, Megatron
   // — so nothing in those names contradicts a listing for a different line of
@@ -308,6 +333,9 @@ const MAKER_HOUSES: string[][] = [
     "good smile arts shanghai",
     "goodsmile racing",
   ],
+  // Bandai's figure business under its several names, so "Bandai Spirits"
+  // below rejects a listing from everyone's figures but Bandai's own.
+  ["bandai spirits", "bandai", "bandai namco", "banpresto", "tamashii nations"],
 ];
 
 /**
@@ -330,6 +358,12 @@ const RIVAL_MAKERS = [
   // A "Shoto Todoroki Funko Pop" was landing on FREEing's 1/4 scale statue,
   // eighty dollars against eight hundred.
   "funko",
+  // Bandai Spirits, unlike "Bandai" alone, never credits a licensor: it is the
+  // company that makes Figuarts, Ichibansho and the Banpresto prizes. Of 134
+  // active listings naming it in October 2026, about seventy sat on figures by
+  // Good Smile, SEGA, Max Factory and FREEing -- "Bandai Spirits My Hero
+  // Academia Katsuki Bakugo Figure" at $15 on Good Smile's 1/4 statue.
+  "bandai spirits",
 ];
 
 /**

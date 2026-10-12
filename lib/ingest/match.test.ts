@@ -302,6 +302,51 @@ describe("scoreMatch", () => {
     assert.ok(scoreMatch("Megami Device PUNI MOFU MAO & Bonus Face Parts Set 1:1 Model Kit KOTOBUKIYA", mao) > 0);
   });
 
+  it("keeps prize lines and kits off a scale figure named only for its character", () => {
+    const bakugo: MatchCandidate = {
+      id: "bakugo-1-4",
+      name: "Katsuki Bakugo",
+      nameJa: "爆豪勝己",
+      scale: "1/4",
+      category: "SCALE",
+      manufacturerName: "Good Smile Company",
+      seriesName: "My Hero Academia",
+      characterNames: ["Katsuki Bakugou"],
+    };
+    for (const title of [
+      "My Hero Academia MAXIMATIC Katsuki Bakugo II Figure NEW Japan",
+      "Bandai Spirits Grandista My Hero Academia Katsuki Bakugo Anime Figure",
+      "Ichiban Kuji My Hero Academia Katsuki Bakugo MASTERLISE Figure Prize C",
+      "My Hero Academia Katsuki Bakugo Figuno Figure BANDAI SPIRITS New Japan",
+      "Good Smile Company My Hero Academia Katsuki Bakugo Moderoid Model Kit",
+      "BANDAI S.H.Figuarts MY HERO ACADEMIA KATSUKI BAKUGO Action Figure",
+    ]) {
+      assert.equal(scoreMatch(title, bakugo), 0, title);
+    }
+    assert.ok(scoreMatch("MHA Bakugo Katsuki My Hero Academia 1/4 Scale Figure 305mm GOOD SMILE COMPANY", bakugo) > 0);
+    // And the ways sellers write the rest of it.
+    assert.equal(scoreMatch("My Hero Academia Katsuki Bakugo plushie", bakugo), 0);
+    assert.equal(scoreMatch("My Hero Academia The Top 5! Katsuki Bakugo Figure Ichibankuji BANDAI", bakugo), 0);
+    assert.equal(scoreMatch("Bandai Spirits My Hero Academia Katsuki Bakugo Figure", bakugo), 0);
+  });
+
+  it("lets Bandai Spirits name its own figures", () => {
+    const grandista = (manufacturerName: string): MatchCandidate => ({
+      id: `todoroki-grandista-${manufacturerName}`,
+      name: "Grandista Shoto Todoroki",
+      nameJa: null,
+      scale: null,
+      category: "PRIZE",
+      manufacturerName,
+      seriesName: "My Hero Academia",
+      characterNames: ["Shoto Todoroki"],
+    });
+    const title = "Bandai Spirits My Hero Academia Shoto Todoroki Grandista Figure";
+    assert.ok(scoreMatch(title, grandista("Bandai Spirits")) > 0);
+    assert.ok(scoreMatch(title, grandista("Banpresto")) > 0, "one house");
+    assert.equal(scoreMatch(title, grandista("SEGA Ltd")), 0);
+  });
+
   it("refuses fan-art garage kits", () => {
     assert.equal(isUnofficial("1:8 Lucy Cyberpunk Edgerunners Fan Art UNPAINTED Resin Garage Kit"), true);
   });
