@@ -83,7 +83,24 @@ export function printings(own: Printing, rows: readonly Printing[]): (Printing &
         merged.priceCurrency = r.priceCurrency;
       }
     } else {
-      rest.push(r);
+      // The same printing from two sources -- Buster Doll Paladin's 2027
+      // reissue folded in from Kotobukiya (June) and Nin-Nin (May) -- is one
+      // printing, filled from both, not two.
+      const same = rest.find(
+        (q) => q.kind === r.kind && !isSeparatePrinting(q.releaseDate, r.releaseDate) && asDate(q.releaseDate) && asDate(r.releaseDate),
+      );
+      if (same) {
+        same.label ??= r.label;
+        same.preorderOpensAt ??= r.preorderOpensAt;
+        same.preorderClosesAt ??= r.preorderClosesAt;
+        same.jan ??= r.jan;
+        if (same.priceAmount == null) {
+          same.priceAmount = r.priceAmount;
+          same.priceCurrency = r.priceCurrency;
+        }
+      } else {
+        rest.push({ ...r });
+      }
     }
   }
   const all = [{ ...merged, own: true }, ...rest.map((r) => ({ ...r, own: false }))].sort(
