@@ -111,6 +111,11 @@ describe("printings", () => {
     assert.equal(list[1].priceAmount, "64.99");
   });
 
+  it("does not give the figure a barcode that another printing owns", () => {
+    const list = printings({ ...own, jan: "4934054098002" }, [row({ releaseDate: "2027-05-31T00:00:00Z", jan: "4934054098002" })]);
+    assert.equal(list.find((p) => p.own)?.jan, null);
+  });
+
   it("is just the figure when there is nothing else", () => {
     assert.equal(printings(own, []).length, 1);
   });

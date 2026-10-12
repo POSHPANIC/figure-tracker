@@ -103,6 +103,10 @@ export function printings(own: Printing, rows: readonly Printing[]): (Printing &
       }
     }
   }
+  // Nor a barcode another printing owns. Folding moves a reissue's barcodes
+  // onto the figure it joins -- they still identify the product -- so the
+  // figure can hold the reissue's as if it were its own.
+  if (merged.jan && rest.some((r) => r.jan === merged.jan)) merged.jan = null;
   const all = [{ ...merged, own: true }, ...rest.map((r) => ({ ...r, own: false }))].sort(
     (a, b) => (asDate(a.releaseDate)?.getTime() ?? Infinity) - (asDate(b.releaseDate)?.getTime() ?? Infinity),
   );
