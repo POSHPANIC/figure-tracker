@@ -31,6 +31,7 @@ import { ebaySearchUrl } from "@/lib/ebay-search";
 import { goodsmileSearchUrl } from "@/lib/goodsmile-search";
 import { getFigureBySlug, getFigureListingPhoto, getFigureStats, getPriceHistory } from "@/lib/queries";
 import { figurePhoto } from "@/lib/images";
+import { canEditFigures } from "@/lib/figure-edit";
 import { hasShipped, printings } from "@/lib/ingest/releases";
 import { getFigureUserState } from "@/lib/user-queries";
 import { SITE_URL } from "@/lib/site";
@@ -191,6 +192,11 @@ async function FigurePageBody({ params, searchParams }: PageProps<"/figures/[slu
           <RecordView slug={slug} />
         </Suspense>
       }
+      editLink={
+        <Suspense fallback={<SuggestEditLink slug={slug} />}>
+          <EditLinkSlot slug={slug} />
+        </Suspense>
+      }
     />
   );
 }
@@ -231,6 +237,7 @@ async function FigureView({
   actions,
   imagesAdmin,
   viewCounter,
+  editLink,
 }: {
   slug: string;
   condition: ItemCondition;
@@ -238,6 +245,8 @@ async function FigureView({
   actions: React.ReactNode;
   imagesAdmin: React.ReactNode;
   viewCounter: React.ReactNode;
+  /** Edit for a moderator or admin, Suggest for everyone else. */
+  editLink: React.ReactNode;
 }) {
   "use cache";
   // Prices move when ingestion runs, nightly. An hour is far fresher than the
@@ -682,13 +691,7 @@ async function FigureView({
             form is a real page, works without JavaScript, and can be sent to
             someone else.
           */}
-          <Link
-            href={`/feedback?kind=edit&figure=${figure.slug}`}
-            className="mt-3 flex items-center justify-center gap-1.5 rounded-lg border border-border px-3 py-2 text-xs font-medium text-muted transition hover:border-foreground hover:text-foreground"
-          >
-            <PencilLine className="size-3.5" />
-            Suggest an edit or add a photo
-          </Link>
+          {editLink}
         </div>
 
         {/* --- Right column: pricing --- */}
@@ -1170,6 +1173,38 @@ function FigureActionsFallback() {
  * Checks the session before it reads any images, so the overwhelming majority
  * of requests — nobody is signed in — cost one session check and no query.
  */
+/**
+ * Edit, for someone who can edit the figure; otherwise the suggestion form.
+ *
+ * A slot, like the image admin below: the page itself is cached for everyone,
+ * and who is looking is only known here.
+ */
+async function EditLinkSlot({ slug }: { slug: string }) {
+  const user = await currentUser();
+  if (!canEditFigures(user?.role)) return <SuggestEditLink slug={slug} />;
+  return (
+    <Link
+      href={`/figures/${slug}/edit`}
+      className="mt-3 flex items-center justify-center gap-1.5 rounded-lg border border-foreground px-3 py-2 text-xs font-medium text-foreground transition hover:bg-foreground hover:text-background"
+    >
+      <PencilLine className="size-3.5" />
+      Edit figure
+    </Link>
+  );
+}
+
+function SuggestEditLink({ slug }: { slug: string }) {
+  return (
+    <Link
+      href={`/feedback?kind=edit&figure=${slug}`}
+      className="mt-3 flex items-center justify-center gap-1.5 rounded-lg border border-border px-3 py-2 text-xs font-medium text-muted transition hover:border-foreground hover:text-foreground"
+    >
+      <PencilLine className="size-3.5" />
+      Suggest an edit or add a photo
+    </Link>
+  );
+}
+
 async function FigureImagesAdminSlot({ slug }: { slug: string }) {
   const user = await currentUser();
   if (user?.role !== "MODERATOR" && user?.role !== "ADMIN") return null;
