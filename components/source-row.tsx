@@ -6,71 +6,108 @@ import { cn } from "@/lib/utils";
  *
  * The figure page offers four different ways off it — a marketplace listing, a
  * shop that stocks the figure, a search on the maker's own store, and a search
- * on a proxy or marketplace — and until now each was drawn differently: the
+ * on a proxy or marketplace — and each used to be drawn differently: the
  * listings as plain ruled rows, the shop offers as bordered cards, and every
  * search as a small pill button. Three shapes for one idea, so a reader had to
  * learn each panel separately.
  *
  * They are all the same object: somewhere to go, who it belongs to, and what it
- * costs if we know. This draws that once.
+ * costs if we know. This draws that once, in two forms.
+ *
+ * `SourceRow` is a row in a ruled list, for things being sold — listings and
+ * shop offers. `SourceBox` is the same content inside a border, standing on its
+ * own, for searches. The split is doing real work: a search is not an offer,
+ * and sitting it among priced rows is exactly how it comes to look like one.
  *
  * The whole row is the hit target rather than just the title. On the listings
- * this replaces a title-only link, and it is the better of the two for the same
+ * this replaced a title-only link, and it is the better of the two for the same
  * reason the title was chosen over a trailing icon — the thing you read and the
  * thing you click should be one object, and a row is a bigger one.
  */
-export function SourceList({ children }: { children: React.ReactNode }) {
-  return <ul className="divide-y divide-border">{children}</ul>;
-}
 
-export function SourceRow({
-  href,
-  rel = "noopener noreferrer",
-  mark,
-  title,
-  /** Full text for the tooltip, where `title` is truncated in the row. */
-  titleAttr,
-  meta,
-  /**
-   * The right-hand end. A price for something being sold; left empty for a
-   * search, which is what keeps the two from reading alike — a row with a
-   * number on it is a claim that this costs that, and a search cannot make it.
-   */
-  trailing,
-}: {
+type SourceProps = {
   href: string;
   rel?: string;
   mark?: React.ReactNode;
   title: React.ReactNode;
+  /** Full text for the tooltip, where `title` is truncated in the row. */
   titleAttr?: string;
   meta?: React.ReactNode;
+  /**
+   * The right-hand end. A price for something being sold; left empty for a
+   * search, which is half of what keeps the two from reading alike — a row with
+   * a number on it is a claim that this costs that, and a search cannot make
+   * that claim. The border is the other half.
+   */
   trailing?: React.ReactNode;
-}) {
+};
+
+function SourceAnchor({
+  href,
+  rel = "noopener noreferrer",
+  mark,
+  title,
+  titleAttr,
+  meta,
+  trailing,
+  className,
+}: SourceProps & { className?: string }) {
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel={rel}
+      title={titleAttr}
+      className={cn("group flex items-center gap-3", className)}
+    >
+      {mark && <span className="shrink-0">{mark}</span>}
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-sm group-hover:underline">{title}</span>
+        {/* Muted by default; a caller that needs to say something with colour
+            — a shop's availability, say — passes its own span and wins. */}
+        {meta && <span className="block truncate text-xs text-muted">{meta}</span>}
+      </span>
+      <span className="shrink-0">
+        {trailing ?? (
+          // Stands in for the price on rows that have none, so every row ends at
+          // the same place and the column does not look broken.
+          <ExternalLink className="size-3.5 text-muted" aria-hidden />
+        )}
+      </span>
+    </a>
+  );
+}
+
+export function SourceList({ children }: { children: React.ReactNode }) {
+  return <ul className="divide-y divide-border">{children}</ul>;
+}
+
+/** A row inside a `SourceList`. For listings and shop offers. */
+export function SourceRow(props: SourceProps) {
   return (
     <li>
-      <a
-        href={href}
-        target="_blank"
-        rel={rel}
-        title={titleAttr}
-        className="group flex items-center gap-3 py-2.5"
-      >
-        {mark && <span className="shrink-0">{mark}</span>}
-        <span className="min-w-0 flex-1">
-          <span className="block truncate text-sm group-hover:underline">{title}</span>
-          {/* Muted by default; a caller that needs to say something with colour
-              — a shop's availability, say — passes its own span and wins. */}
-          {meta && <span className="block truncate text-xs text-muted">{meta}</span>}
-        </span>
-        <span className="shrink-0">
-          {trailing ?? (
-            // Stands in for the price on rows that have none, so every row ends
-            // at the same place and the column does not look broken.
-            <ExternalLink className="size-3.5 text-muted" aria-hidden />
-          )}
-        </span>
-      </a>
+      <SourceAnchor {...props} className="py-2.5" />
     </li>
+  );
+}
+
+/**
+ * A standalone bordered row. For searches.
+ *
+ * Outside the ruled list rather than first in it: inside, the border and the
+ * list's own rules fight, and more importantly a search reads as one of the
+ * priced rows the moment it is lined up with them. The box is what says this is
+ * a different kind of thing.
+ */
+export function SourceBox({ className, ...props }: SourceProps & { className?: string }) {
+  return (
+    <SourceAnchor
+      {...props}
+      className={cn(
+        "border border-border px-3 py-2.5 transition-colors hover:border-foreground",
+        className,
+      )}
+    />
   );
 }
 
@@ -82,9 +119,9 @@ export function SourcePrice({ children }: { children: React.ReactNode }) {
 /**
  * A heading for a run of rows inside a panel that already has an <h2>.
  *
- * Searches sit under one of these rather than loose among the offers: a reader
- * scanning rows should be told once, in the structure rather than in each row,
- * that what follows is somewhere to look rather than something for sale.
+ * Used where the group carries something the rows cannot say for themselves —
+ * the proxy disclaimer, for instance. Searches that explain themselves in their
+ * own title do not need one.
  */
 export function SourceGroup({
   label,
@@ -101,7 +138,7 @@ export function SourceGroup({
     <div className={cn("mt-4 border-t border-border pt-3", className)}>
       <p className="term-label">{label}</p>
       {note && <p className="mt-1 text-xs text-muted">{note}</p>}
-      <div className="mt-1">{children}</div>
+      <div className="mt-2">{children}</div>
     </div>
   );
 }

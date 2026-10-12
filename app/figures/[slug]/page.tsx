@@ -14,7 +14,13 @@ import { FigureImagesAdmin } from "@/components/figure-images-admin";
 import { FigureThumb } from "@/components/figure-thumb";
 import { PriceChart } from "@/components/price-chart";
 import { StoreMark, isManufacturerStore } from "@/components/store-mark";
-import { SourceGroup, SourceList, SourcePrice, SourceRow } from "@/components/source-row";
+import {
+  SourceBox,
+  SourceGroup,
+  SourceList,
+  SourcePrice,
+  SourceRow,
+} from "@/components/source-row";
 import { proxyLinks, proxyLinkDisclaimer } from "@/lib/proxy-links";
 import { figureValue, valueLabel, valueNote } from "@/lib/figure-value";
 import { withSolarisAffiliate } from "@/lib/solaris-affiliate";
@@ -768,51 +774,45 @@ async function FigureView({
             </SourceList>
 
             {(archiveId || amiami) && (
-              /* Searches, grouped and labelled as such rather than mixed in
-                 among the offers above. Neither can say more than "look for it
-                 here" — we hold no product ids for either shop — and a row
-                 sitting under a price reads as "for sale, at that price" unless
-                 it is told otherwise. The heading says it once so the rows do
-                 not each have to. */
-              <SourceGroup
-                label="Look for it"
-                note="Searches, not listings — we have not checked whether either shop has this figure."
-              >
-                <SourceList>
-                  {archiveId && (
-                    /* Their search rather than the product, because the product
-                       cannot be linked: goodsmile.com has no sitemap, and its
-                       only index sits under a path robots.txt asks bots to stay
-                       out of, so there is nothing to map our figures onto.
-                       nofollow keeps crawlers off it, which is what that rule is
-                       there for — a person clicking is not what it guards
-                       against.
+              /* No heading over these. Each title begins with "Search", which
+                 is the thing a reader has to know, and the border already sets
+                 them apart from the priced offers above — a label saying the
+                 same thing a third time was furniture. Neither shop can say
+                 more than "look for it here" regardless: we hold no product ids
+                 for either. */
+              <div className="mt-3 space-y-2">
+                {archiveId && (
+                  /* Their search rather than the product, because the product
+                     cannot be linked: goodsmile.com has no sitemap, and its only
+                     index sits under a path robots.txt asks bots to stay out of,
+                     so there is nothing to map our figures onto. nofollow keeps
+                     crawlers off it, which is what that rule is there for — a
+                     person clicking is not what it guards against.
 
-                       Only for figures that came from Good Smile's archive.
-                       Sending someone to search goodsmile.com for a Kotobukiya
-                       figure wastes their click on a shop that never sold it. */
-                    <SourceRow
-                      href={goodsmileSearchUrl(figure)}
-                      rel="nofollow noopener noreferrer"
-                      title="Search Good Smile Company"
-                      meta="Their store carries current stock only"
-                    />
-                  )}
-                  {amiami && (
-                    /* AmiAmi carries essentially every Japanese release, and
-                       unlike the manufacturer stores it keeps selling them after
-                       the preorder window closes — so this is worth offering on
-                       every figure rather than only the ones whose store link is
-                       already dead. */
-                    <SourceRow
-                      href={amiami}
-                      rel="nofollow noopener noreferrer"
-                      title="Search AmiAmi"
-                      meta="Stocks most Japanese releases, including after preorder closes"
-                    />
-                  )}
-                </SourceList>
-              </SourceGroup>
+                     Only for figures that came from Good Smile's archive.
+                     Sending someone to search goodsmile.com for a Kotobukiya
+                     figure wastes their click on a shop that never sold it. */
+                  <SourceBox
+                    href={goodsmileSearchUrl(figure)}
+                    rel="nofollow noopener noreferrer"
+                    title="Search Good Smile Company"
+                    meta="Their store carries current stock only"
+                  />
+                )}
+                {amiami && (
+                  /* AmiAmi carries essentially every Japanese release, and
+                     unlike the manufacturer stores it keeps selling them after
+                     the preorder window closes — so this is worth offering on
+                     every figure rather than only the ones whose store link is
+                     already dead. */
+                  <SourceBox
+                    href={amiami}
+                    rel="nofollow noopener noreferrer"
+                    title="Search AmiAmi"
+                    meta="Stocks most Japanese releases, including after preorder closes"
+                  />
+                )}
+              </div>
             )}
 
             {archiveId && (
@@ -847,9 +847,9 @@ async function FigureView({
                  because it is worth reading before the click rather than after
                  it. We have checked neither the price nor the stock. */
               <SourceGroup label="Buy secondhand" note={proxyLinkDisclaimer}>
-                <SourceList>
+                <div className="space-y-2">
                   {secondhand.map((link) => (
-                    <SourceRow
+                    <SourceBox
                       key={link.service}
                       href={link.url}
                       rel="nofollow noopener noreferrer"
@@ -857,7 +857,7 @@ async function FigureView({
                       meta="Japanese secondhand market, through a proxy"
                     />
                   ))}
-                </SourceList>
+                </div>
               </SourceGroup>
             )}
           </section>
@@ -883,25 +883,25 @@ async function FigureView({
             </div>
 
             {/*
-              The search leads the list rather than floating above it as a link.
+              Above the list and inside a border, rather than first in it.
               Whatever we matched is a guess about someone else's title, so the
-              unfiltered thing has to be reachable without reading the list
-              first — but it is the same kind of object as the rows under it,
-              somewhere to go, and it should look like one. Carrying no price is
-              what keeps it from reading as one of the listings.
+              unfiltered search has to be reachable without reading the list
+              first — but lined up with the priced rows it starts to read as one
+              of them. The box is what says it is a different kind of thing.
             */}
-            <SourceList>
-              <SourceRow
-                href={ebaySearchUrl(figure, condition)}
-                rel="noopener noreferrer nofollow"
-                title={
-                  <>
-                    Search <EbayMark className="text-[0.95em]" /> for this figure
-                  </>
-                }
-                meta={`Every ${CONDITION_LABELS[condition].toLowerCase()} listing, unfiltered`}
-              />
+            <SourceBox
+              href={ebaySearchUrl(figure, condition)}
+              rel="noopener noreferrer nofollow"
+              className="mb-3"
+              title={
+                <>
+                  Search <EbayMark className="text-[0.95em]" /> for this figure
+                </>
+              }
+              meta={`Every ${CONDITION_LABELS[condition].toLowerCase()} listing, unfiltered`}
+            />
 
+            <SourceList>
               {figure.listings.map((l) => {
                 const isEbay = l.source.key === "ebay";
                 return (
