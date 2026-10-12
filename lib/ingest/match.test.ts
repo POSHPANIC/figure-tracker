@@ -11,6 +11,7 @@ import {
   sizeAgreesWith,
   isNotAFigure,
   isUnofficial,
+  isAccessoryListing,
   isNotASingleFigure,
   normalizeCondition,
   scoreMatch,
@@ -395,6 +396,31 @@ describe("scoreMatch", () => {
     assert.ok(scoreMatch(title, grandista("Bandai Spirits")) > 0);
     assert.ok(scoreMatch(title, grandista("Banpresto")) > 0, "one house");
     assert.equal(scoreMatch(title, grandista("SEGA Ltd")), 0);
+  });
+
+  it("refuses parts sold on their own, but not a figure that comes with them", () => {
+    for (const title of [
+      "Kotobukiya MEGAMI DEVICE PUNI☆MOFU LONG Model Genuine Replacemet Parts",
+      "KOTOBUKIYA MEGAMI DEVICE DESIRE MAIDEN MEDIC Model Genuine Replacement Parts",
+      "Fate Stay Night Figure Nendoroid Saber Super Movable Edition REPLACEMENT PARTS",
+      "Figma Ooi spare parts",
+      "Nendoroid Kirby Meta Knight Figure #669 Good Smile Company REPLACEMENT SWORD",
+      "Figma Shiroko Sunaookami (Cycling) Bonus face part only -new-us seller-",
+      "KOTOBUKIYA Uma Musume Pretty Derby Sakura Chiyono O Bonus Face Replacement Parts",
+    ]) {
+      assert.equal(isAccessoryListing(title), true, title);
+    }
+    for (const title of [
+      "figma Futaba Sakura PERSONA5 No.434 Figure with Spare Parts and Stand Set",
+      "Nendoroid Sam Porter Bridges Figure Parts Included Repair Needed Junk",
+      "Figma 014 Hatsune Miku Figure VOCALOID Max Factory Parts/REPAIR W/Box",
+      "Oshi no Ko Kana Arima Figure Bonus Face Replacement Parts Included Kotobukiya",
+      "ARTFX J 13 Sentinels Natsuno Minami & BJ 1/8 Figure no box or spare parts",
+      "Megami Device PUNI MOFU LONG & Bonus Hair Parts Set Kit 15+ KOTOBUKIYA Japan NEW",
+      "Megami Device PUNI MOFU LONG 1/1 Scale Model Kit 15+ KOTOBUKIYA Japan Sealed NEW",
+    ]) {
+      assert.equal(isAccessoryListing(title), false, title);
+    }
   });
 
   it("refuses fan-art garage kits", () => {

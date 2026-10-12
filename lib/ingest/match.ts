@@ -888,9 +888,32 @@ function isUnofficialImpl(title: string): boolean {
 }
 export const isUnofficial = memoized(isUnofficialImpl);
 
-/** An accessory sold for a figure, unless it is a bonus packed with one. */
+/**
+ * Parts sold on their own: "Model Genuine Replacement Parts", "spare parts",
+ * "Bonus face part only", "REPLACEMENT SWORD".
+ *
+ * Kotobukiya's eBay store lists a $20 parts bag against nearly every kit it
+ * makes -- spelled "Replacemet" as often as not, so the rule allows for it --
+ * and in October 2026 seventeen of them sat on the kits' pages, beside the
+ * $70 kit itself. Unlike the accessory rule there is no exception for a
+ * bonus: "Bonus Face Replacement Parts" is the bonus part, alone.
+ *
+ * Parts that come *with* something are the figure: "figma Futaba Sakura with
+ * Spare Parts and Stand Set", $300. And "Parts/REPAIR" is a broken figure,
+ * still the figure, so it is left to the condition rules.
+ */
+const PARTS_ONLY =
+  /\b(?:replace?me?n?t|spare)\s+(?:parts?|weapons?|swords?|hands?|heads?|faces?)\b|\bparts?\s+only\b/i;
+// With them, including them, or explicitly without them -- "Figure no box or
+// spare parts" is still the figure -- and "Bonus Face Replacement Parts
+// Included".
+const PARTS_WITH =
+  /\b(?:with|w\/|includes?|including|no|without)\s+(?:\w+\s+){0,3}(?:replace?me?n?t|spare)\b|\b(?:replace?me?n?t|spare)\s+(?:\w+\s+)?parts?\s+(?:included|incl)\b/i;
+
+/** An accessory sold for a figure, unless it is a bonus packed with one; or parts sold alone. */
 export const isAccessoryListing = memoized(
-  (title: string) => isAccessory(title) && !/\bbonus\b/i.test(title),
+  (title: string) =>
+    (isAccessory(title) && !/\bbonus\b/i.test(title)) || (PARTS_ONLY.test(title) && !PARTS_WITH.test(title)),
 );
 
 /**
