@@ -67,6 +67,7 @@ export async function editFigure(formData: FormData): Promise<EditResult> {
       msrpAmount: true,
       msrpCurrency: true,
       manufacturer: { select: { name: true } },
+      series: { select: { id: true, franchiseId: true, franchise: { select: { name: true } } } },
       characters: { select: { id: true, name: true } },
       identifiers: { where: { kind: "JAN" }, select: { id: true, value: true }, orderBy: { id: "asc" } },
     },
@@ -74,7 +75,10 @@ export async function editFigure(formData: FormData): Promise<EditResult> {
   if (!figure) return { ok: false, error: "That figure no longer exists." };
 
   const currentJan = figure.identifiers[0] ?? null;
-  const changed = changedFields({ ...figure, jan: currentJan?.value ?? null }, edit);
+  const changed = changedFields(
+    { ...figure, franchise: figure.series?.franchise?.name ?? null, jan: currentJan?.value ?? null },
+    edit,
+  );
   if (changed.length === 0) return { ok: true, changed };
 
   // A barcode belongs to one figure. Taking one another figure holds would
@@ -137,6 +141,53 @@ export async function editFigure(formData: FormData): Promise<EditResult> {
     }
   }
 
+  // The franchise belongs to the series, so it changes for every figure in it --
+  // the form says how many. A figure with no series joins one of the
+  // franchise's own name, which is what makes it show under that franchise.
+  let seriesForFigure: string | undefined;
+  let seriesFranchise: { seriesId: string; franchiseId: string | null } | null = null;
+  if (changed.includes("franchise")) {
+    let franchiseId: string | null = null;
+    if (edit.franchise) {
+      const existing = await prisma.franchise.findFirst({
+        where: { name: { equals: edit.franchise, mode: "insensitive" } },
+        select: { id: true },
+      });
+      franchiseId =
+        existing?.id ??
+        (
+          await prisma.franchise.create({
+            data: {
+              name: edit.franchise,
+              slug: await freeSlug(edit.franchise, async (s) => !!(await prisma.franchise.findUnique({ where: { slug: s } }))),
+            },
+            select: { id: true },
+          })
+        ).id;
+    }
+    if (figure.series) {
+      seriesFranchise = { seriesId: figure.series.id, franchiseId };
+    } else if (edit.franchise && franchiseId) {
+      const named = await prisma.series.findFirst({
+        where: { name: { equals: edit.franchise, mode: "insensitive" } },
+        select: { id: true, franchiseId: true },
+      });
+      seriesForFigure =
+        named?.id ??
+        (
+          await prisma.series.create({
+            data: {
+              name: edit.franchise,
+              franchiseId,
+              slug: await freeSlug(edit.franchise, async (s) => !!(await prisma.series.findUnique({ where: { slug: s } }))),
+            },
+            select: { id: true },
+          })
+        ).id;
+      if (named && !named.franchiseId) seriesFranchise = { seriesId: named.id, franchiseId };
+    }
+  }
+
   const locks = [...new Set(changed.map((f) => LOCK_KEY[f]).filter((k): k is string => !!k))];
   const note = `Edited by ${account?.username ?? account?.name ?? "an editor"}`;
 
@@ -156,8 +207,12 @@ export async function editFigure(formData: FormData): Promise<EditResult> {
         msrpCurrency: edit.msrpCurrency,
         ...(manufacturerId !== undefined ? { manufacturerId } : {}),
         ...(characterIds ? { characters: { set: characterIds.map((id) => ({ id })) } } : {}),
+        ...(seriesForFigure ? { seriesId: seriesForFigure } : {}),
       },
     }),
+    ...(seriesFranchise
+      ? [prisma.series.update({ where: { id: seriesFranchise.seriesId }, data: { franchiseId: seriesFranchise.franchiseId } })]
+      : []),
     // The shown barcode, replaced in place; others the figure holds -- a
     // reissue's -- are left alone.
     ...(changed.includes("jan")
@@ -179,7 +234,7 @@ export async function editFigure(formData: FormData): Promise<EditResult> {
   ]);
 
   // Names, characters and makers are what search reads.
-  if (changed.some((f) => ["name", "nameJa", "manufacturer", "characters"].includes(f))) {
+  if (seriesForFigure || changed.some((f) => ["name", "nameJa", "manufacturer", "characters"].includes(f))) {
     await rebuildSearchTextFor(figure.id);
   }
 
@@ -203,7 +258,7 @@ export type Suggestion = { value: string; note?: string };
  * with its series beside it, since "Saber" is several people.
  */
 export async function suggestNames(
-  field: "manufacturer" | "character",
+  field: "manufacturer" | "character" | "franchise",
   query: string,
   figureId?: string,
 ): Promise<Suggestion[]> {
@@ -215,6 +270,18 @@ export async function suggestNames(
   const q = query.trim();
   if (!q) return [];
   const starts = (name: string) => name.toLowerCase().startsWith(q.toLowerCase());
+
+  if (field === "franchise") {
+    const rows = await prisma.franchise.findMany({
+      where: { name: { contains: q, mode: "insensitive" } },
+      select: { name: true, _count: { select: { series: true } } },
+      take: 30,
+    });
+    return rows
+      .sort((a, b) => Number(starts(b.name)) - Number(starts(a.name)) || b._count.series - a._count.series)
+      .slice(0, 8)
+      .map((r) => ({ value: r.name, note: `${r._count.series} series` }));
+  }
 
   if (field === "manufacturer") {
     const rows = await prisma.manufacturer.findMany({

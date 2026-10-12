@@ -59,6 +59,7 @@ async function EditBody({ params }: PageProps<"/figures/[slug]/edit">) {
       msrpAmount: true,
       msrpCurrency: true,
       manufacturer: { select: { name: true } },
+      series: { select: { name: true, franchise: { select: { name: true } }, _count: { select: { figures: true } } } },
       characters: { select: { name: true }, orderBy: { name: "asc" } },
       identifiers: { where: { kind: "JAN" }, select: { value: true }, orderBy: { id: "asc" }, take: 1 },
       fieldLocks: { select: { field: true, note: true, createdAt: true, lockedBy: { select: { username: true } } } },
@@ -103,7 +104,12 @@ async function EditBody({ params }: PageProps<"/figures/[slug]/edit">) {
       <FigureEditForm
         figureId={figure.id}
         slug={figure.slug}
-        values={formValues({ ...figure, jan: figure.identifiers[0]?.value ?? null })}
+        values={formValues({
+          ...figure,
+          franchise: figure.series?.franchise?.name ?? null,
+          jan: figure.identifiers[0]?.value ?? null,
+        })}
+        series={figure.series ? { name: figure.series.name, figures: figure.series._count.figures } : null}
         locked={locked}
         scales={scales}
       />

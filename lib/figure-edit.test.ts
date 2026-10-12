@@ -14,6 +14,7 @@ const figure: EditableFigure = {
   msrpAmount: { toString: () => "33000" },
   msrpCurrency: "JPY",
   manufacturer: { name: "Good Smile Company" },
+  franchise: "My Hero Academia",
   characters: [{ name: "Katsuki Bakugou" }],
   jan: "4580416924146",
 };

@@ -33,6 +33,8 @@ export type FigureEdit = {
   msrpAmount: string | null;
   msrpCurrency: string | null;
   manufacturer: string | null;
+  /** The figure's franchise, which it takes from its series. */
+  franchise: string | null;
   characters: string[];
   jan: string | null;
 };
@@ -96,6 +98,7 @@ export function parseEdit(raw: Record<string, unknown>): ParseResult {
   }
 
   const manufacturer = text(raw.manufacturer) || null;
+  const franchise = text(raw.franchise) || null;
   const characters = text(raw.characters)
     .split(",")
     .map((c) => c.trim())
@@ -119,6 +122,7 @@ export function parseEdit(raw: Record<string, unknown>): ParseResult {
       msrpAmount,
       msrpCurrency,
       manufacturer,
+      franchise,
       characters,
       jan,
     },
@@ -138,6 +142,8 @@ export type EditableFigure = {
   msrpAmount: { toString(): string } | null;
   msrpCurrency: string | null;
   manufacturer: { name: string } | null;
+  /** The franchise of the figure's series, if it has one. */
+  franchise: string | null;
   characters: { name: string }[];
   jan: string | null;
 };
@@ -156,6 +162,7 @@ export function formValues(f: EditableFigure): Record<string, string> {
     msrpAmount: f.msrpAmount ? String(Number(f.msrpAmount.toString())) : "",
     msrpCurrency: f.msrpCurrency ?? "",
     manufacturer: f.manufacturer?.name ?? "",
+    franchise: f.franchise ?? "",
     characters: f.characters.map((c) => c.name).join(", "),
     jan: f.jan ?? "",
   };
@@ -181,7 +188,7 @@ export function changedFields(before: EditableFigure, after: FigureEdit): EditFi
     ["name", "name"], ["nameJa", "nameJa"], ["category", "category"], ["status", "status"],
     ["scale", "scale"], ["heightMm", "heightMm"], ["releaseDate", "releaseDate"],
     ["msrpAmount", "msrpAmount"], ["msrpCurrency", "msrpCurrency"],
-    ["manufacturer", "manufacturer"], ["characters", "characters"], ["jan", "jan"],
+    ["manufacturer", "manufacturer"], ["franchise", "franchise"], ["characters", "characters"], ["jan", "jan"],
   ];
   return keys.filter(([, k]) => (was[k] ?? "") !== (now[k] ?? "")).map(([field]) => field);
 }
@@ -201,5 +208,7 @@ export const LOCK_KEY: Partial<Record<EditField, string>> = {
   msrpAmount: "msrp",
   msrpCurrency: "msrp",
   manufacturer: "manufacturer",
+  // Set through the series, which is the field an import would overwrite.
+  franchise: "series",
   characters: "character",
 };

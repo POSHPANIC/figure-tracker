@@ -29,12 +29,15 @@ export function FigureEditForm({
   values,
   locked,
   scales,
+  series,
 }: {
   figureId: string;
   slug: string;
   values: Record<string, string>;
   /** Scales the catalogue already uses, most common first, for the scale field's suggestions. */
   scales: readonly string[];
+  /** The figure's series, which the franchise belongs to, and how many figures share it. */
+  series: { name: string; figures: number } | null;
   /** Fields already confirmed by someone, and by whom. Shown, not enforced. */
   locked: Record<string, string>;
 }) {
@@ -124,6 +127,18 @@ export function FigureEditForm({
       {field("manufacturer", "Manufacturer", { placeholder: "Good Smile Company" }, "manufacturer", {
         fetch: (q) => suggestNames("manufacturer", q),
       })}
+      <div>
+        {field("franchise", "Franchise", { placeholder: "JoJo's Bizarre Adventure" }, "series", {
+          fetch: (q) => suggestNames("franchise", q),
+        })}
+        <p className="mt-1 text-xs text-muted">
+          {series
+            ? series.figures > 1
+              ? `Set on the series "${series.name}", so it changes for all ${series.figures} figures in it.`
+              : `Set on the series "${series.name}".`
+            : "This figure has no series; setting a franchise files it under one of the same name."}
+        </p>
+      </div>
       {field("characters", "Characters", { placeholder: "Marin Kitagawa, Shinju Inui — comma between several" }, "character", {
         fetch: (q) => suggestNames("character", q, figureId),
         multiple: true,
@@ -137,7 +152,26 @@ export function FigureEditForm({
 
       <div className="grid gap-4 sm:grid-cols-3">
         <div className="sm:col-span-2">{field("msrpAmount", "MSRP", { inputMode: "decimal", placeholder: "16093" }, "msrp")}</div>
-        {field("msrpCurrency", "Currency", { placeholder: "JPY", maxLength: 3 }, "msrp", { options: CURRENCIES })}
+        <label className="block">
+          <span className="mb-1 flex justify-between text-xs text-muted">
+            Currency
+            {locked["msrp"] && <span title={locked["msrp"]}>confirmed</span>}
+          </span>
+          <select
+            name="msrpCurrency"
+            defaultValue={values.msrpCurrency ?? ""}
+            className={cn(inputClass, fieldErrors.msrpCurrency && "border-alert")}
+          >
+            <option value="">—</option>
+            {/* Whatever the figure holds, even if it is not one of the usual. */}
+            {[...new Set([...(values.msrpCurrency ? [values.msrpCurrency] : []), ...CURRENCIES])].map((c) => (
+              <option key={c} value={c}>
+                {c}
+              </option>
+            ))}
+          </select>
+          {fieldErrors.msrpCurrency && <span className="mt-1 block text-xs text-alert">{fieldErrors.msrpCurrency}</span>}
+        </label>
       </div>
 
       {field("jan", "JAN barcode", { inputMode: "numeric", placeholder: "4580590174665" })}
