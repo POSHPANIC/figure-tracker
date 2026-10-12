@@ -66,7 +66,14 @@ function buildProviders(): Provider[] {
     providers.push(Google);
   }
   if (process.env.AUTH_DISCORD_ID && process.env.AUTH_DISCORD_SECRET) {
-    providers.push(Discord);
+    // Discord now returns an `iss` parameter with the authorization code
+    // (RFC 9207; their discovery document sets
+    // authorization_response_iss_parameter_supported). Auth.js checks it
+    // against the provider's issuer, and its Discord provider declares none, so
+    // the check ran against the placeholder "https://authjs.dev" and every
+    // sign-in failed with a bare "Configuration" error from October 2026.
+    // The value is Discord's own, from discord.com/.well-known/openid-configuration.
+    providers.push(Discord({ issuer: "https://discord.com" }));
   }
 
   // Email sign-in link. Offered in production only when it can actually send,
