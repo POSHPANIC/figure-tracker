@@ -4,8 +4,10 @@ import { looksJapanese } from "../lib/ingest/barcode";
 import {
   SHOP_ORIGIN,
   parseShopProduct,
+  parseShopVariants,
   type GoodSmileShopProduct,
 } from "../lib/ingest/goodsmile-shop";
+import { recordShopVariants } from "../lib/ingest/figure-release";
 
 /**
  * Recover barcodes from Good Smile's own shop.
@@ -194,6 +196,9 @@ async function main() {
     }
 
     if (WRITE) await addIdentifier(figure.id, "GSC_SHOP_PRODUCT", String(id));
+    // Its printings, while the page is in hand. Reissues added to a page later
+    // are found by refresh-goodsmile-releases.ts, which comes back to it.
+    if (WRITE) await recordShopVariants(figure.id, String(id), parseShopVariants(html));
 
     if (!product.gtin) {
       unmatched += 1;

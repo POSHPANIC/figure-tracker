@@ -185,6 +185,12 @@ model Figure {
   /// inventing precision. See lib/ingest/fx-monthly.ts.
   releaseDatePrecision String @default("MONTH") @db.VarChar(5)
 
+  /// When an upcoming reissue counts as out, while one is upcoming; null
+  /// otherwise. Kept by the nightly pass from FigureRelease, so that "not out
+  /// yet" stays a date comparison -- the figure's own releaseDate is its first
+  /// printing's, years past, while its reissue is still on preorder.
+  reissueDueAt DateTime?
+
   /// Whether this figure may want a content warning.
   ///
   /// Hidden: nothing renders it and nothing filters on it yet. It exists so a
@@ -319,6 +325,8 @@ model Figure {
   shopOffers       ShopOffer[]
   /// Products a source described before we could name them.
   sourceProducts   SourceProduct[]
+  /// Every printing beyond what the figure's own fields describe -- see FigureRelease.
+  releases         FigureRelease[]
 
   @@index([slug])
   @@index([manufacturerId])
@@ -331,6 +339,48 @@ model Figure {
   @@index([searchText])
   // The polling queue reads by staleness.
   @@index([lastPolledAt])
+}
+
+/// One printing of a figure: its first release, or a reissue.
+///
+/// A figure's own releaseDate and msrp describe one printing, and the
+/// catalogue had nowhere to put a second. Good Smile sell a reissue on the
+/// original's product page -- Insane Black Rock Shooter, ¥14,457 in 2013 and
+/// ¥20,000 again in March 2025, each with its own barcode -- and a reissue
+/// imported as its own entry and then folded kept its facts on a row nobody
+/// reads. This is where both now go, and what the figure page's Releases card
+/// and the reissue-preorder status read.
+///
+/// `source` and `code` say where a row came from, so a refresh updates its own
+/// row and nothing else: GSC_SHOP with the shop's product code ("1633R1"), or
+/// FOLDED with the slug of the entry it was folded from.
+model FigureRelease {
+  id       String @id @default(cuid())
+  figureId String
+  figure   Figure @relation(fields: [figureId], references: [id], onDelete: Cascade)
+
+  source String @db.VarChar(24)
+  code   String
+
+  /// "original" or "reissue", as the source states it or as the dates show.
+  kind  String  @db.VarChar(10)
+  /// The source's own name for the printing, when it gives one: "Rerelease".
+  label String?
+
+  releaseDate          DateTime?
+  releaseDatePrecision String    @default("MONTH") @db.VarChar(5)
+  preorderOpensAt      DateTime?
+  preorderClosesAt     DateTime?
+  priceAmount          Decimal?  @db.Decimal(12, 2)
+  priceCurrency        String?   @db.VarChar(3)
+  jan                  String?
+  sourceUrl            String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([figureId, source, code])
+  @@index([releaseDate])
 }
 
 /// A catalog image for a figure — the product photo, not a marketplace listing's.
@@ -1056,7 +1106,7 @@ model SourceProduct {
   /// Set once this is known to be the same product as a figure we hold, so it
   /// is never linked twice and the evidence stays auditable.
   figureId String?
-  figure   Figure? @relation(fields: [figureId], references: [id], onDelete: SetNull)
+  figure   Figure?   @relation(fields: [figureId], references: [id], onDelete: SetNull)
   /// How the link was decided, in a word: "jan", "nameJa", "specs".
   linkedBy String?
   linkedAt DateTime?

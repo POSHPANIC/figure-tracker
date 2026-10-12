@@ -2,6 +2,7 @@ import { prisma } from "../prisma";
 import { pruneRateLimits } from "../rate-limit-store";
 import { toUsd } from "./fx";
 import { releasedBefore } from "./release-status";
+import { upcomingReissue } from "./releases";
 import { rebuildAllSearchText } from "./search-index";
 import type { ItemCondition } from "../generated/prisma/enums";
 
@@ -500,7 +501,7 @@ export async function expireStaleListings(olderThanDays = 3): Promise<number> {
 export async function recomputeMsrpUsd(
   now = new Date(),
 ): Promise<{ written: number; cleared: number; unconvertible: number }> {
-  const rows = await prisma.figure.findMany({
+  const firstRelease = await prisma.figure.findMany({
     where: {
       msrpAmount: { not: null },
       msrpCurrency: { not: null },
@@ -508,6 +509,13 @@ export async function recomputeMsrpUsd(
     },
     select: { id: true, msrpAmount: true, msrpCurrency: true, msrpUsd: true },
   });
+  // And a figure already out whose reissue is on preorder, at the reissue's
+  // price: Insane Black Rock Shooter was ¥14,457 in 2013 and is ¥20,000 now.
+  const reissues = await reissuePrices(now);
+  const rows = [
+    ...firstRelease.filter((r) => !reissues.has(r.id)),
+    ...[...reissues.values()],
+  ];
 
   let unconvertible = 0;
   // Grouped by the value to write, so this is a handful of statements rather
@@ -546,7 +554,10 @@ export async function recomputeMsrpUsd(
   // "the list price of something you cannot buy yet". A run of this job that
   // was not bounded to the unreleased left 5,301 of these behind.
   const { count: cleared } = await prisma.figure.updateMany({
-    where: { msrpUsd: { not: null }, OR: [{ releaseDate: null }, { releaseDate: { lte: now } }] },
+    where: {
+      msrpUsd: { not: null },
+      AND: [{ OR: [{ releaseDate: null }, { releaseDate: { lte: now } }] }, { OR: NO_PENDING_REISSUE(now) }],
+    },
     data: { msrpUsd: null },
   });
 
@@ -576,6 +587,7 @@ export async function markReleased(now = new Date()): Promise<number> {
       status: { in: waiting as unknown as never[] },
       releaseDatePrecision: "DAY",
       releaseDate: { lt: cutoff.day },
+      OR: NO_PENDING_REISSUE(now),
     },
     data: { status: "RELEASED" as never },
   });
@@ -585,9 +597,94 @@ export async function markReleased(now = new Date()): Promise<number> {
       status: { in: waiting as unknown as never[] },
       releaseDatePrecision: { not: "DAY" },
       releaseDate: { lt: cutoff.month },
+      OR: NO_PENDING_REISSUE(now),
     },
     data: { status: "RELEASED" as never },
   });
 
   return dayGrained.count + monthGrained.count;
+}
+
+
+/**
+ * No reissue on its way. Spelled out rather than NOT { reissueDueAt > now }:
+ * SQL's NOT of a comparison with NULL is unknown, not true, so that form drops
+ * every figure that has never had a reissue at all.
+ */
+const NO_PENDING_REISSUE = (now: Date) => [{ reissueDueAt: null }, { reissueDueAt: { lte: now } }];
+
+/** The reissues that have not shipped yet, one per figure, from FigureRelease. */
+async function pendingReissues(now: Date) {
+  // Bounded to what could still be upcoming: dated this month or later, or
+  // undated with orders still to close. upcomingReissue() makes the call.
+  const monthStart = releasedBefore(now).month;
+  const rows = await prisma.figureRelease.findMany({
+    where: {
+      kind: { not: "original" },
+      OR: [{ releaseDate: { gte: monthStart } }, { releaseDate: null, preorderClosesAt: { gt: now } }],
+    },
+  });
+  const byFigure = new Map<string, typeof rows>();
+  for (const r of rows) byFigure.set(r.figureId, [...(byFigure.get(r.figureId) ?? []), r]);
+  const pending = new Map<string, (typeof rows)[number]>();
+  for (const [figureId, list] of byFigure) {
+    const next = upcomingReissue(list, now);
+    if (next) pending.set(figureId, next);
+  }
+  return pending;
+}
+
+/** What each pending reissue costs, in the shape recomputeMsrpUsd() reads. */
+async function reissuePrices(now: Date) {
+  const out = new Map<string, { id: string; msrpAmount: unknown; msrpCurrency: string | null; msrpUsd: unknown }>();
+  const pending = await pendingReissues(now);
+  if (pending.size === 0) return out;
+  const held = await prisma.figure.findMany({
+    where: { id: { in: [...pending.keys()] } },
+    select: { id: true, msrpUsd: true },
+  });
+  for (const f of held) {
+    const r = pending.get(f.id)!;
+    if (r.priceAmount === null || !r.priceCurrency) continue;
+    out.set(f.id, { id: f.id, msrpAmount: r.priceAmount, msrpCurrency: r.priceCurrency, msrpUsd: f.msrpUsd });
+  }
+  return out;
+}
+
+/**
+ * Mark the figures whose reissue is on its way, and unmark the rest.
+ *
+ * A figure that came out years ago and is being made again reads, until the
+ * reissue ships, like any other preorder: status Preorder, valued at the
+ * maker's new price. reissueDueAt is when that stops -- the first of the month
+ * after a month-dated reissue, the day after a day-dated one -- so figureValue()
+ * can tell from a date, as it does for a first release, rather than trusting a
+ * status. markReleased() leaves these alone and then, once the date passes,
+ * puts them back to Released like anything else.
+ */
+export async function refreshReissues(now = new Date()): Promise<{ pending: number; preorder: number; cleared: number }> {
+  const pending = await pendingReissues(now);
+
+  let preorder = 0;
+  for (const [figureId, r] of pending) {
+    const at = r.releaseDate;
+    const due = !at
+      ? r.preorderClosesAt!
+      : r.releaseDatePrecision === "DAY"
+        ? new Date(at.getTime() + 86_400_000)
+        : new Date(Date.UTC(at.getUTCFullYear(), at.getUTCMonth() + 1, 1));
+    await prisma.figure.update({ where: { id: figureId }, data: { reissueDueAt: due } });
+    const { count } = await prisma.figure.updateMany({
+      where: { id: figureId, status: "RELEASED" as never },
+      data: { status: "PREORDER" as never },
+    });
+    preorder += count;
+  }
+
+  const { count: cleared } = await prisma.figure.updateMany({
+    where: { reissueDueAt: { not: null }, id: { notIn: [...pending.keys()] } },
+    data: { reissueDueAt: null },
+  });
+
+  return { pending: pending.size, preorder, cleared };
 }

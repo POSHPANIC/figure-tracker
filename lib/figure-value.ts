@@ -26,6 +26,8 @@ export type ValueBasis = "sold" | "asking" | "msrp";
 export type FigureValue = {
   amountUsd: number;
   basis: ValueBasis;
+  /** On an msrp basis, whether the price is a reissue's rather than a first release's. */
+  reissue?: boolean;
   /** How many listings the asking median came from. Zero for a sold price. */
   listings: number;
 };
@@ -45,6 +47,8 @@ type Valuable = {
    * correct in a script, silently inert in the product.
    */
   releaseDate?: Date | string | null;
+  /** When an upcoming reissue counts as out; see Figure.reissueDueAt. Same string caveat. */
+  reissueDueAt?: Date | string | null;
 };
 
 /**
@@ -56,7 +60,15 @@ type Valuable = {
  * stale that way.
  */
 function unreleased(figure: Valuable, now = new Date()): boolean {
-  const raw = figure.releaseDate;
+  return ahead(figure.releaseDate, now) || reissuePending(figure, now);
+}
+
+/** Whether a reissue of a figure that is already out is still to come. */
+export function reissuePending(figure: Pick<Valuable, "reissueDueAt">, now = new Date()): boolean {
+  return ahead(figure.reissueDueAt, now);
+}
+
+function ahead(raw: Date | string | null | undefined, now: Date): boolean {
   if (!raw) return false;
   const at = raw instanceof Date ? raw.getTime() : Date.parse(raw);
   return Number.isFinite(at) && at > now.getTime();
@@ -83,7 +95,9 @@ export function figureValue(figure: Valuable, now = new Date()): FigureValue | n
   // Only ahead of asking, never ahead of a completed sale.
   if (unreleased(figure, now)) {
     const msrp = toNumber(figure.msrpUsd as never);
-    if (msrp !== null) return { amountUsd: msrp, basis: "msrp", listings: 0 };
+    if (msrp !== null) {
+      return { amountUsd: msrp, basis: "msrp", listings: 0, reissue: !ahead(figure.releaseDate, now) };
+    }
   }
 
   const asking = toNumber(figure.askMedianUsd as never);
@@ -106,7 +120,9 @@ export function valueLabel(basis: ValueBasis, short = false): string {
 /** "median of 14 listings", for showing what an asking price rests on. */
 export function valueNote(value: FigureValue): string | null {
   if (value.basis === "sold") return null;
-  if (value.basis === "msrp") return "the maker's price — not yet released";
+  if (value.basis === "msrp") {
+    return value.reissue ? "the maker's price for the reissue — not out yet" : "the maker's price — not yet released";
+  }
   return `median of ${value.listings} listing${value.listings === 1 ? "" : "s"}`;
 }
 

@@ -154,6 +154,19 @@ jobs:
         # fifteen minutes of walking empty ids for nothing.
         run: npm run backfill:goodsmile -- --write --max 200
 
+      # Reissues. Good Smile add a rerelease to the original's own product page,
+      # years later, and the walk above never comes back to a page it has
+      # passed. This does, 300 known pages a night, so every linked figure is
+      # re-read about once a fortnight. Five and a half minutes at a page a
+      # second. The Releases card and the reissue-preorder status read what it
+      # finds; see lib/ingest/releases.ts.
+      - name: Check Good Smile pages for reissues
+        if: always()
+        env:
+          DIRECT_DATABASE_URL: ${{ secrets.DIRECT_DATABASE_URL }}
+          DATABASE_URL: ${{ secrets.DIRECT_DATABASE_URL }}
+        run: npx tsx scripts/refresh-goodsmile-releases.ts --write --max 300
+
       # One slice of HobbySearch. Unlike the other sources this creates figures
       # directly, because it has what a review queue exists to establish: a JAN
       # barcode proving the figure is not already listed, and the manufacturer's

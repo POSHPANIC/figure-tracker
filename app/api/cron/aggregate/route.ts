@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { isAuthorizedCron } from "@/lib/cron-auth";
-import { markReleased, purgeExpiredSales, recomputeMsrpUsd, runAggregation } from "@/lib/ingest/aggregate";
+import { markReleased, purgeExpiredSales, recomputeMsrpUsd, refreshReissues, runAggregation } from "@/lib/ingest/aggregate";
 
 export const maxDuration = 60;
 
@@ -24,10 +24,13 @@ export async function GET(request: Request) {
     // the one manual run never showed its retail price, and figures past
     // their release date still said Preorder. They belong to the nightly pass.
     // Neither depends on the other: both read the release date, not the status.
+    // Reissues first: markReleased() leaves a figure with one on its way alone,
+    // and recomputeMsrpUsd() prices it at the reissue's price.
+    const reissues = await refreshReissues();
     const released = await markReleased();
     const msrp = await recomputeMsrpUsd();
     const purged = await purgeExpiredSales();
-    return NextResponse.json({ ok: true, ...result, released, msrp, salesPurged: purged });
+    return NextResponse.json({ ok: true, ...result, reissues, released, msrp, salesPurged: purged });
   } catch (err) {
     console.error("[cron/aggregate] failed:", err);
     return NextResponse.json(

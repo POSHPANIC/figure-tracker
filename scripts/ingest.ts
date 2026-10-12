@@ -8,7 +8,7 @@
 import "dotenv/config";
 import { prisma } from "../lib/prisma";
 import { runIngestion } from "../lib/ingest/run";
-import { markReleased, recomputeMsrpUsd, runAggregation } from "../lib/ingest/aggregate";
+import { markReleased, recomputeMsrpUsd, refreshReissues, runAggregation } from "../lib/ingest/aggregate";
 
 function flag(name: string): string | undefined {
   const i = process.argv.indexOf(`--${name}`);
@@ -45,6 +45,8 @@ async function main() {
   // Before the MSRP pass, though the two do not depend on each other: both
   // read the release date rather than the status, precisely so that neither
   // can be wrong because the other has not run.
+  const reissues = await refreshReissues();
+  console.log(`  ${reissues.pending} reissue(s) on their way, ${reissues.preorder} figure(s) back to preorder`);
   const released = await markReleased();
   console.log(`  ${released} figure(s) left preorder`);
 

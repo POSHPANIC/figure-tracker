@@ -1,5 +1,6 @@
 import "dotenv/config";
 import { prisma } from "../lib/prisma";
+import { recordFolded } from "../lib/ingest/figure-release";
 
 /**
  * Fold one catalogue entry into another, by hand, when a person has decided
@@ -43,6 +44,10 @@ const pick = {
   slug: true,
   name: true,
   supersededById: true,
+  releaseDate: true,
+  releaseDatePrecision: true,
+  msrpAmount: true,
+  msrpCurrency: true,
   manufacturer: { select: { name: true } },
   shopOffers: { select: { id: true, source: true, url: true } },
   identifiers: { select: { id: true, kind: true, value: true } },
@@ -120,6 +125,9 @@ async function main() {
       prisma.priceAlert.updateMany({ where: { figureId: f.id }, data: { figureId: k.id } }),
       prisma.figure.update({ where: { id: f.id }, data: { supersededById: k.id } }),
     ]);
+    // A reissue folded in is still a printing of its own; keep it on the survivor.
+    const jan = f.identifiers.find((i) => i.kind === "JAN")?.value ?? null;
+    if (await recordFolded(k, f, jan)) console.log("    kept as a separate printing.");
     console.log("    folded.\n");
   }
 

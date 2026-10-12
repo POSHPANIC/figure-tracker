@@ -22,6 +22,8 @@ export const figureCardSelect = {
   status: true,
   scale: true,
   releaseDate: true,
+  // A figure already out whose reissue is on preorder is valued like a preorder.
+  reissueDueAt: true,
   primaryImageUrl: true,
   // The live listing whose photo stands in until a catalog photo exists.
   listings: listingPhotoSelect,
@@ -208,6 +210,7 @@ export async function quickSearch(q: string, limit = 8) {
       // And the list price, which wins on anything not yet released.
       msrpUsd: true,
       releaseDate: true,
+      reissueDueAt: true,
       // The franchise, because that is what browsing is by now — a result
       // labelled "Evangelion: 2.0" points at a filter the site no longer
       // offers.
@@ -253,6 +256,8 @@ export async function getFigureBySlug(slug: string, condition?: ItemCondition) {
       },
       characters: { include: { series: { select: { name: true, slug: true } } } },
       images: { orderBy: { sortOrder: "asc" } },
+      // Every printing beyond the figure's own, for the Releases card.
+      releases: { orderBy: { releaseDate: "asc" } },
       // The archive id, which links back to the manufacturer's entry for the
       // product, and the release number, which is what makes their store
       // search land on the right thing.

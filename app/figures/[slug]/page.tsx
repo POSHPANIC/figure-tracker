@@ -31,6 +31,7 @@ import { ebaySearchUrl } from "@/lib/ebay-search";
 import { goodsmileSearchUrl } from "@/lib/goodsmile-search";
 import { getFigureBySlug, getFigureListingPhoto, getFigureStats, getPriceHistory } from "@/lib/queries";
 import { figurePhoto } from "@/lib/images";
+import { hasShipped, printings } from "@/lib/ingest/releases";
 import { getFigureUserState } from "@/lib/user-queries";
 import { SITE_URL } from "@/lib/site";
 import { safeHttpUrl } from "@/lib/safe-url";
@@ -312,6 +313,66 @@ async function FigureView({
           figure.releaseDatePrecision === "DAY" ? "DAY" : "MONTH",
         )
       : null;
+  // Every printing, when there is more than one. The figure's own fields are
+  // one of them -- the spec box above shows it -- and each other printing gets
+  // a box of its own below, saying only what differs from it.
+  const releaseRows = printings(
+    {
+      kind: "original",
+      label: null,
+      releaseDate: figure.releaseDate,
+      releaseDatePrecision: figure.releaseDatePrecision,
+      priceAmount: figure.msrpAmount,
+      priceCurrency: figure.msrpCurrency,
+      jan,
+    },
+    figure.releases,
+  );
+  const ownPrinting = releaseRows.find((r) => r.own)!;
+  const ownOrders = orderWindow(ownPrinting);
+  const samePrice = (r: (typeof releaseRows)[number]) =>
+    r.priceAmount != null &&
+    ownPrinting.priceAmount != null &&
+    Number(r.priceAmount) === Number(ownPrinting.priceAmount) &&
+    r.priceCurrency?.toUpperCase() === ownPrinting.priceCurrency?.toUpperCase();
+  const releases = await Promise.all(
+    releaseRows
+      .filter((r) => !r.own)
+      // An earlier printing than the figure's own -- the original, when what
+      // was folded in is older -- leads; after it, the newest first.
+      .sort((a, b) => {
+        if (a.kind === "original" && b.kind !== "original") return -1;
+        if (b.kind === "original" && a.kind !== "original") return 1;
+        return (new Date(b.releaseDate ?? 0).getTime() || 0) - (new Date(a.releaseDate ?? 0).getTime() || 0);
+      })
+      .map(async (r) => {
+        const at = r.releaseDate ? new Date(r.releaseDate) : null;
+        const showPrice = r.priceAmount != null && r.priceCurrency && !samePrice(r);
+        const converted =
+          showPrice && r.priceCurrency!.toUpperCase() !== money.currency
+            ? await historicalMoney(
+                Number(r.priceAmount),
+                r.priceCurrency!,
+                at,
+                money.currency,
+                r.releaseDatePrecision === "DAY" ? "DAY" : "MONTH",
+              )
+            : null;
+        const orders = orderWindow(r);
+        return {
+          label: r.label,
+          when: at ? releaseWhen(at, r.releaseDatePrecision) : "Date not announced",
+          upcoming: !hasShipped(r),
+          price: showPrice
+            ? formatCurrency(r.priceAmount as Parameters<typeof formatCurrency>[0], r.priceCurrency!)
+            : null,
+          converted: converted ? approxAt(formatCurrency(converted.amount, money.currency), converted.basis) : null,
+          orders,
+          jan: r.jan && r.jan !== ownPrinting.jan ? r.jan : null,
+        };
+      }),
+  );
+
   const msrpConverted =
     msrp !== null && figure.msrpCurrency?.toUpperCase() !== money.currency
       ? approxAt(formatCurrency(msrp.amount, money.currency), msrp.basis)
@@ -591,9 +652,16 @@ async function FigureView({
             {/* Last, and only where we hold one. It is the barcode on the box —
                 useful for searching a Japanese marketplace, useless to read,
                 and absent from nearly every entry the archive gave us. */}
-            {jan && (
+            {/* This printing's window, when a source told us. Shops publish it
+                for the printings they sell, so it appears beside the reissue
+                boxes below rather than everywhere. */}
+            {ownOrders && <Spec label="Orders">{ownOrders}</Spec>}
+            {/* This printing's own barcode. A figure holds whichever barcode it
+                was first found by, which for a reissued figure can be the
+                reissue's; the printing's record says which is which. */}
+            {ownPrinting.jan && (
               <Spec label="JAN">
-                <span className="tabular">{jan}</span>
+                <span className="tabular">{ownPrinting.jan}</span>
               </Spec>
             )}
             {upc && (
@@ -602,6 +670,10 @@ async function FigureView({
               </Spec>
             )}
           </dl>
+
+          {releases.map((r, i) => (
+            <ReleaseBox key={i} release={r} />
+          ))}
 
           {/*
             Under the spec box on purpose: this is where someone notices the
@@ -1175,6 +1247,73 @@ function StatCard({
       </p>
       {note && <p className="mt-0.5 text-[10px] text-muted">{note}</p>}
     </div>
+  );
+}
+
+/** "18 Jul 2024", in Japan's calendar, which is the one shops' windows are set in. */
+function shortDate(d: Date | string): string {
+  return new Date(d).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "Asia/Tokyo" });
+}
+
+/** "26 Dec 2012 – 6 Feb 2013": when orders were taken, if a source said. */
+function orderWindow(p: { preorderOpensAt?: Date | string | null; preorderClosesAt?: Date | string | null }): string | null {
+  return p.preorderOpensAt && p.preorderClosesAt
+    ? `${shortDate(p.preorderOpensAt)} – ${shortDate(p.preorderClosesAt)}`
+    : null;
+}
+
+/** "September 2013", or "17 March 2025" when the day is known. */
+function releaseWhen(at: Date, precision: string): string {
+  return at.toLocaleDateString("en-GB", {
+    ...(precision === "DAY" ? { day: "numeric" } : {}),
+    month: "long",
+    year: "numeric",
+    timeZone: "UTC",
+  });
+}
+
+/**
+ * One more printing of the figure: a reissue, or the original when the entry
+ * above is the later one.
+ *
+ * Drawn as the spec box is, because it is the same kind of record -- and
+ * holding only what differs from it. A reissue at the original's price, with
+ * the original's barcode, says nothing about either; it is a date and, while
+ * it lasts, a preorder.
+ */
+function ReleaseBox({
+  release: r,
+}: {
+  release: {
+    label: string;
+    when: string;
+    upcoming: boolean;
+    price: string | null;
+    converted: string | null;
+    orders: string | null;
+    jan: string | null;
+  };
+}) {
+  return (
+    <section className="mt-3 rounded-xl border border-border bg-surface p-4 text-sm">
+      <h2 className="term-label mb-1">{r.label}</h2>
+      <dl>
+        <Spec label="Released">{r.when}</Spec>
+        {r.upcoming && <Spec label="Status">Preorder</Spec>}
+        {r.price && (
+          <Spec label="MSRP">
+            <span className="tabular">{r.price}</span>
+            {r.converted && <span className="tabular ml-1.5 text-muted">{r.converted}</span>}
+          </Spec>
+        )}
+        {r.orders && <Spec label="Orders">{r.orders}</Spec>}
+        {r.jan && (
+          <Spec label="JAN">
+            <span className="tabular">{r.jan}</span>
+          </Spec>
+        )}
+      </dl>
+    </section>
   );
 }
 

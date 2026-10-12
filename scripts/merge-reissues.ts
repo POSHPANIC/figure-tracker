@@ -32,6 +32,7 @@
  */
 import "dotenv/config";
 import { prisma } from "../lib/prisma";
+import { recordFolded } from "../lib/ingest/figure-release";
 
 const WRITE = process.argv.includes("--write");
 
@@ -43,7 +44,9 @@ type Row = {
   scale: string | null;
   heightMm: number | null;
   releaseDate: Date | null;
+  releaseDatePrecision: string;
   msrpAmount: unknown;
+  msrpCurrency: string | null;
   supersededById: string | null;
   manufacturer: { name: string } | null;
   identifiers: { kind: string; value: string }[];
@@ -93,7 +96,7 @@ async function main() {
   const rows = (await prisma.figure.findMany({
     select: {
       id: true, name: true, slug: true, category: true, scale: true, heightMm: true,
-      releaseDate: true, msrpAmount: true, supersededById: true,
+      releaseDate: true, releaseDatePrecision: true, msrpAmount: true, msrpCurrency: true, supersededById: true,
       manufacturer: { select: { name: true } },
       identifiers: { select: { kind: true, value: true } },
       _count: { select: { listings: true, collectionItems: true, wishlistItems: true } },
@@ -165,6 +168,7 @@ async function main() {
             prisma.wishlistItem.updateMany({ where: { figureId: f.id }, data: { figureId: survivor.id } }),
             prisma.figure.update({ where: { id: f.id }, data: { supersededById: survivor.id } }),
           ]);
+          await recordFolded(survivor, f, f.identifiers.find((i) => i.kind === "JAN")?.value ?? null);
         }
       }
     }

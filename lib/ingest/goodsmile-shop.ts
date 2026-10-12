@@ -59,3 +59,101 @@ export function parseShopProduct(html: string): GoodSmileShopProduct | null {
   }
   return null;
 }
+
+/** One printing as the shop's product page lists it. */
+export type ShopVariant = {
+  /** Their code for the printing: "1633" for the first, "1633R1" for a reissue. */
+  code: string;
+  kind: "original" | "reissue";
+  /** Their label for it, when they give one: "Rerelease". */
+  label: string | null;
+  name: string | null;
+  jan: string | null;
+  priceJpy: number | null;
+  preorderOpensAt: Date | null;
+  preorderClosesAt: Date | null;
+  /** The first of the month it shipped, in UTC: the shop states it to the month. */
+  releaseMonth: Date | null;
+};
+
+/**
+ * Every printing on a product page.
+ *
+ * A reissue is not a separate product on the shop: Insane Black Rock Shooter's
+ * page sells both the 2013 figure at ¥14,457 and its March 2025 rerelease at
+ * ¥20,000, each with its own barcode, preorder window and ship month. They
+ * are listed in a script variable, `variantItems`, which is empty on a page
+ * with only one printing -- so an empty answer here means "no reissue", not
+ * "could not read".
+ */
+export function parseShopVariants(html: string): ShopVariant[] {
+  const at = html.indexOf("let variantItems = ");
+  if (at === -1) return [];
+  const start = html.indexOf("[", at);
+  if (start === -1) return [];
+
+  // The array literal's end, found by walking it: it is followed by more
+  // script, and contains brackets inside strings.
+  let depth = 0;
+  let inString = false;
+  let escaped = false;
+  let end = -1;
+  for (let i = start; i < html.length; i += 1) {
+    const c = html[i];
+    if (inString) {
+      if (escaped) escaped = false;
+      else if (c === "\\") escaped = true;
+      else if (c === '"') inString = false;
+      continue;
+    }
+    if (c === '"') inString = true;
+    else if (c === "[") depth += 1;
+    else if (c === "]" && --depth === 0) {
+      end = i;
+      break;
+    }
+  }
+  if (end === -1) return [];
+
+  let items: unknown;
+  try {
+    items = JSON.parse(html.slice(start, end + 1));
+  } catch {
+    return [];
+  }
+  if (!Array.isArray(items)) return [];
+
+  const date = (raw: unknown): Date | null => {
+    if (typeof raw !== "string" || !raw) return null;
+    const d = new Date(raw);
+    return Number.isNaN(d.getTime()) ? null : d;
+  };
+  // The ship month as Japan sees it: their "2025-03-17T15:00Z" is the 18th in
+  // Tokyo, and near a month's end that difference is the month.
+  const monthOf = (d: Date | null): Date | null => {
+    if (!d) return null;
+    const jst = new Date(d.getTime() + 9 * 3600_000);
+    return new Date(Date.UTC(jst.getUTCFullYear(), jst.getUTCMonth(), 1));
+  };
+
+  const out: ShopVariant[] = [];
+  for (const raw of items) {
+    const v = raw as Record<string, unknown>;
+    const code = String(v.productMasterCode ?? "").trim();
+    if (!code) continue;
+    const jan = String(v.jan ?? "").trim();
+    const price = Number(v.retailPriceInTax);
+    out.push({
+      code,
+      kind: v.type === "original" ? "original" : "reissue",
+      label: typeof v.label === "string" && v.label.trim() ? v.label.trim() : null,
+      name: typeof v.fullyQualifiedProductName === "string" ? v.fullyQualifiedProductName : null,
+      jan: /^\d{8,14}$/.test(jan) ? jan : null,
+      priceJpy: Number.isFinite(price) && price > 0 ? price : null,
+      preorderOpensAt: date(v.preOrderStartDate),
+      preorderClosesAt: date(v.preOrderEndDate),
+      releaseMonth: monthOf(date(v.releaseDate)),
+    });
+  }
+  return out;
+}
