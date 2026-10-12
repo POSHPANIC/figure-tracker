@@ -190,3 +190,57 @@ export async function editFigure(formData: FormData): Promise<EditResult> {
   revalidatePath("/figures");
   return { ok: true, changed };
 }
+
+export type Suggestion = { value: string; note?: string };
+
+/**
+ * Names an editor might mean, for the edit form's dropdowns.
+ *
+ * Manufacturers and characters, because those are the two fields where typing
+ * a name that already exists slightly differently creates a second one. Names
+ * starting with what was typed come first, then the most used; characters
+ * from the figure's own series ahead of namesakes from elsewhere, and each
+ * with its series beside it, since "Saber" is several people.
+ */
+export async function suggestNames(
+  field: "manufacturer" | "character",
+  query: string,
+  figureId?: string,
+): Promise<Suggestion[]> {
+  const user = await requireUser().catch(() => null);
+  if (!user) return [];
+  const account = await prisma.user.findUnique({ where: { id: user.id }, select: { role: true } });
+  if (!canEditFigures(account?.role)) return [];
+
+  const q = query.trim();
+  if (!q) return [];
+  const starts = (name: string) => name.toLowerCase().startsWith(q.toLowerCase());
+
+  if (field === "manufacturer") {
+    const rows = await prisma.manufacturer.findMany({
+      where: { name: { contains: q, mode: "insensitive" } },
+      select: { name: true, _count: { select: { figures: true } } },
+      orderBy: { figures: { _count: "desc" } },
+      take: 30,
+    });
+    return rows
+      .sort((a, b) => Number(starts(b.name)) - Number(starts(a.name)))
+      .slice(0, 8)
+      .map((r) => ({ value: r.name, note: `${r._count.figures} figure${r._count.figures === 1 ? "" : "s"}` }));
+  }
+
+  const seriesId = figureId
+    ? (await prisma.figure.findUnique({ where: { id: figureId }, select: { seriesId: true } }))?.seriesId ?? null
+    : null;
+  const rows = await prisma.character.findMany({
+    where: { name: { contains: q, mode: "insensitive" } },
+    select: { name: true, seriesId: true, series: { select: { name: true } }, _count: { select: { figures: true } } },
+    orderBy: { figures: { _count: "desc" } },
+    take: 40,
+  });
+  const rank = (r: (typeof rows)[number]) => (r.seriesId && r.seriesId === seriesId ? 2 : 0) + (starts(r.name) ? 1 : 0);
+  return rows
+    .sort((a, b) => rank(b) - rank(a))
+    .slice(0, 8)
+    .map((r) => ({ value: r.name, note: r.series?.name ?? undefined }));
+}

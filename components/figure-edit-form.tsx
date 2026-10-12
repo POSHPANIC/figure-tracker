@@ -4,10 +4,14 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Loader2 } from "lucide-react";
-import { editFigure } from "@/lib/actions/figure-edit";
+import { editFigure, suggestNames } from "@/lib/actions/figure-edit";
+import { SuggestInput, type SuggestOption } from "@/components/suggest-input";
 import type { EditField } from "@/lib/figure-edit";
 import { CATEGORY_LABELS, STATUS_LABELS } from "@/lib/labels";
 import { cn } from "@/lib/utils";
+
+/** The currencies a maker prices in, most used first. */
+const CURRENCIES = ["JPY", "USD", "EUR", "GBP", "CNY", "HKD", "KRW", "TWD", "CAD", "AUD"] as const;
 
 const inputClass =
   "w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm outline-none transition focus:border-foreground";
@@ -24,10 +28,13 @@ export function FigureEditForm({
   slug,
   values,
   locked,
+  scales,
 }: {
   figureId: string;
   slug: string;
   values: Record<string, string>;
+  /** Scales the catalogue already uses, most common first, for the scale field's suggestions. */
+  scales: readonly string[];
   /** Fields already confirmed by someone, and by whom. Shown, not enforced. */
   locked: Record<string, string>;
 }) {
@@ -46,23 +53,44 @@ export function FigureEditForm({
         setFieldErrors(result.fieldErrors ?? {});
         return;
       }
-      router.push(`/figures/${slug}`);
+      // Replace, not push: the edit page took the figure page's place in
+      // history when it opened, and gives it back here, so Back never lands
+      // on the edit page again.
+      router.replace(`/figures/${slug}`);
       router.refresh();
     });
   }
 
-  const field = (name: EditField, label: string, props: React.InputHTMLAttributes<HTMLInputElement> = {}, lockKey?: string) => (
+  const field = (
+    name: EditField,
+    label: string,
+    props: React.InputHTMLAttributes<HTMLInputElement> = {},
+    lockKey?: string,
+    suggest?: { options?: readonly string[]; fetch?: (q: string) => Promise<SuggestOption[]>; multiple?: boolean },
+  ) => (
     <label className="block">
       <span className="mb-1 flex justify-between text-xs text-muted">
         {label}
         {lockKey && locked[lockKey] && <span title={locked[lockKey]}>confirmed</span>}
       </span>
-      <input
-        name={name}
-        defaultValue={values[name] ?? ""}
-        className={cn(inputClass, fieldErrors[name] && "border-alert")}
-        {...props}
-      />
+      {suggest ? (
+        <SuggestInput
+          name={name}
+          defaultValue={values[name] ?? ""}
+          options={suggest.options}
+          fetchOptions={suggest.fetch}
+          multiple={suggest.multiple}
+          className={cn(inputClass, fieldErrors[name] && "border-alert")}
+          inputProps={props}
+        />
+      ) : (
+        <input
+          name={name}
+          defaultValue={values[name] ?? ""}
+          className={cn(inputClass, fieldErrors[name] && "border-alert")}
+          {...props}
+        />
+      )}
       {fieldErrors[name] && <span className="mt-1 block text-xs text-alert">{fieldErrors[name]}</span>}
     </label>
   );
@@ -93,18 +121,23 @@ export function FigureEditForm({
         {select("status", "Status", STATUS_LABELS)}
       </div>
 
-      {field("manufacturer", "Manufacturer", { placeholder: "Good Smile Company" }, "manufacturer")}
-      {field("characters", "Characters", { placeholder: "Marin Kitagawa, Shinju Inui — comma between several" }, "character")}
+      {field("manufacturer", "Manufacturer", { placeholder: "Good Smile Company" }, "manufacturer", {
+        fetch: (q) => suggestNames("manufacturer", q),
+      })}
+      {field("characters", "Characters", { placeholder: "Marin Kitagawa, Shinju Inui — comma between several" }, "character", {
+        fetch: (q) => suggestNames("character", q, figureId),
+        multiple: true,
+      })}
 
       <div className="grid gap-4 sm:grid-cols-3">
-        {field("scale", "Scale", { placeholder: "1/7" }, "scale")}
+        {field("scale", "Scale", { placeholder: "1/7" }, "scale", { options: scales })}
         {field("heightMm", "Height (mm)", { inputMode: "numeric", placeholder: "230" }, "heightMm")}
         {field("releaseDate", "Released", { placeholder: "2024-05 or 2024-05-17" }, "releaseDate")}
       </div>
 
       <div className="grid gap-4 sm:grid-cols-3">
         <div className="sm:col-span-2">{field("msrpAmount", "MSRP", { inputMode: "decimal", placeholder: "16093" }, "msrp")}</div>
-        {field("msrpCurrency", "Currency", { placeholder: "JPY", maxLength: 3 }, "msrp")}
+        {field("msrpCurrency", "Currency", { placeholder: "JPY", maxLength: 3 }, "msrp", { options: CURRENCIES })}
       </div>
 
       {field("jan", "JAN barcode", { inputMode: "numeric", placeholder: "4580590174665" })}
@@ -125,7 +158,7 @@ export function FigureEditForm({
           {pending && <Loader2 className="size-4 animate-spin" />}
           Save
         </button>
-        <Link href={`/figures/${slug}`} className="text-sm text-muted hover:text-foreground hover:underline">
+        <Link href={`/figures/${slug}`} replace className="text-sm text-muted hover:text-foreground hover:underline">
           Cancel
         </Link>
       </div>

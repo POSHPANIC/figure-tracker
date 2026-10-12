@@ -1183,8 +1183,11 @@ async function EditLinkSlot({ slug }: { slug: string }) {
   const user = await currentUser();
   if (!canEditFigures(user?.role)) return <SuggestEditLink slug={slug} />;
   return (
+    // Replace: the edit page stands in for the figure page in history, and
+    // Save or Cancel puts the figure page back, so Back never returns to it.
     <Link
       href={`/figures/${slug}/edit`}
+      replace
       className="mt-3 flex items-center justify-center gap-1.5 rounded-lg border border-foreground px-3 py-2 text-xs font-medium text-foreground transition hover:bg-foreground hover:text-background"
     >
       <PencilLine className="size-3.5" />

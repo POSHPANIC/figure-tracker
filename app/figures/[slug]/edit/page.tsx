@@ -65,6 +65,16 @@ async function EditBody({ params }: PageProps<"/figures/[slug]/edit">) {
     },
   });
   if (!figure) notFound();
+
+  // The scales already in use, most common first, for the scale suggestions.
+  const scales = (
+    await prisma.figure.groupBy({
+      by: ["scale"],
+      where: { scale: { not: null } },
+      _count: true,
+      orderBy: { _count: { scale: "desc" } },
+    })
+  ).map((s) => s.scale!);
   // A folded entry is edited where it now lives.
   if (figure.supersededBy) redirect(`/figures/${figure.supersededBy.slug}/edit`);
 
@@ -85,7 +95,7 @@ async function EditBody({ params }: PageProps<"/figures/[slug]/edit">) {
           Edit figure
         </h1>
         <p className="mt-1 text-sm text-muted">
-          <Link href={`/figures/${figure.slug}`} className="hover:text-foreground hover:underline">
+          <Link href={`/figures/${figure.slug}`} replace className="hover:text-foreground hover:underline">
             {figure.name}
           </Link>
         </p>
@@ -95,6 +105,7 @@ async function EditBody({ params }: PageProps<"/figures/[slug]/edit">) {
         slug={figure.slug}
         values={formValues({ ...figure, jan: figure.identifiers[0]?.value ?? null })}
         locked={locked}
+        scales={scales}
       />
     </div>
   );
