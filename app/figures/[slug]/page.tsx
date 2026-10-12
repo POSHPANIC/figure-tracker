@@ -497,9 +497,14 @@ async function FigureView({
         ]}
       />
 
-      <div className="mt-4 grid gap-8 lg:grid-cols-[20rem_1fr]">
+      {/* minmax(0, 1fr), not 1fr: a bare 1fr column is never narrower than its
+          widest unbreakable child, and the truncated rows in Where to buy hold
+          the figure's whole name on one line. A long name -- "Jojo no Kimyou
+          na Bouken - Phantom Blood - ... - Masterlise" -- stretched the pricing
+          column to 1,500px and pushed it off the screen. */}
+      <div className="mt-4 grid gap-8 lg:grid-cols-[20rem_minmax(0,1fr)]">
         {/* --- Left column: artwork + spec sheet --- */}
-        <div className="space-y-4">
+        <div className="min-w-0 space-y-4">
           <div>
             <div className="aspect-[3/4] overflow-hidden rounded-xl border border-border bg-surface-2">
               <FigureThumb name={figure.name} src={photo?.src} />
@@ -695,7 +700,7 @@ async function FigureView({
         </div>
 
         {/* --- Right column: pricing --- */}
-        <div className="space-y-6">
+        <div className="min-w-0 space-y-6">
           <header>
             {/*
               No series line above the name. The breadcrumb already carries the
