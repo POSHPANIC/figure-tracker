@@ -2,7 +2,7 @@ import { prisma } from "../prisma";
 import { pruneRateLimits } from "../rate-limit-store";
 import { toUsd } from "./fx";
 import { releasedBefore } from "./release-status";
-import { upcomingReissue } from "./releases";
+import { isSeparatePrinting, upcomingReissue } from "./releases";
 import { rebuildAllSearchText } from "./search-index";
 import type { ItemCondition } from "../generated/prisma/enums";
 
@@ -629,7 +629,19 @@ async function pendingReissues(now: Date) {
   const pending = new Map<string, (typeof rows)[number]>();
   for (const [figureId, list] of byFigure) {
     const next = upcomingReissue(list, now);
-    if (next) pending.set(figureId, next);
+    if (!next) continue;
+    // Filled from any other row for the same printing: Buster Doll Paladin's
+    // 2027 reissue came from Nin-Nin, dated sooner and unpriced, and from
+    // Kotobukiya at $64.99. The price is the one the reader needs.
+    const filled = { ...next };
+    for (const r of list) {
+      if (r === next || isSeparatePrinting(r.releaseDate, next.releaseDate)) continue;
+      if (filled.priceAmount === null && r.priceAmount !== null) {
+        filled.priceAmount = r.priceAmount;
+        filled.priceCurrency = r.priceCurrency;
+      }
+    }
+    pending.set(figureId, filled);
   }
   return pending;
 }
