@@ -375,6 +375,10 @@ const RIVAL_MAKERS = [
   // Good Smile, SEGA, Max Factory and FREEing -- "Bandai Spirits My Hero
   // Academia Katsuki Bakugo Figure" at $15 on Good Smile's 1/4 statue.
   "bandai spirits",
+  // Yolopark make Transformers model kits ("AMK PRO", "AMK Mini") and nothing
+  // this catalogue holds. Unfolding threeA's two Optimus Primes showed their
+  // kits landing on the statues and on Megatron.
+  "yolopark",
 ];
 
 /**

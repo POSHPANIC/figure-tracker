@@ -365,6 +365,21 @@ describe("scoreMatch", () => {
     );
   });
 
+  it("keeps Yolopark's model kits off threeA's statues", () => {
+    const prime: MatchCandidate = {
+      id: "optimus-dotm",
+      name: "Optimus Prime (Transformers: Dark of the Moon)",
+      nameJa: null,
+      scale: null,
+      category: "OTHER",
+      manufacturerName: "threeA",
+      seriesName: "Transformers",
+      characterNames: [],
+    };
+    assert.equal(scoreMatch("Yolopark Transformers AMK MINI Wave 03 Optimus Prime Dark Of The Moon Mode", prime), 0);
+    assert.ok(scoreMatch("threeA Transformers Dark of the Moon Optimus Prime 48cm Action Figure 2016", prime) > 0);
+  });
+
   it("lets Bandai Spirits name its own figures", () => {
     const grandista = (manufacturerName: string): MatchCandidate => ({
       id: `todoroki-grandista-${manufacturerName}`,
