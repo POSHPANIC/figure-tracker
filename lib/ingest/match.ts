@@ -156,6 +156,17 @@ const GENERIC_DESCRIPTORS = new Set([
  */
 const MIN_NAME_WORDS_WITHOUT_CHARACTER = 3;
 
+/** Lines of kits, and the catalogue types a kit can be filed under. */
+const KIT_LINES = new Set(["moderoid"]);
+const KIT_CATEGORIES = new Set(["MODEL_KIT", "OTHER"]);
+
+/** Bandai's own lines, and whether a maker is Bandai under one of its names. */
+const BANDAI_LINES = new Set(["maximatic", "grandista", "masterlise", "figuno", "ichibansho", "figuarts", "ichiban"]);
+function isBandaiHouse(maker: string | null | undefined): boolean {
+  const m = maker?.toLowerCase() ?? "";
+  return ["bandai", "banpresto", "tamashii"].some((b) => m.includes(b));
+}
+
 const PRODUCT_LINE_TOKENS = [
   "nendoroid",
   "figma",
@@ -1083,6 +1094,16 @@ export function scoreMatch(
   const nameTokensForLine = tokenize(figure.name);
   for (const line of PRODUCT_LINE_TOKENS) {
     if (titleTokens.has(line) && line !== figureLine && !nameTokensForLine.has(line)) {
+      // A kit line only contradicts a finished figure. Good Smile's own kits
+      // are often catalogued without the word -- "HAGANE WORKS Mazinkaiser
+      // Haou: Mazin Set", "Orguss II Olson Special", typed model kit or other
+      // -- and the first pass of this rule took their real listings away.
+      if (KIT_LINES.has(line) && KIT_CATEGORIES.has(figure.category)) continue;
+      // Likewise Bandai's lines on Bandai's own entries typed "other", which
+      // is where the line name goes missing: "One Piece - Monkey D. Luffy -
+      // Romance Dawn" is the S.H.Figuarts figure, and lost twelve S.H.Figuarts
+      // listings to the first pass. On anyone else's figure the rule stands.
+      if (BANDAI_LINES.has(line) && figure.category === "OTHER" && isBandaiHouse(figure.manufacturerName)) continue;
       return 0;
     }
   }

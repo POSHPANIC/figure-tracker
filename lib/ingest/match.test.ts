@@ -330,6 +330,41 @@ describe("scoreMatch", () => {
     assert.equal(scoreMatch("Bandai Spirits My Hero Academia Katsuki Bakugo Figure", bakugo), 0);
   });
 
+  it("lets a MODEROID listing reach a kit catalogued without the word", () => {
+    const orguss: MatchCandidate = {
+      id: "orguss",
+      name: "Super Dimension Century Orguss - Orguss II Olson Special",
+      nameJa: null,
+      scale: null,
+      category: "OTHER",
+      manufacturerName: null,
+      seriesName: null,
+      characterNames: [],
+    };
+    assert.ok(
+      scoreMatch("MODEROID Super Dimension Century Orguss Orguss II Olson Special Model Kit", orguss) > 0,
+    );
+  });
+
+  it("lets an S.H.Figuarts listing reach Bandai's own figure catalogued without the line", () => {
+    const luffy: MatchCandidate = {
+      id: "luffy-romance-dawn",
+      name: "One Piece - Monkey D. Luffy - Romance Dawn",
+      nameJa: null,
+      scale: null,
+      category: "OTHER",
+      manufacturerName: "Bandai Spirits",
+      seriesName: "One Piece",
+      characterNames: ["Monkey D. Luffy"],
+    };
+    assert.ok(scoreMatch("S.H.Figuarts ONE PIECE Monkey D. Luffy Romance Dawn TAMASHII NATIONS", luffy) > 0);
+    // Someone else's figure still refuses it.
+    assert.equal(
+      scoreMatch("S.H.Figuarts ONE PIECE Monkey D. Luffy Romance Dawn", { ...luffy, manufacturerName: "MegaHouse" }),
+      0,
+    );
+  });
+
   it("lets Bandai Spirits name its own figures", () => {
     const grandista = (manufacturerName: string): MatchCandidate => ({
       id: `todoroki-grandista-${manufacturerName}`,

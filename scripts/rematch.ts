@@ -15,6 +15,7 @@
  *   npm run rematch -- --yes --safe-moves  # moves, minus the doubtful ones
  *   npm run rematch -- --yes --only-unmatches  # take wrong matches away, add none
  *   npm run rematch -- --figure some-slug  # only the listings on one figure
+ *   npm run rematch -- --title-contains moderoid  # only titles with a word
  *
  * --no-moves exists because the two kinds of change carry very different risk.
  * Dropping a listing that no longer matches only ever removes a claim. Moving
@@ -40,6 +41,12 @@ const ONLY_UNMATCHES = process.argv.includes("--only-unmatches");
 // One figure's listings, for when a person has just corrected that figure --
 // renamed it, folded a duplicate into it -- and wants its page right now rather
 // than after an hour's pass over every listing.
+// Listings whose title contains a word, matched or not -- for putting back the
+// ones a rule took away before it was corrected.
+const TITLE_CONTAINS = (() => {
+  const i = process.argv.indexOf("--title-contains");
+  return i === -1 ? null : process.argv[i + 1] ?? null;
+})();
 const FIGURE_SLUG = (() => {
   const i = process.argv.indexOf("--figure");
   return i === -1 ? null : process.argv[i + 1] ?? null;
@@ -53,7 +60,10 @@ async function main() {
     : null;
   if (FIGURE_SLUG && !only) throw new Error(`no figure with slug ${FIGURE_SLUG}`);
   const listings = await prisma.listing.findMany({
-    where: only ? { figureId: only.id } : undefined,
+    where: {
+      ...(only ? { figureId: only.id } : {}),
+      ...(TITLE_CONTAINS ? { title: { contains: TITLE_CONTAINS, mode: "insensitive" as const } } : {}),
+    },
     select: { id: true, title: true, figureId: true, matchScore: true },
   });
 
