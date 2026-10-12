@@ -13,6 +13,7 @@
  *   npm run rematch -- --yes --no-moves    # apply only unmatches and new matches
  *   npm run rematch -- --all           # list every change, not the first six
  *   npm run rematch -- --yes --safe-moves  # moves, minus the doubtful ones
+ *   npm run rematch -- --yes --only-unmatches  # take wrong matches away, add none
  *
  * --no-moves exists because the two kinds of change carry very different risk.
  * Dropping a listing that no longer matches only ever removes a claim. Moving
@@ -30,6 +31,11 @@ const APPLY = process.argv.includes("--yes");
 const SKIP_MOVES = process.argv.includes("--no-moves");
 const ALL = process.argv.includes("--all");
 const SAFE_MOVES = process.argv.includes("--safe-moves");
+// The one change that cannot make a page wrong: a listing leaves a figure it no
+// longer matches and goes nowhere. Used when a matcher fix removes far more
+// than it should add -- in October 2026, 864 listings off a figure called MM
+// -- and its new matches still need reading before they are trusted.
+const ONLY_UNMATCHES = process.argv.includes("--only-unmatches");
 
 async function main() {
   const candidates = await loadCandidates(true);
@@ -111,6 +117,11 @@ async function main() {
       continue;
     }
 
+    if (ONLY_UNMATCHES && next) {
+      if (isMove) skippedMoves += 1;
+      continue;
+    }
+
     // --safe-moves applies only the moves that cannot be the scoring fault
     // this catalogue is known to have: the score is a ratio, so a one-word
     // name matching completely outscores a four-word name matching completely.
@@ -146,7 +157,8 @@ async function main() {
   // skippedMoves is counted during the scan whether or not this is a dry
   // run, so the report says how many a filter holds back before anything
   // is written - which is the number worth seeing beforehand.
-  const heldBack = SKIP_MOVES ? moved.length : skippedMoves;
+  const heldBack = SKIP_MOVES || ONLY_UNMATCHES ? moved.length : skippedMoves;
+  if (ONLY_UNMATCHES) console.log(`  (--only-unmatches: the ${gained.length} new matches are reported, not applied)`);
   console.log(
     `moved figure      : ${moved.length}` +
       (heldBack ? ` (${moved.length - heldBack} to apply, ${heldBack} held back)` : ""),

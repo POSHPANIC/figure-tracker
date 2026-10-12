@@ -1,5 +1,6 @@
 import type { ItemCondition } from "../generated/prisma/enums";
 import { readReleaseNumber as strictTitleNumber } from "./release-number";
+import { isAccessory } from "./accessory";
 
 /**
  * Matching marketplace listings to catalog figures.
@@ -450,7 +451,7 @@ const MAKER_ALIASES: Record<string, string[]> = {
  * plus the names of the candidates themselves. So a plain Map with a wholesale
  * clear when it fills beats tracking recency for the sake of it.
  */
-function memoized<T>(compute: (input: string) => T, cap = 8192): (input: string) => T {
+function memoized<T>(compute: (input: string) => T, cap = 65536): (input: string) => T {
   const cache = new Map<string, T>();
   return (input: string): T => {
     const hit = cache.get(input);
@@ -540,10 +541,22 @@ function canonical(token: string): string {
   return SYNONYMS[token] ?? token;
 }
 
+/**
+ * Units of size, which are not words when a number comes before them.
+ *
+ * normalize() splits "250mm" into "250 mm" so the number tokenizes on its
+ * own, which left "mm" behind as a word. Max Factory's 1/8 MM, from Kemeko
+ * Deluxe!, is named exactly that, and by October 2026 she held 872 listings:
+ * every Frame Arms Girl, Holo and statue whose seller gave a height in
+ * millimetres. After a number these are measurements; anywhere else, a name.
+ */
+const SIZE_UNITS = new Set(["mm", "cm", "in", "inch", "inches"]);
+
 function tokenizeImpl(text: string): Set<string> {
+  const raw = normalize(text).split(/[\s/.-]+/);
   return new Set(
-    normalize(text)
-      .split(/[\s/.-]+/)
+    raw
+      .filter((t, i) => !(SIZE_UNITS.has(t) && i > 0 && /^\d+$/.test(raw[i - 1])))
       .filter((t) => t.length > 1 && !STOPWORDS.has(t))
       .map(canonical),
   );
@@ -565,7 +578,7 @@ export const tokenize = memoized(tokenizeImpl);
  * normalize() has already split "Nendoroid1935" into two tokens and stripped
  * the "#" from "#1935", so both spellings arrive here in the same shape.
  */
-export function extractLineNumber(text: string): string | null {
+function extractLineNumberImpl(text: string): string | null {
   const m = normalize(text).match(
     /\b(?:nendoroid|figma)\s+(?:no\.?\s*)?((?:ex|sp|figfix)[\s-]?)?(\d{1,4})([\s-]?dx)?\b/,
   );
@@ -597,8 +610,7 @@ export function extractLineNumber(text: string): string | null {
  * as a suffix, and "Nendoroid 390 A Certain Magical Index" is a real title in
  * this catalogue. Those figures keep the behaviour they already had.
  */
-export function canonicalLineNumber(raw: string | null | undefined): string | null {
-  if (!raw) return null;
+function canonicalLineNumberImpl(raw: string): string | null {
   const m = normalize(raw)
     .replace(/\s+/g, "")
     .match(/^((?:ex|sp|figfix)-?)?0*(\d{1,4})(-?dx)?[ab]?$/);
@@ -609,10 +621,25 @@ export function canonicalLineNumber(raw: string | null | undefined): string | nu
   return `${prefix}:${m[2]}:${suffix}`;
 }
 
-/** Pull "1/7", "1/8" etc. out of a title. */
-function extractScale(text: string): string | null {
-  const m = normalize(text).match(/\b1\s*\/\s*(\d{1,2})\b/);
-  return m ? `1/${m[1]}` : null;
+/**
+ * Pull a scale out of a title, written the way the catalogue writes it.
+ *
+ * "1/7" and "1/8", and also "1:7" -- read from the raw title, because
+ * normalize() strips the colon -- and "1/0.5", which is a double-size kit
+ * and is held in the catalogue as "2/1". Without those, Kotobukiya's 2:1
+ * PUNI☆MOFU Tu collected every listing of the original 1:1 kit: "1:1 Scale"
+ * was not read as a scale at all, so nothing disagreed with "2/1".
+ */
+function extractScaleImpl(text: string): string | null {
+  const m = text
+    .normalize("NFKC")
+    .match(/(?<![\d.])1\s*[/:]\s*(\d{1,2}(?:\.\d+)?)(?!\d|\.\d)/);
+  if (!m) return null;
+  const d = Number(m[1]);
+  if (!Number.isFinite(d) || d <= 0) return null;
+  // Larger than life: 1/0.5 is 2/1.
+  if (d < 1) return `${Math.round(1 / d)}/1`;
+  return `1/${m[1]}`;
 }
 
 /**
@@ -625,7 +652,7 @@ function extractScale(text: string): string | null {
  * Deliberately ignores a bare number: "Nendoroid 1935" is not 1,935 of
  * anything, and "1/4" is a scale, which Gate 6 handles.
  */
-export function extractSizesMm(text: string): number[] {
+function extractSizesMmImpl(text: string): number[] {
   const sizes: number[] = [];
   const pattern = /(\d{1,3}(?:\.\d)?)\s*-?\s*(mm|cm|inch|inches|in)\b/gi;
   for (const m of normalize(text).matchAll(pattern)) {
@@ -703,6 +730,8 @@ export type MatchCandidate = {
  * Exported for testing — getting this set wrong is how wrong matches happen.
  */
 export function descriptorTokens(figure: MatchCandidate): Set<string> {
+  const held = descriptorCache.get(figure);
+  if (held) return held;
   const shared = new Set<string>([
     ...figure.characterNames.flatMap((n) => [...tokenize(n)]),
     ...(figure.seriesName ? tokenize(figure.seriesName) : []),
@@ -713,8 +742,12 @@ export function descriptorTokens(figure: MatchCandidate): Set<string> {
   for (const token of tokenize(figure.name)) {
     if (!shared.has(token) && !GENERIC_DESCRIPTORS.has(token)) out.add(token);
   }
+  descriptorCache.set(figure, out);
   return out;
 }
+
+/** Per candidate object: the catalogue is loaded once and scored against every title. */
+const descriptorCache = new WeakMap<MatchCandidate, Set<string>>();
 
 /**
  * Variant words in the title that the figure's own name doesn't explain.
@@ -781,9 +814,10 @@ const IS_A_FIGURE =
  * gates, which is the right way round — a missed rejection shows a wrong
  * listing, but an over-eager one hides a real product with no trace.
  */
-export function isNotAFigure(title: string): boolean {
+function isNotAFigureImpl(title: string): boolean {
   return MERCHANDISE.test(title) && !IS_A_FIGURE.test(title);
 }
+export const isNotAFigure = memoized(isNotAFigureImpl);
 
 /**
  * Made-to-order resin, which is a figure but not a *product*.
@@ -798,11 +832,17 @@ export function isNotAFigure(title: string): boolean {
  * deliberately absent: those are a legitimate category with real releases.
  */
 const UNOFFICIAL =
-  /\b(3\s?d[-\s]?print(?:ed|ing)?|hand[-\s]?made|various\s+sizes|made[-\s]to[-\s]order|custom[-\s]made|bootleg|fan[-\s]?made|unofficial)\b/i;
+  /\b(3\s?d[-\s]?print(?:ed|ing)?|hand[-\s]?made|various\s+sizes|made[-\s]to[-\s]order|custom[-\s]made|bootleg|fan[-\s]?made|fan[-\s]?art|unofficial)\b/i;
 
-export function isUnofficial(title: string): boolean {
+function isUnofficialImpl(title: string): boolean {
   return UNOFFICIAL.test(title);
 }
+export const isUnofficial = memoized(isUnofficialImpl);
+
+/** An accessory sold for a figure, unless it is a bonus packed with one. */
+export const isAccessoryListing = memoized(
+  (title: string) => isAccessory(title) && !/\bbonus\b/i.test(title),
+);
 
 /**
  * Which series a title names, out of the ones the catalogue knows.
@@ -836,6 +876,25 @@ export function seriesNamedIn(title: string, allSeries: readonly string[]): Set<
   return named;
 }
 
+/**
+ * The per-title readings, memoized by title.
+ *
+ * scoreMatch runs once per title per catalogue entry, and everything below
+ * depends on the title alone, so each was being recomputed eleven thousand
+ * times for one listing. With the catalogue past the old 8,192-entry memo cap
+ * as well, matching had slowed from about 6ms a title to 160ms: a full rematch
+ * that once took fifteen minutes ran for two hours without finishing, and the
+ * nightly listing sweep was spending most of its time here.
+ */
+export const extractLineNumber = memoized(extractLineNumberImpl);
+const canonicalLineNumberMemo = memoized(canonicalLineNumberImpl);
+export function canonicalLineNumber(raw: string | null | undefined): string | null {
+  return raw ? canonicalLineNumberMemo(raw) : null;
+}
+export const extractScale = memoized(extractScaleImpl);
+export const extractSizesMm = memoized(extractSizesMmImpl);
+const strictTitleNumberOf = memoized(strictTitleNumber);
+
 /** Everything a title-wide computation can tell one scoreMatch call. */
 export type MatchContext = {
   /** Series the title names, lowercased. Empty means it names none. */
@@ -862,6 +921,15 @@ export function scoreMatch(
   // --- Gate 0b: and a product, not somebody's resin cast of one. ---
   if (isUnofficial(title)) return 0;
 
+  // --- Gate 0c: and not an accessory for one. ---
+  //
+  // The catalogue refuses decal sheets and parts sets (lib/ingest/accessory.ts),
+  // so their listings had nowhere right to go and fell to the kit they fit:
+  // thirty "PUNI☆MOFU Mao Eye Decal Set 1/1" listings scored as the kit, with
+  // its scale agreeing and its name complete. A bonus packed with a kit is the
+  // exception -- "PUNI MOFU MAO & Bonus Face Parts Set Model Kit" is the kit.
+  if (isAccessoryListing(title)) return 0;
+
   // The number printed on the box, read from both sides. Computed up here
   // rather than beside Gate 5 because Gate 1 needs it too.
   const figureLineNumber = canonicalLineNumber(figure.lineNumber);
@@ -875,7 +943,7 @@ export function scoreMatch(
   // decides. It cost two bad matches to learn: "Hatsune Miku Nendoroid 15th
   // Anniversary Ver" read as Nendoroid no. 15 and landed on Nendoroid
   // Tachikoma, and "figma 69 Marisa Kirisame" on figma Rider.
-  const strictNumber = strictTitleNumber(title);
+  const strictNumber = strictTitleNumberOf(title);
   const numberIdentifiesStrictly =
     numberIdentifies &&
     strictNumber !== null &&

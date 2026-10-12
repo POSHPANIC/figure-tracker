@@ -6,6 +6,7 @@ import {
   canonicalLineNumber,
   descriptorTokens,
   extractLineNumber,
+  extractScale,
   extractSizesMm,
   sizeAgreesWith,
   isNotAFigure,
@@ -238,6 +239,71 @@ describe("scoreMatch", () => {
       scoreMatch("Jujutsu Kaisen Satoru Gojo - ARTFX J 1/8 Scale Figure Kotobukiya", gojo),
       0,
     );
+  });
+
+  it("reads a scale written with a colon, or larger than life", () => {
+    assert.equal(extractScale("Megami Device PUNI MOFU TU 1:1 Scale Model Kit"), "1/1");
+    assert.equal(extractScale("Saber 1:7 PVC"), "1/7");
+    assert.equal(extractScale("Megami Device - PUNI☆MOFU Tu - 1/0.5"), "2/1");
+    assert.equal(extractScale("Gojo ARTFX J 1/8 Scale"), "1/8");
+    assert.equal(extractScale("Gunpla RG 1/144"), null);
+    assert.equal(extractScale("Nendoroid 2193"), null);
+    assert.equal(extractScale("Rem 1/7."), "1/7");
+  });
+
+  it("keeps the original 1:1 kit off its 2:1 remake", () => {
+    // From production: every listing of Kotobukiya's 2019 PUNI☆MOFU Tu kit
+    // landed on the 2027 double-size PV376, two of them "used" for a figure
+    // not yet made.
+    const tu2x: MatchCandidate = {
+      id: "puni-tu-2x",
+      name: "PUNI☆MOFU TU",
+      nameJa: null,
+      scale: "2/1",
+      category: "SCALE",
+      manufacturerName: "Kotobukiya",
+      seriesName: "Megami Device",
+      characterNames: [],
+    };
+    assert.equal(scoreMatch("Megami Device PUNI MOFU TU 1:1 Scale Model Kit KOTOBUKIYA Japan NEW", tu2x), 0);
+    assert.equal(scoreMatch("KOTOBUKIYA 1/1 Megami Device PUNI☆MOFU Tu Plastic Model Kit Japan", tu2x), 0);
+  });
+
+  it("does not read a height in millimetres as a name", () => {
+    // Max Factory's MM, from Kemeko Deluxe!, held 872 listings in October 2026,
+    // all for figures whose sellers gave a height like "250mm".
+    const mm: MatchCandidate = {
+      id: "mm",
+      name: "MM",
+      nameJa: null,
+      scale: "1/8",
+      category: "SCALE",
+      manufacturerName: "Max Factory",
+      seriesName: "Kemeko Deluxe!",
+      characterNames: ["MM"],
+    };
+    assert.equal(tokenize("Frame Arms Girl Gourai 250mm Kotobukiya").has("mm"), false);
+    assert.equal(tokenize("Kemeko Deluxe MM 1/8 Max Factory").has("mm"), true);
+    assert.equal(scoreMatch("Kotobukiya PV234 1:8 Spice and Wolf Holo 215mm PVC", mm), 0);
+  });
+
+  it("refuses an accessory for a figure, but not a kit with a bonus", () => {
+    const mao: MatchCandidate = {
+      id: "mao",
+      name: "PUNI☆MOFU MAO",
+      nameJa: null,
+      scale: "1/1",
+      category: "MODEL_KIT",
+      manufacturerName: "Kotobukiya",
+      seriesName: "Megami Device",
+      characterNames: [],
+    };
+    assert.equal(scoreMatch("Kotobukiya Megami Device M.S.G PUNI☆MOFU Mao Eye Decal Set 1/1 Scale", mao), 0);
+    assert.ok(scoreMatch("Megami Device PUNI MOFU MAO & Bonus Face Parts Set 1:1 Model Kit KOTOBUKIYA", mao) > 0);
+  });
+
+  it("refuses fan-art garage kits", () => {
+    assert.equal(isUnofficial("1:8 Lucy Cyberpunk Edgerunners Fan Art UNPAINTED Resin Garage Kit"), true);
   });
 
   it("still matches a title that states no scale at all", () => {

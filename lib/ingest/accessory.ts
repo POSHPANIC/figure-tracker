@@ -30,6 +30,8 @@ const ACCESSORY: RegExp[] = [
   /\b(option(al)?\s+)?parts?\s+set\b/i,
   // "MEGAMI DEVICE M.S.G 09 HAND SET SKIN COLOR"
   /\bhand\s+set\b/i,
+  // "Egyptian God Statue Expansion Parts" -- sold for a statue, without "set"
+  /\bexpansion\s+parts\b/i,
   // "figma Basic Joint Set 2 (White)"
   /\bjoint\s+set\b/i,
   // "Sanrio Characters: My Melody Flocked Earrings" -- the noun ends the name
