@@ -17,6 +17,29 @@ const nextConfig: NextConfig = {
    * moves that traffic onto ISR reads, a quota sitting entirely unused.
    */
   cacheComponents: true,
+
+  /**
+   * One address for the site: www.figureindex.com goes to figureindex.com.
+   *
+   * www was serving the whole site in its own right, and that broke signing
+   * in. Starting from www, Auth.js set its PKCE cookie on www, then Discord
+   * sent the browser back to figureindex.com -- the one callback URL Discord
+   * knows -- where that cookie does not exist, and the check failed as an
+   * unexplained "Configuration" error. It also published every page twice.
+   *
+   * A config redirect rather than proxy.ts: it is matched before anything
+   * renders, and a host-to-host rule needs no code.
+   */
+  async redirects() {
+    return [
+      {
+        source: "/:path*",
+        has: [{ type: "host", value: "www.figureindex.com" }],
+        destination: "https://figureindex.com/:path*",
+        permanent: true,
+      },
+    ];
+  },
 };
 
 export default nextConfig;
