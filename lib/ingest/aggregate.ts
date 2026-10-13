@@ -700,3 +700,33 @@ export async function refreshReissues(now = new Date()): Promise<{ pending: numb
 
   return { pending: pending.size, preorder, cleared };
 }
+
+/**
+ * Refresh one figure's asking price, by the same rules as recomputeAskingPrices().
+ *
+ * For when its listings change in the day -- an editor taking a wrong one off
+ * the page, a rematch moving some -- so the price shown is the one the page's
+ * listings now support, not last night's. The rematch used to refresh sold
+ * stats only, which is why Good Smile's 1/4 Bakugo kept a $48 asking price,
+ * made of prize figures, until the nightly job ran.
+ */
+export async function recomputeAskingPriceFor(figureId: string): Promise<void> {
+  const rows = await prisma.$queryRaw<{ med: unknown; n: number }[]>`
+    SELECT round(percentile_cont(0.5) WITHIN GROUP (ORDER BY "amountUsd")::numeric, 2) AS med,
+           count(*)::int AS n
+    FROM "Listing"
+    WHERE "figureId" = ${figureId}
+      AND "isActive"
+      AND condition = 'NEW_SEALED'
+      AND "matchScore" >= ${ASK_MIN_MATCH_SCORE}
+  `;
+  const n = rows[0]?.n ?? 0;
+  const enough = n >= ASK_MIN_LISTINGS;
+  await prisma.figure.update({
+    where: { id: figureId },
+    data: {
+      askMedianUsd: enough ? String(rows[0].med) : null,
+      askListings: enough ? n : 0,
+    },
+  });
+}

@@ -82,11 +82,26 @@ export function SourceList({ children }: { children: React.ReactNode }) {
   return <ul className="divide-y divide-border">{children}</ul>;
 }
 
-/** A row inside a `SourceList`. For listings and shop offers. */
-export function SourceRow(props: SourceProps) {
+/**
+ * A row inside a `SourceList`. For listings and shop offers.
+ *
+ * `aside` sits beside the link, not in it -- a control inside a link is both
+ * invalid HTML and a click that opens the shop. It is how an editor's "Not this
+ * figure" reaches a listing row; for everyone else it renders nothing, and the
+ * row is exactly as it was.
+ */
+export function SourceRow({ aside, ...props }: SourceProps & { aside?: React.ReactNode }) {
+  if (!aside) {
+    return (
+      <li>
+        <SourceAnchor {...props} className="py-2.5" />
+      </li>
+    );
+  }
   return (
-    <li>
-      <SourceAnchor {...props} className="py-2.5" />
+    <li className="flex items-center gap-2">
+      <SourceAnchor {...props} className="min-w-0 flex-1 py-2.5" />
+      {aside}
     </li>
   );
 }

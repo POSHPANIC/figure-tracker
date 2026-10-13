@@ -1498,3 +1498,17 @@ export function normalizeCondition(raw: string | null | undefined): ItemConditio
 
   return "UNKNOWN";
 }
+
+/**
+ * bestMatch, never answering with a figure an editor has ruled out for this
+ * listing (Listing.rejectedFigureIds). With none ruled out it is bestMatch.
+ */
+export function bestMatchExcluding(
+  title: string,
+  candidates: MatchCandidate[],
+  rejected: readonly string[] | null | undefined,
+): MatchResult {
+  if (!rejected || rejected.length === 0) return bestMatch(title, candidates);
+  const skip = new Set(rejected);
+  return bestMatch(title, candidates.filter((c) => !skip.has(c.id)));
+}

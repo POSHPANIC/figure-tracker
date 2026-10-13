@@ -2,7 +2,7 @@ import { prisma } from "../prisma";
 import { toUsd } from "./fx";
 import { isEbayConfigured, searchActiveListings, searchSoldItems, type EbayItem } from "./ebay";
 import { isAmiAmiEnabled, searchAmiAmi } from "./amiami";
-import { bestMatch, normalizeCondition, type MatchCandidate } from "./match";
+import { bestMatch, bestMatchExcluding, normalizeCondition, type MatchCandidate } from "./match";
 import { loadCandidates } from "./candidates";
 import { selectByPriority } from "./poll-priority";
 import { expireStaleListings } from "./aggregate";
@@ -237,6 +237,8 @@ async function ingestEbay(
     return;
   }
 
+  const rejected = await loadRejections(sourceId);
+
   // Counters are incremented from several workers, which is safe because
   // JavaScript runs them on one thread — no two increments interleave.
   await inParallel(figures, FIGURE_CONCURRENCY, async (figure) => {
@@ -250,7 +252,7 @@ async function ingestEbay(
     summary.itemsSeen += active.length + sold.length;
 
     for (const item of active) {
-      const matched = await upsertEbayListing(sourceId, item, candidates);
+      const matched = await upsertEbayListing(sourceId, item, candidates, rejected.get(item.externalId));
       if (matched) summary.itemsUpserted += 1;
       else summary.unmatched += 1;
     }
@@ -270,6 +272,20 @@ async function ingestEbay(
   });
 }
 
+/**
+ * The figures an editor has said each listing is not, by its id at the source.
+ *
+ * Loaded once per run: it is a handful of rows, and asking per listing would
+ * be a query for each of the tens of thousands a sweep sees.
+ */
+async function loadRejections(sourceId: string): Promise<Map<string, string[]>> {
+  const rows = await prisma.listing.findMany({
+    where: { sourceId, rejectedFigureIds: { isEmpty: false } },
+    select: { externalId: true, rejectedFigureIds: true },
+  });
+  return new Map(rows.map((r) => [r.externalId, r.rejectedFigureIds]));
+}
+
 /** Note that a marketplace was searched for this figure. */
 async function markPolled(figureId: string): Promise<void> {
   await prisma.figure.update({
@@ -282,8 +298,9 @@ async function upsertEbayListing(
   sourceId: string,
   item: EbayItem,
   candidates: MatchCandidate[],
+  rejectedFigureIds?: readonly string[],
 ): Promise<boolean> {
-  const match = bestMatch(item.title, candidates);
+  const match = bestMatchExcluding(item.title, candidates, rejectedFigureIds);
 
   let converted;
   try {
@@ -375,13 +392,14 @@ async function ingestAmiAmi(
     return;
   }
 
+  const rejected = await loadRejections(sourceId);
   for (const figure of figures) {
     const items = await searchAmiAmi(buildQuery(figure), 20);
     summary.itemsSeen += items.length;
     await markPolled(figure.id);
 
     for (const item of items) {
-      const match = bestMatch(item.title, candidates);
+      const match = bestMatchExcluding(item.title, candidates, rejected.get(item.externalId));
 
       let converted;
       try {

@@ -557,6 +557,12 @@ model Listing {
   /// Anything below MATCH_REVIEW_THRESHOLD is excluded from price aggregation.
   matchScore Float?
 
+  /// Figures an editor has said this listing is not, with the "Not this
+  /// figure" button. The matcher never links it to them again -- not the
+  /// nightly sweep, not a rematch -- so taking a wrong listing off a page is
+  /// a decision that holds rather than one the next run undoes.
+  rejectedFigureIds String[] @default([])
+
   @@unique([sourceId, externalId])
   @@index([figureId, isActive])
   @@index([lastSeen])

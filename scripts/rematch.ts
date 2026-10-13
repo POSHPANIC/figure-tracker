@@ -26,8 +26,8 @@
 import "dotenv/config";
 import { prisma } from "../lib/prisma";
 import { loadCandidates } from "../lib/ingest/candidates";
-import { bestMatch, descriptorTokens, tokenize } from "../lib/ingest/match";
-import { recomputeFigureStatsFor } from "../lib/ingest/aggregate";
+import { bestMatchExcluding, descriptorTokens, tokenize } from "../lib/ingest/match";
+import { recomputeAskingPriceFor, recomputeFigureStatsFor } from "../lib/ingest/aggregate";
 
 const APPLY = process.argv.includes("--yes");
 const SKIP_MOVES = process.argv.includes("--no-moves");
@@ -64,7 +64,7 @@ async function main() {
       ...(only ? { figureId: only.id } : {}),
       ...(TITLE_CONTAINS ? { title: { contains: TITLE_CONTAINS, mode: "insensitive" as const } } : {}),
     },
-    select: { id: true, title: true, figureId: true, matchScore: true },
+    select: { id: true, title: true, figureId: true, matchScore: true, rejectedFigureIds: true },
   });
 
   const gained: { title: string; to: string }[] = [];
@@ -122,7 +122,8 @@ async function main() {
   }
 
   for (const l of listings) {
-    const match = bestMatch(l.title, candidates);
+    // Never back onto a figure an editor took it off.
+    const match = bestMatchExcluding(l.title, candidates, l.rejectedFigureIds);
     const next = match?.figureId ?? null;
     if (next === l.figureId) continue;
 
@@ -214,7 +215,12 @@ async function main() {
   } else {
     await flush();
 
-    for (const id of touched) await recomputeFigureStatsFor(id);
+    // Asking price too: it is what moving listings changes, and refreshing only
+    // the sold stats left pages priced on listings they no longer had.
+    for (const id of touched) {
+      await recomputeFigureStatsFor(id);
+      await recomputeAskingPriceFor(id);
+    }
     console.log(`\nApplied ${written} change(s). Refreshed stats for ${touched.size} figure(s).`);
     if (skippedMoves) {
       console.log(`Left ${skippedMoves} move(s) alone, as asked.`);

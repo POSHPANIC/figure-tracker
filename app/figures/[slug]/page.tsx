@@ -32,6 +32,7 @@ import { goodsmileSearchUrl } from "@/lib/goodsmile-search";
 import { getFigureBySlug, getFigureListingPhoto, getFigureStats, getPriceHistory } from "@/lib/queries";
 import { figurePhoto } from "@/lib/images";
 import { canEditFigures } from "@/lib/figure-edit";
+import { RejectListingButton } from "@/components/reject-listing-button";
 import { hasShipped, printings } from "@/lib/ingest/releases";
 import { getFigureUserState } from "@/lib/user-queries";
 import { SITE_URL } from "@/lib/site";
@@ -987,6 +988,8 @@ async function FigureView({
                 return (
                   <SourceRow
                     key={l.id}
+                    // Shown only to moderators and admins; see the component.
+                    aside={<RejectListingButton listingId={l.id} />}
                     href={withAffiliate(l.url, "figure-listing")}
                     rel="noopener noreferrer nofollow"
                     title={l.title}
