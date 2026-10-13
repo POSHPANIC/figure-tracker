@@ -102,6 +102,15 @@ const SYNONYMS: Record<string, string> = {
   plushies: "plush",
   // "Ichibankuji" as one word, so the Ichiban line rule still sees it.
   ichibankuji: "ichiban",
+  // SEGA's Luminasta, as sellers spell it, and Bandai's Figuarts as written
+  // short: "S.H.Figuart", "SHF".
+  laminasta: "luminasta",
+  luminasuta: "luminasta",
+  figuart: "figuarts",
+  // SEGA write it FIGURIZMα, and the alpha sticks to the word.
+  "figurizmα": "figurizm",
+  figurisma: "figurizm",
+  shf: "figuarts",
 };
 
 /**
@@ -167,6 +176,16 @@ function isBandaiHouse(maker: string | null | undefined): boolean {
   return ["bandai", "banpresto", "tamashii"].some((b) => m.includes(b));
 }
 
+/**
+ * SEGA's prize lines, under the same terms: they pass on SEGA's own entries
+ * typed prize or other, where the shops name the line differently -- Sega
+ * Fave's "Chokonose" entries are the "High Premium Perching" figures.
+ */
+const SEGA_LINES = new Set(["luminasta", "xstellar", "figurizm", "qyurume", "perching"]);
+function isSegaHouse(maker: string | null | undefined): boolean {
+  return (maker?.toLowerCase() ?? "").includes("sega");
+}
+
 const PRODUCT_LINE_TOKENS = [
   "nendoroid",
   "figma",
@@ -191,6 +210,19 @@ const PRODUCT_LINE_TOKENS = [
   "moderoid",
   "figuarts",
   "ichiban",
+  // SEGA's prize lines, FuRyu's and Good Smile's small ones. SEGA's 1/7 Yuji
+  // Itadori is catalogued as "JUJUTSU KAISEN Figure Yuji Itadori", and all 44
+  // of its listings were Luminasta, XStellar, FIGURIZM, QyuruMe, Premium
+  // Perching and Hikkake figures at $10 to $50 against a 24,750-yen statue.
+  // Measured as the others were: of what each would take off, all but a
+  // handful sat on scale figures, and those few are SEGA's own entries, which
+  // SEGA_LINES lets through.
+  "luminasta",
+  "xstellar",
+  "figurizm",
+  "qyurume",
+  "perching",
+  "hikkake",
   // threezero's two Transformers lines. Their large "Premium Scale" figures are
   // catalogued under bare character names — STARSCREAM, OPTIMUS PRIME, Megatron
   // — so nothing in those names contradicts a listing for a different line of
@@ -240,6 +272,10 @@ const PRODUCT_LINE_PHRASES = [
   // through when the figure's own name carries the phrase, and the Hyper Body
   // figure is named for its line.
   "hyper body",
+  // FuRyu's line, and SEGA's SPM spelled out. Compared with hyphens read as
+  // spaces, so "Trio-Try-iT" in a name and "Trio Try iT" in a title agree.
+  "trio try it",
+  "super premium",
 ] as const;
 
 /** The line word a catalog category implies, if any. */
@@ -1131,14 +1167,18 @@ export function scoreMatch(
       // Romance Dawn" is the S.H.Figuarts figure, and lost twelve S.H.Figuarts
       // listings to the first pass. On anyone else's figure the rule stands.
       if (BANDAI_LINES.has(line) && figure.category === "OTHER" && isBandaiHouse(figure.manufacturerName)) continue;
+      if (SEGA_LINES.has(line) && (figure.category === "OTHER" || figure.category === "PRIZE") && isSegaHouse(figure.manufacturerName)) continue;
       return 0;
     }
   }
 
-  // The same rule for lines whose name is a phrase.
-  const normalizedForLine = normalize(title);
+  // The same rule for lines whose name is a phrase, hyphens read as spaces on
+  // both sides: the Rozen Maiden "Trio-Try-iT Figure (FuRyu)" entries were
+  // refusing listings that wrote "Trio Try iT".
+  const unhyphen = (t: string) => t.replace(/-/g, " ").replace(/\s+/g, " ");
+  const normalizedForLine = unhyphen(normalize(title));
   const figureLinePhrase = CATEGORY_LINE_PHRASE[figure.category] ?? null;
-  const nameForLine = normalize(figure.name);
+  const nameForLine = unhyphen(normalize(figure.name));
   for (const phrase of PRODUCT_LINE_PHRASES) {
     if (
       normalizedForLine.includes(phrase) &&

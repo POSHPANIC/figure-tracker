@@ -423,6 +423,62 @@ describe("scoreMatch", () => {
     }
   });
 
+  it("keeps SEGA's and FuRyu's prize lines off SEGA's 1/7 Yuji Itadori", () => {
+    const yuji: MatchCandidate = {
+      id: "yuji-sega-1-7",
+      name: "JUJUTSU KAISEN Figure Yuji Itadori",
+      nameJa: null,
+      scale: "1/7",
+      category: "SCALE",
+      manufacturerName: "SEGA Ltd",
+      seriesName: "Jujutsu Kaisen",
+      characterNames: ["Yuuji Itadori"],
+    };
+    for (const title of [
+      "SEGA Jujutsu Kaisen Yuji Itadori 5th Anniversary Luminasta Figure FREE SHIPPING",
+      "Jujutsu Kaisen Yuji Itadori Figure Sega Laminasta [Pre-Owned] [Missing Parts]",
+      "Jujutsu Kaisen Yuji Itadori XStellar Figure Sega New US Seller",
+      "Yuji Itadori SEGA FIGURIZM Jujutsu Kaisen  Anime & Manga Figure",
+      "SEGA-FIGURIZMα Jujutsu Kaisen - Sukuna (Yuji Itadori) Figure",
+      "SEGA - Jujutsu Kaisen - QyuruMe - Yuji Itadori Mini Figure",
+      'Sega Jujutsu Kaisen Yuji Itadori Premium Perching Anime Figure Sitting  4.3"',
+      "Good Smile Company Jujutsu Kaisen Series Hikkake Figure Puchi-Yuji Itadori",
+      "Jujutsu Kaisen Trio-Try-iT Figure – Yuji Itadori –  prize Japan",
+      "Jujutsu Kaisen Yuji Itadori SEGA Super Premium Figure Collectible",
+      "Bandai Jujutsu Kaisen S.H.Figuart Shf Yuji Itadori Tnt Best Selection Figure Toy",
+    ]) {
+      assert.equal(scoreMatch(title, yuji), 0, title);
+    }
+  });
+
+  it("reads a line written with hyphens or spaces as the same line", () => {
+    const suigintou: MatchCandidate = {
+      id: "suigintou-tti",
+      name: "Rozen Maiden - Suigintou - Trio-Try-iT Figure (FuRyu)",
+      nameJa: null,
+      scale: null,
+      category: "PRIZE",
+      manufacturerName: "FuRyu",
+      seriesName: "Rozen Maiden",
+      characterNames: ["Suigintou"],
+    };
+    assert.ok(scoreMatch("Rozen Maiden Trio Try iT Figure Suigintou FuRyu Japan", suigintou) > 0);
+  });
+
+  it("lets SEGA's line words through to SEGA's own entries filed under another name", () => {
+    const chokonose: MatchCandidate = {
+      id: "hakuri-chokonose",
+      name: "Kagurabachi - Sazanami Hakuri - Chokonose",
+      nameJa: null,
+      scale: null,
+      category: "OTHER",
+      manufacturerName: "Sega Fave",
+      seriesName: "Kagurabachi",
+      characterNames: ["Hakuri Sazanami"],
+    };
+    assert.ok(scoreMatch("Hakuri Sazanami High Premium Perching Kagurabachi Figure Chokonose Sega", chokonose) > 0);
+  });
+
   it("refuses fan-art garage kits", () => {
     assert.equal(isUnofficial("1:8 Lucy Cyberpunk Edgerunners Fan Art UNPAINTED Resin Garage Kit"), true);
   });
