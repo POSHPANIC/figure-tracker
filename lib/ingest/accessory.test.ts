@@ -46,6 +46,23 @@ describe("isAccessory", () => {
     }
   });
 
+  it("refuses goods that are not figures at all", () => {
+    for (const name of [
+      "Google Fitbit Air: Pokémon Sleep (Limited Edition)",
+      "DualSense Wireless Controller - Grand Theft Auto VI Black Limited Edition (CFI-ZCT2JZH)",
+      "Mushoku Tensei Jobless Reincarnation: Roxy Migurdia Model Smartwatch (Limited Edition)",
+      "[Switch 2] Romancing SaGa 3: Destinies United (Multi-Language) (Limited + Bonus)",
+      "Fortnite: Keyboard Keycaps (Set of 12)",
+      "Hatsune Miku: Long Wallet (Tradition) - Deerskin Leather Koshu Inden",
+      "Rilakkuma: Rilakkuma Plush Slippers",
+    ]) {
+      assert.equal(isAccessory(name), true, name);
+    }
+    for (const name of ["Watch Maid", "figma Leonardo Watch", "Nendoroid Leonardo Watch"]) {
+      assert.equal(isAccessory(name), false, name);
+    }
+  });
+
   it("does not take a necklace worn by a figure for a necklace sold alone", () => {
     assert.equal(isAccessory("Rem: Necklace Ver. 1/7"), false);
   });

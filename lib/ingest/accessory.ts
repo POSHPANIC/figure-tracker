@@ -53,7 +53,20 @@ const ACCESSORY: RegExp[] = [
  *   "Kurumi Tapinui (Set of 2)"). 45 had reached the catalogue by October 2026,
  *   typed Other because the shops call them mascots, not plush.
  */
-const NOT_FIGURE_LINES: RegExp[] = [/\btapinui\b/i];
+const NOT_FIGURE_LINES: RegExp[] = [
+  /\btapinui\b/i,
+  // Goods that are not figures at all, which Nin-Nin Game sells beside them:
+  // 28 had reached the catalogue by October 2026 -- a Google Fitbit, DualSense
+  // controllers, Mushoku Tensei "Model Smartwatches", Switch games, keycaps,
+  // leather and plush wallets, plush slippers. Each pattern names the product
+  // itself, so a figure's name never carries it: "Watch Maid" and "figma
+  // Leonardo Watch" are not smartwatches.
+  /^\[(?:switch(?: 2)?|ps[45]|xbox[^\]]*|pc)\]/i,
+  /\b(?:dualsense|dualshock)\b|\bwireless controller\b/i,
+  /\bfitbit\b|\bsmart ?watch\b/i,
+  /\bkeycaps?\b/i,
+  /\bwallet\b|\bslippers\b/i,
+];
 
 export function isAccessory(name: string | null | undefined): boolean {
   if (!name) return false;
